@@ -1,0 +1,2897 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Dpu Agent API",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/token": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login For Access Token",
+                "operationId": "login_for_access_token_token_post",
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_login_for_access_token_token_post"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/dpu_agent/v1/xscnet/add": {
+            "post": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Create Xscnet",
+                "operationId": "create_xscnet_dpu_agent_v1_xscnet_add_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/dpuagent__api__v1__schemas__xscnet_schemas__CreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dpuagent__api__v1__schemas__xscnet_schemas__CreateResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/xscnet/del": {
+            "post": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Delete Xscnet",
+                "operationId": "delete_xscnet_dpu_agent_v1_xscnet_del_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/dpuagent__api__v1__schemas__xscnet_schemas__DeleteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/xscqos/{uuid}": {
+            "get": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Show Qos",
+                "description": "Get current QoS configuration for a specific id (PF/VF).",
+                "operationId": "show_qos_dpu_agent_v1_xscqos__uuid__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "path"
+                    },
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Prio",
+                            "maximum": 7,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "example": 0,
+                        "name": "prio",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QosResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Set Qos",
+                "description": "Set QoS rate limit for a specific id (PF/VF).\n\nWhen limit is 0, it means unsetting",
+                "operationId": "set_qos_dpu_agent_v1_xscqos__uuid__post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QoSRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/vblk/add": {
+            "post": {
+                "tags": [
+                    "vblk"
+                ],
+                "summary": "Create Vblk",
+                "operationId": "create_vblk_dpu_agent_v1_vblk_add_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/dpuagent__api__v1__schemas__vblk_schemas__CreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dpuagent__api__v1__schemas__vblk_schemas__CreateResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/vblk/list": {
+            "get": {
+                "tags": [
+                    "vblk"
+                ],
+                "summary": "List Vblk Controllers",
+                "description": "List virtual block controllers\n\nArgs:\n- `uuid`: Optional controller uuid to filter the results. If provided, only returns \n              information about the specified controller.",
+                "operationId": "list_vblk_controllers_dpu_agent_v1_vblk_list_get",
+                "parameters": [
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VBlkListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/vblk/del": {
+            "post": {
+                "tags": [
+                    "vblk"
+                ],
+                "summary": "Delete Vblk",
+                "operationId": "delete_vblk_dpu_agent_v1_vblk_del_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/dpuagent__api__v1__schemas__vblk_schemas__DeleteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/bdev_qos/set": {
+            "post": {
+                "tags": [
+                    "vblk"
+                ],
+                "summary": "Set Bdev Qos Limit",
+                "operationId": "set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QosSetRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/bdev_qos/get": {
+            "get": {
+                "tags": [
+                    "vblk"
+                ],
+                "summary": "Get Bdev Qos Limit",
+                "operationId": "get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BdevQosInfoResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/ovsflow/add": {
+            "post": {
+                "tags": [
+                    "ovsflow"
+                ],
+                "summary": "Add Ovsflow",
+                "operationId": "add_ovsflow_dpu_agent_v1_ovsflow_add_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OvsflowRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/ovsflow/del": {
+            "post": {
+                "tags": [
+                    "ovsflow"
+                ],
+                "summary": "Del Ovsflow",
+                "operationId": "del_ovsflow_dpu_agent_v1_ovsflow_del_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OvsflowDeleteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/version": {
+            "get": {
+                "tags": [
+                    "version"
+                ],
+                "summary": "Get Version",
+                "operationId": "get_version_dpu_agent_v1_version_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VersionRsp"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/cloudinit/create": {
+            "post": {
+                "tags": [
+                    "cloudinit"
+                ],
+                "summary": "Create Cloudinit",
+                "operationId": "create_cloudinit_dpu_agent_v1_cloudinit_create_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CloudInitRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CloudInitResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/cloudinit/delete": {
+            "post": {
+                "tags": [
+                    "cloudinit"
+                ],
+                "summary": "Delete Cloudinit",
+                "operationId": "delete_cloudinit_dpu_agent_v1_cloudinit_delete_post",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/uuid": {
+            "get": {
+                "tags": [
+                    "usage"
+                ],
+                "summary": "Get Uuid Usage",
+                "operationId": "get_uuid_usage_dpu_agent_v1_uuid_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UuidUsageResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/list_nics": {
+            "get": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "List Nics Info",
+                "description": "Get the NICs information from rdma.",
+                "operationId": "list_nics_info_dpu_agent_v1_rdma_list_nics_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NicsInfoResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}": {
+            "get": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Get Nic Qos",
+                "description": "Get the qos information for the device.",
+                "operationId": "get_nic_qos_dpu_agent_v1_rdma_qos__bdf__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QosInfo"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/pfc": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Device Pfc",
+                "description": "Configure the PFC for the device.",
+                "operationId": "configure_device_pfc_dpu_agent_v1_rdma_qos__bdf__pfc_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PfcRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/trush": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Device Trust",
+                "description": "Configure the trust mode for the device.",
+                "operationId": "configure_device_trust_dpu_agent_v1_rdma_qos__bdf__trush_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TrustRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/dscp2prio": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Device Dscp2Prio",
+                "description": "Set/unset a (dscp,prio) mapping.",
+                "operationId": "configure_device_dscp2prio_dpu_agent_v1_rdma_qos__bdf__dscp2prio_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Dscp2PrioRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/cma_dscp": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Cma Dscp",
+                "description": "Configure the CMA DSCP value.",
+                "operationId": "configure_cma_dscp_dpu_agent_v1_rdma_qos__bdf__cma_dscp_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DscpRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/force_dscp": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Force Dscp",
+                "description": "Configure PF force dscp .",
+                "operationId": "configure_force_dscp_dpu_agent_v1_rdma_qos__bdf__force_dscp_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DscpRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/cma_pcp": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Cma Pcp",
+                "description": "Configure the CMA PCP value.",
+                "operationId": "configure_cma_pcp_dpu_agent_v1_rdma_qos__bdf__cma_pcp_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PcpRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/rdma/qos/{bdf}/force_pcp": {
+            "post": {
+                "tags": [
+                    "rdma"
+                ],
+                "summary": "Configure Force Pcp",
+                "description": "Configure PF force pcp .",
+                "operationId": "configure_force_pcp_dpu_agent_v1_rdma_qos__bdf__force_pcp_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Bdf",
+                            "type": "string"
+                        },
+                        "name": "bdf",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PcpRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/checkpoint/save": {
+            "post": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Save Checkpoint",
+                "description": "Save the checkpoint to a file.",
+                "operationId": "save_checkpoint_dpu_agent_v1_checkpoint_save_post",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/checkpoint/restore": {
+            "post": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Restore From Checkpoint",
+                "description": "Restore the checkpoint from a file.",
+                "operationId": "restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/recoverymode/update": {
+            "post": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Update Recovery Mode",
+                "description": "Update the recovery mode.\n\nArgs:\n\n    - mode (str): Required. Must be either \"auto\" or \"manual\".",
+                "operationId": "update_recovery_mode_dpu_agent_v1_recoverymode_update_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecoveryModeRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/records/clear": {
+            "delete": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Clear Recovery File",
+                "operationId": "clear_recovery_file_dpu_agent_v1_records_clear_delete",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/recovery/status": {
+            "get": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Get Recovery Status",
+                "description": "Query the current recovery process status.\n\nPossible values for `status`:\n- `\"idle\"`: Recovery not triggered yet.\n- `\"recovering\"`: Recovery is in progress.\n- `\"done\"`: Recovery completed successfully.\n- `\"failed\"`: Recovery has failed.",
+                "operationId": "get_recovery_status_dpu_agent_v1_recovery_status_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecoveryStatusResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Reset Recovery Status",
+                "description": "Reset the recovery status of the DPU agent.\n\nArgs:\n\n    status (str): Required. Must be either \"done\" or \"recovering\".\n\nBehavior:\n- If `status` is `\"done\"`:\n    - Marks the recovery process as completed.\n    - Unlocks the DPU agent, allowing it to accept all incoming requests.\n- If `status` is `\"recovering\"`:\n    - Marks the agent as undergoing recovery.\n    - Locks the DPU agent, rejecting all requests except GET,\n      to ensure isolation and consistency during recovery.",
+                "operationId": "reset_recovery_status_dpu_agent_v1_recovery_status_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecoveryStatusRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/pcieqos/set": {
+            "post": {
+                "tags": [
+                    "pcie"
+                ],
+                "summary": "Set Pcie Qos",
+                "description": "Set the PCIe traffic QoS ratio between storage and network.\n\nArgs:\n\n    - storage (int): Storage traffic weight.\n    - network (int): Network traffic weight.",
+                "operationId": "set_pcie_qos_dpu_agent_v1_pcieqos_set_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QosRatioRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/dpu_agent/v1/settings/clouddisk_enable": {
+            "get": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Get Clouddisk Enable Setting",
+                "description": "Retrieve the current cloud disk boot support setting",
+                "operationId": "get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CloudDiskResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Enable Pxe",
+                "description": "Set whether the host supports cloud disk boot",
+                "operationId": "enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CloudDiskEnableRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "BackendSpecific": {
+                "title": "BackendSpecific",
+                "required": [
+                    "block"
+                ],
+                "type": "object",
+                "properties": {
+                    "block": {
+                        "$ref": "#/components/schemas/BdevInfo"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "BaseResponseBody": {
+                "title": "BaseResponseBody",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "BdevInfo": {
+                "title": "BdevInfo",
+                "required": [
+                    "readonly",
+                    "bdev"
+                ],
+                "type": "object",
+                "properties": {
+                    "readonly": {
+                        "title": "Readonly",
+                        "type": "boolean",
+                        "description": "Indicates if the block device is read-only",
+                        "example": false
+                    },
+                    "bdev": {
+                        "title": "Bdev",
+                        "type": "string",
+                        "description": "Name of the block device"
+                    }
+                }
+            },
+            "BdevQosInfoResponse": {
+                "title": "BdevQosInfoResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "rw_ios_per_sec": {
+                        "title": "Rw Ios Per Sec",
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "rw_mbytes_per_sec": {
+                        "title": "Rw Mbytes Per Sec",
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "r_mbytes_per_sec": {
+                        "title": "R Mbytes Per Sec",
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "w_mbytes_per_sec": {
+                        "title": "W Mbytes Per Sec",
+                        "type": "integer",
+                        "example": 100
+                    }
+                },
+                "additionalProperties": false
+            },
+            "Body_login_for_access_token_token_post": {
+                "title": "Body_login_for_access_token_token_post",
+                "type": "object",
+                "properties": {
+                    "grant_type": {
+                        "title": "Grant Type",
+                        "type": "string",
+                        "default": "password"
+                    },
+                    "username": {
+                        "title": "Username",
+                        "type": "string"
+                    },
+                    "password": {
+                        "title": "Password",
+                        "type": "string"
+                    },
+                    "scope": {
+                        "title": "Scope",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "client_id": {
+                        "title": "Client Id",
+                        "type": "string"
+                    },
+                    "client_secret": {
+                        "title": "Client Secret",
+                        "type": "string"
+                    },
+                    "refresh_token": {
+                        "title": "Refresh Token",
+                        "type": "string"
+                    }
+                }
+            },
+            "CloudDiskEnableRequest": {
+                "title": "CloudDiskEnableRequest",
+                "type": "object",
+                "properties": {
+                    "clouddisk_enable": {
+                        "title": "Clouddisk Enable",
+                        "type": "boolean",
+                        "description": "Does the host support cloud disk boot",
+                        "default": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CloudDiskResponse": {
+                "title": "CloudDiskResponse",
+                "required": [
+                    "code",
+                    "message",
+                    "clouddisk_enable"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "clouddisk_enable": {
+                        "title": "Clouddisk Enable",
+                        "type": "boolean"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CloudInitRequest": {
+                "title": "CloudInitRequest",
+                "type": "object",
+                "properties": {
+                    "user_data": {
+                        "$ref": "#/components/schemas/UserData"
+                    },
+                    "network_config": {
+                        "$ref": "#/components/schemas/NetworkConfig"
+                    },
+                    "uuid": {
+                        "title": "Uuid",
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CloudInitResponse": {
+                "title": "CloudInitResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "user_data": {
+                        "title": "User Data",
+                        "type": "object"
+                    },
+                    "network_config": {
+                        "title": "Network Config",
+                        "type": "object"
+                    },
+                    "meta_data": {
+                        "title": "Meta Data",
+                        "type": "object"
+                    },
+                    "uuid": {
+                        "title": "Uuid",
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ControllerInfo": {
+                "title": "ControllerInfo",
+                "required": [
+                    "ctrlr",
+                    "cpumask",
+                    "uuid",
+                    "vq_count",
+                    "vq_size",
+                    "backend_specific"
+                ],
+                "type": "object",
+                "properties": {
+                    "ctrlr": {
+                        "title": "Ctrlr",
+                        "type": "string",
+                        "description": "Name of the virtual block controller"
+                    },
+                    "cpumask": {
+                        "title": "Cpumask",
+                        "type": "string",
+                        "description": "CPU core mask assigned to the controller",
+                        "example": "0x8"
+                    },
+                    "uuid": {
+                        "title": "Uuid",
+                        "type": "integer",
+                        "description": "Unique identifier for the controller"
+                    },
+                    "vq_count": {
+                        "title": "Vq Count",
+                        "type": "integer",
+                        "description": "Number of virtual queues",
+                        "example": 2
+                    },
+                    "vq_size": {
+                        "title": "Vq Size",
+                        "type": "integer",
+                        "description": "Size of each virtual queue",
+                        "example": 512
+                    },
+                    "backend_specific": {
+                        "$ref": "#/components/schemas/BackendSpecific"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "Dscp2PrioRequest": {
+                "title": "Dscp2PrioRequest",
+                "required": [
+                    "prio2dscp"
+                ],
+                "type": "object",
+                "properties": {
+                    "prio2dscp": {
+                        "title": "Prio2Dscp",
+                        "type": "string",
+                        "example": "set,30,2"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "DscpRequest": {
+                "title": "DscpRequest",
+                "required": [
+                    "dscp"
+                ],
+                "type": "object",
+                "properties": {
+                    "dscp": {
+                        "title": "Dscp",
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "Ethernet": {
+                "title": "Ethernet",
+                "required": [
+                    "name",
+                    "dhcp4",
+                    "dhcp6"
+                ],
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                        "description": "ethernet name",
+                        "example": "eth0"
+                    },
+                    "mac": {
+                        "title": "Mac",
+                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                        "type": "string",
+                        "example": "00:1A:2B:3C:4D:5E"
+                    },
+                    "driver": {
+                        "title": "Driver",
+                        "type": "string",
+                        "example": "xsc_eth"
+                    },
+                    "dhcp4": {
+                        "title": "Dhcp4",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "dhcp6": {
+                        "title": "Dhcp6",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "addresses": {
+                        "title": "Addresses",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "description": "IP/Netmask (support IPv4/IPv6)",
+                            "format": "ip-netmask",
+                            "example": "127.0.0.1/24"
+                        },
+                        "example": [
+                            "192.168.1.2/24"
+                        ]
+                    },
+                    "gateway4": {
+                        "title": "Gateway4",
+                        "type": "string",
+                        "format": "ipv4",
+                        "example": "192.168.1.254"
+                    },
+                    "gateway6": {
+                        "title": "Gateway6",
+                        "type": "string",
+                        "format": "ipv6",
+                        "example": "2001:db8::1"
+                    },
+                    "nameservers": {
+                        "title": "Nameservers",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "ipvanyaddress"
+                        },
+                        "example": [
+                            "8.8.8.8"
+                        ]
+                    },
+                    "routes": {
+                        "title": "Routes",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Route"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "HTTPValidationError": {
+                "title": "HTTPValidationError",
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "title": "Detail",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        }
+                    }
+                }
+            },
+            "Mode": {
+                "title": "Mode",
+                "enum": [
+                    "auto",
+                    "manual"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "NetworkConfig": {
+                "title": "NetworkConfig",
+                "type": "object",
+                "properties": {
+                    "ethernets": {
+                        "title": "Ethernets",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Ethernet"
+                        }
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "integer",
+                        "description": "Version 2 requires the system to support netplan",
+                        "default": 2
+                    }
+                },
+                "additionalProperties": false
+            },
+            "NicInfo": {
+                "title": "NicInfo",
+                "required": [
+                    "bdf",
+                    "ifname",
+                    "ibdev_name",
+                    "ip addr",
+                    "vendor",
+                    "mac"
+                ],
+                "type": "object",
+                "properties": {
+                    "bdf": {
+                        "title": "Bdf",
+                        "type": "string",
+                        "description": "BDF of the NIC",
+                        "example": "0000:17:00.0"
+                    },
+                    "ifname": {
+                        "title": "Ifname",
+                        "type": "string",
+                        "description": "Interface name of the NIC",
+                        "example": "enp17s0f0"
+                    },
+                    "ibdev_name": {
+                        "title": "Ibdev Name",
+                        "type": "string",
+                        "description": "IB device name of the NIC",
+                        "example": "xscale_0"
+                    },
+                    "ip addr": {
+                        "title": "Ip Addr",
+                        "type": "string",
+                        "description": "IP address of the NIC",
+                        "format": "ipvanyaddress",
+                        "example": "127.0.0.1"
+                    },
+                    "vendor": {
+                        "title": "Vendor",
+                        "type": "string",
+                        "description": "Vendor of the NIC",
+                        "example": "Yunsilicon"
+                    },
+                    "mac": {
+                        "title": "Mac",
+                        "type": "string",
+                        "description": "MAC address of the NIC",
+                        "example": "5c-6a-ec-3f-0e-7b"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "NicsInfoResponse": {
+                "title": "NicsInfoResponse",
+                "required": [
+                    "code",
+                    "message",
+                    "nics_info"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "nics_info": {
+                        "title": "Nics Info",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/NicInfo"
+                        },
+                        "description": "List of NICs information"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "OvsflowDeleteRequest": {
+                "title": "OvsflowDeleteRequest",
+                "required": [
+                    "uuid"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 1
+                    }
+                },
+                "additionalProperties": false
+            },
+            "OvsflowRequest": {
+                "title": "OvsflowRequest",
+                "required": [
+                    "uuid",
+                    "vlan",
+                    "ip",
+                    "gw_ip",
+                    "src_mac"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "vlan": {
+                        "title": "Vlan",
+                        "maximum": 4095,
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "ip": {
+                        "title": "Ip",
+                        "type": "string",
+                        "description": "IP/Netmask (support IPv4/IPv6)",
+                        "format": "ip-netmask",
+                        "example": "127.0.0.1/24"
+                    },
+                    "gw_ip": {
+                        "title": "Gw Ip",
+                        "type": "string",
+                        "format": "ipvanyaddress",
+                        "example": "127.0.0.1"
+                    },
+                    "src_mac": {
+                        "title": "Src Mac",
+                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                        "type": "string",
+                        "example": "00:11:00:11:00:11"
+                    },
+                    "dns": {
+                        "title": "Dns",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "ipvanyaddress"
+                        },
+                        "example": [
+                            "8.8.8.8"
+                        ]
+                    },
+                    "dhcp_server": {
+                        "title": "Dhcp Server",
+                        "type": "string",
+                        "format": "ipvanyaddress",
+                        "example": "127.0.0.1"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PcpRequest": {
+                "title": "PcpRequest",
+                "required": [
+                    "pcp"
+                ],
+                "type": "object",
+                "properties": {
+                    "pcp": {
+                        "title": "Pcp",
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PfcRequest": {
+                "title": "PfcRequest",
+                "required": [
+                    "prio",
+                    "status"
+                ],
+                "type": "object",
+                "properties": {
+                    "prio": {
+                        "title": "Prio",
+                        "type": "integer"
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "example": "on"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "QoSRequest": {
+                "title": "QoSRequest",
+                "required": [
+                    "prio",
+                    "limit"
+                ],
+                "type": "object",
+                "properties": {
+                    "prio": {
+                        "title": "Prio",
+                        "maximum": 7,
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 0
+                    },
+                    "limit": {
+                        "title": "Limit",
+                        "maximum": 200000,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "QosInfo": {
+                "title": "QosInfo",
+                "required": [
+                    "code",
+                    "message",
+                    "qos"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "qos": {
+                        "title": "Qos",
+                        "type": "string",
+                        "description": "QoS information of the NIC",
+                        "example": "BDF:0000:15:00.0:\n......\npfc_watchdog_period: 100"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "QosRatioRequest": {
+                "title": "QosRatioRequest",
+                "required": [
+                    "storage",
+                    "network"
+                ],
+                "type": "object",
+                "properties": {
+                    "storage": {
+                        "title": "Storage",
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "network": {
+                        "title": "Network",
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 3
+                    }
+                },
+                "additionalProperties": false
+            },
+            "QosResponse": {
+                "title": "QosResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "limit": {
+                        "title": "Limit",
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "QosSetRequest": {
+                "title": "QosSetRequest",
+                "required": [
+                    "uuid"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "rw_ios_per_sec": {
+                        "title": "Rw Ios Per Sec",
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "rw_mbytes_per_sec": {
+                        "title": "Rw Mbytes Per Sec",
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "r_mbytes_per_sec": {
+                        "title": "R Mbytes Per Sec",
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "w_mbytes_per_sec": {
+                        "title": "W Mbytes Per Sec",
+                        "type": "integer",
+                        "example": 100
+                    }
+                },
+                "additionalProperties": false
+            },
+            "RecoveryModeRequest": {
+                "title": "RecoveryModeRequest",
+                "required": [
+                    "mode"
+                ],
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "$ref": "#/components/schemas/Mode"
+                    }
+                },
+                "additionalProperties": false,
+                "description": "Request model for recovery mode"
+            },
+            "RecoveryStatus": {
+                "title": "RecoveryStatus",
+                "enum": [
+                    "done",
+                    "recovering"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "RecoveryStatusRequest": {
+                "title": "RecoveryStatusRequest",
+                "required": [
+                    "status"
+                ],
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "$ref": "#/components/schemas/RecoveryStatus"
+                    }
+                },
+                "additionalProperties": false,
+                "description": "Request model for recovery mode"
+            },
+            "RecoveryStatusResponse": {
+                "title": "RecoveryStatusResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string",
+                        "example": "done"
+                    }
+                },
+                "additionalProperties": false,
+                "description": "Response model for recovery status"
+            },
+            "Route": {
+                "title": "Route",
+                "required": [
+                    "to",
+                    "via"
+                ],
+                "type": "object",
+                "properties": {
+                    "to": {
+                        "title": "To",
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "ipvanyaddress"
+                            },
+                            {
+                                "type": "string",
+                                "format": "ipvanynetwork"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ],
+                        "example": "10.0.0.0/8"
+                    },
+                    "via": {
+                        "title": "Via",
+                        "type": "string",
+                        "format": "ipvanyaddress",
+                        "example": "192.168.1.254"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "TokenResponse": {
+                "title": "TokenResponse",
+                "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in",
+                    "refresh_token"
+                ],
+                "type": "object",
+                "properties": {
+                    "access_token": {
+                        "title": "Access Token",
+                        "type": "string"
+                    },
+                    "token_type": {
+                        "title": "Token Type",
+                        "type": "string"
+                    },
+                    "expires_in": {
+                        "title": "Expires In",
+                        "type": "integer"
+                    },
+                    "refresh_token": {
+                        "title": "Refresh Token",
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "TrustRequest": {
+                "title": "TrustRequest",
+                "required": [
+                    "trust"
+                ],
+                "type": "object",
+                "properties": {
+                    "trust": {
+                        "title": "Trust",
+                        "type": "string",
+                        "example": "dscp"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "User": {
+                "title": "User",
+                "required": [
+                    "name",
+                    "password"
+                ],
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "password": {
+                        "title": "Password",
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "UserData": {
+                "title": "UserData",
+                "type": "object",
+                "properties": {
+                    "hostname": {
+                        "title": "Hostname",
+                        "type": "string"
+                    },
+                    "users": {
+                        "title": "Users",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/User"
+                        },
+                        "description": "user and password to be created"
+                    },
+                    "authorized_keys": {
+                        "title": "Authorized Keys",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "ssh-rsa AAAAB3Nza..."
+                        ]
+                    },
+                    "chpasswd": {
+                        "title": "Chpasswd",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/User"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "UuidUsageResponse": {
+                "title": "UuidUsageResponse",
+                "required": [
+                    "code",
+                    "message",
+                    "blk_used",
+                    "xsc_used",
+                    "unused"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "blk_used": {
+                        "title": "Blk Used",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of blk used UUIDs"
+                    },
+                    "xsc_used": {
+                        "title": "Xsc Used",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of xsc_net used UUIDs"
+                    },
+                    "unused": {
+                        "title": "Unused",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of unused UUIDs"
+                    }
+                },
+                "additionalProperties": false,
+                "description": "Response model for Vsdk UUID usage"
+            },
+            "VBlkListResponse": {
+                "title": "VBlkListResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "vblks": {
+                        "title": "Vblks",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControllerInfo"
+                        },
+                        "description": "List of virtual block controllers information"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ValidationError": {
+                "title": "ValidationError",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "type": "object",
+                "properties": {
+                    "loc": {
+                        "title": "Location",
+                        "type": "array",
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "msg": {
+                        "title": "Message",
+                        "type": "string"
+                    },
+                    "type": {
+                        "title": "Error Type",
+                        "type": "string"
+                    }
+                }
+            },
+            "VersionRsp": {
+                "title": "VersionRsp",
+                "required": [
+                    "code",
+                    "message",
+                    "dpuagent",
+                    "vsdk",
+                    "ovs",
+                    "dpdk",
+                    "driver",
+                    "firmware",
+                    "gw"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "dpuagent": {
+                        "title": "Dpuagent",
+                        "type": "string",
+                        "example": "1.0.0"
+                    },
+                    "vsdk": {
+                        "title": "Vsdk",
+                        "type": "string",
+                        "example": "1.0.0"
+                    },
+                    "ovs": {
+                        "title": "Ovs",
+                        "type": "string",
+                        "example": "1.0.0"
+                    },
+                    "dpdk": {
+                        "title": "Dpdk",
+                        "type": "string",
+                        "example": "1.0.0"
+                    },
+                    "driver": {
+                        "title": "Driver",
+                        "type": "string",
+                        "example": "1.4.0.413"
+                    },
+                    "firmware": {
+                        "title": "Firmware",
+                        "type": "string",
+                        "example": "v1.0.0+7982"
+                    },
+                    "gw": {
+                        "title": "Gw",
+                        "type": "string",
+                        "example": "v1.0.0+7982"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "dpuagent__api__v1__schemas__vblk_schemas__CreateRequest": {
+                "title": "CreateRequest",
+                "required": [
+                    "rbd_path",
+                    "vq_count",
+                    "vq_size",
+                    "gw_user",
+                    "gw_pwd",
+                    "gws",
+                    "bootable"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "rbd_path": {
+                        "title": "Rbd Path",
+                        "type": "string",
+                        "example": "rbd_pool/rbd_name"
+                    },
+                    "vq_count": {
+                        "title": "Vq Count",
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "vq_size": {
+                        "title": "Vq Size",
+                        "type": "integer",
+                        "example": 512
+                    },
+                    "gw_user": {
+                        "title": "Gw User",
+                        "type": "string",
+                        "example": "admin"
+                    },
+                    "gw_pwd": {
+                        "title": "Gw Pwd",
+                        "type": "string",
+                        "example": "yunsilicon"
+                    },
+                    "gws": {
+                        "title": "Gws",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "ipvanyaddress"
+                        },
+                        "example": [
+                            "127.0.0.1"
+                        ]
+                    },
+                    "bootable": {
+                        "title": "Bootable",
+                        "type": "boolean",
+                        "example": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "dpuagent__api__v1__schemas__vblk_schemas__CreateResponseBody": {
+                "title": "CreateResponseBody",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "uuid": {
+                        "title": "Uuid",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "gw_ip": {
+                        "title": "Gw Ip",
+                        "type": "string",
+                        "example": "127.0.0.1"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "dpuagent__api__v1__schemas__vblk_schemas__DeleteRequest": {
+                "title": "DeleteRequest",
+                "required": [
+                    "rbd_path",
+                    "uuid",
+                    "gw_user",
+                    "gw_pwd",
+                    "gw_ip",
+                    "bootable"
+                ],
+                "type": "object",
+                "properties": {
+                    "rbd_path": {
+                        "title": "Rbd Path",
+                        "type": "string",
+                        "example": "rbd_pool/rbd_name"
+                    },
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "gw_user": {
+                        "title": "Gw User",
+                        "type": "string",
+                        "example": "admin"
+                    },
+                    "gw_pwd": {
+                        "title": "Gw Pwd",
+                        "type": "string",
+                        "example": "yunsilicon"
+                    },
+                    "gw_ip": {
+                        "title": "Gw Ip",
+                        "type": "string",
+                        "example": "127.0.0.1"
+                    },
+                    "force": {
+                        "title": "Force",
+                        "type": "boolean",
+                        "description": "Force to continue when deleting a failed step",
+                        "default": false
+                    },
+                    "bootable": {
+                        "title": "Bootable",
+                        "type": "boolean",
+                        "example": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "dpuagent__api__v1__schemas__xscnet_schemas__CreateRequest": {
+                "title": "CreateRequest",
+                "required": [
+                    "vq_count",
+                    "vq_size",
+                    "mac"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "vq_count": {
+                        "title": "Vq Count",
+                        "type": "integer",
+                        "description": "vq_count must be a power of 2",
+                        "example": 2
+                    },
+                    "vq_size": {
+                        "title": "Vq Size",
+                        "type": "integer",
+                        "description": "vq_size must be a power of 2, recommended value is 512, max value is 1024, defaults to 512",
+                        "example": 512
+                    },
+                    "mac": {
+                        "title": "Mac",
+                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                        "type": "string",
+                        "description": "Optional field, MAC address",
+                        "example": "00:11:00:11:00:11"
+                    },
+                    "mtu": {
+                        "title": "Mtu",
+                        "type": "integer",
+                        "description": "Optional field, MTU size",
+                        "default": 1500,
+                        "example": 1500
+                    },
+                    "pxe": {
+                        "title": "Pxe",
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "dpuagent__api__v1__schemas__xscnet_schemas__CreateResponseBody": {
+                "title": "CreateResponseBody",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "uuid": {
+                        "title": "Uuid",
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "dpuagent__api__v1__schemas__xscnet_schemas__DeleteRequest": {
+                "title": "DeleteRequest",
+                "required": [
+                    "uuid"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "maximum": 63,
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "xsc-net device identifier, valid range is 0-63"
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "securitySchemes": {
+            "OAuth2PasswordBearer": {
+                "type": "oauth2",
+                "flows": {
+                    "password": {
+                        "scopes": {},
+                        "tokenUrl": "token"
+                    }
+                }
+            }
+        }
+    }
+}

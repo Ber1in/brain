@@ -1,0 +1,33 @@
+import apiClient from './client'
+import type { SystemDisk, BareMetalCreate, SystemDiskUpdate, UploadToImage, RebuildToImage } from '@/types/api'
+
+export const systemDisksApi = {
+  getAll(): Promise<SystemDisk[]> {
+    return apiClient.get('/system-disks')
+  },
+
+  getById(id: string): Promise<SystemDisk> {
+    return apiClient.get(`/system-disks/${id}`)
+  },
+
+  create(data: BareMetalCreate): Promise<SystemDisk> {
+    return apiClient.post('/system-disks', data)
+  },
+
+  update(id: string, data: SystemDiskUpdate): Promise<SystemDisk> {
+    return apiClient.put(`/system-disks/${id}`, data)
+  },
+
+  delete(id: string): Promise<void> {
+    return apiClient.delete(`/system-disks/${id}`)
+  },
+
+  uploadToImage(id: string, data: UploadToImage): Promise<void> {
+    return apiClient.post(`/system-disks/${id}/upload`, data)
+  },
+
+  rebuildFromImage(id: string, data: RebuildToImage): Promise<void> {
+    return apiClient.post(`/system-disks/${id}/rebuild`, data)
+  }
+
+}
