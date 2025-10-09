@@ -135,8 +135,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     # Set system user
     if cloudinit:
         system_user = data.system_user
-        user_data = {"hostname": "dasdsadsa",
-                     "users": [{"name": system_user.name,
+        user_data = {"users": [{"name": system_user.name,
                                "password": system_user.password}]}
 
         network_config = {
