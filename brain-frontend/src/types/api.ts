@@ -135,3 +135,9 @@ export interface UploadToImage {
 export interface RebuildToImage {
   image_id: string
 }
+
+export interface BootEntriesResponse {
+  entries: Record<string, string>
+  current: string
+  next?: string | null
+}

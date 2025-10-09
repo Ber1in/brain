@@ -1,7 +1,8 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import paramiko
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 import logging
 import uuid
@@ -16,6 +17,8 @@ db = JSONDocumentDB()
 
 # Collection name
 BARE_METAL_SERVER_COLLECTION = "bare_metals"
+BMC_USER = "wubl"
+BMC_PASS = "199610wad14s.."
 
 
 @router.post("/bare-metals", response_model=bare_metal_schemas.BareMetalServer,
@@ -190,3 +193,105 @@ async def delete_bare_metal_server(server_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete bare metal"
         )
+
+
+def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
+    """Execute a command on remote host via SSH"""
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(host, username=user, password=pwd, timeout=100)
+        stdin, stdout, stderr = ssh.exec_command(command)
+        out = stdout.read().decode()
+        err = stderr.read().decode()
+        ssh.close()
+        if err:
+            LOG.warning(f"Command error on {host}: {err.strip()}")
+        return out.strip()
+    except Exception as e:
+        LOG.error(f"SSH execution failed on {host}: {e}")
+        raise HTTPException(status_code=500, detail=f"SSH execution failed on {host}: {e}")
+
+
+@router.get("/bare-metals/{server_id}/boot-entries",
+            response_model=bare_metal_schemas.BootEntriesResponse)
+async def get_boot_entries(server_id: str, user: str = Query(...), pwd: str = Query(...)):
+    """
+    Get all boot entries (name only) and current boot
+    """
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    host_ip = server.get("host_ip")
+    if not host_ip:
+        raise HTTPException(status_code=400, detail="host_ip not configured for this server")
+
+    result = ssh_execute(host_ip, "efibootmgr -v", user, pwd).splitlines()
+
+    entries = {}
+    current_boot = None
+    next_boot = None
+    for line in result:
+        line = line.strip()
+        # 获取当前启动项号
+        if line.startswith("BootCurrent"):
+            current_boot = line.split(":")[1].strip()
+        elif line.startswith("BootNext"):
+            next_boot = line.split(":")[1].strip()
+        # 只解析系统启动项（排除 PXE / EFI Shell）
+        elif line.startswith("Boot") and "*" in line:
+            boot_num, rest = line.split("*", 1)
+            boot_num = boot_num.strip().replace("Boot", "")  # 去掉 Boot 前缀
+            name = rest.strip().split("\t")[0]
+            if not name.startswith("UEFI: PXE") and "EFI Shell" not in name:
+                entries[boot_num] = name
+
+    return {
+        "entries": entries,
+        "current": current_boot,
+        "next": next_boot
+    }
+
+
+@router.post("/bare-metals/{server_id}/set-boot")
+async def set_boot_entry(server_id: str, boot_id: str = Query(...),
+                         user: str = Query(...), pwd: str = Query(...)):
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    host_ip = server.get("host_ip")
+    if not host_ip:
+        raise HTTPException(status_code=400, detail="host_ip not configured for this server")
+
+    ssh_execute(host_ip, f"efibootmgr -n {boot_id}", user, pwd)
+    return {"message": f"BootNext set to {boot_id} on {host_ip}"}
+
+
+@router.post("/bare-metals/{server_id}/power-cycle")
+async def power_cycle_server(server_id: str, user: str = Query(...), pwd: str = Query(...)):
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    host_ip = server.get("host_ip")
+    if not host_ip:
+        raise HTTPException(status_code=400, detail="host_ip not configured for this server")
+
+    ssh_execute(host_ip, "ipmitool power cycle", user, pwd)
+    return {"message": f"Server {server_id} power cycled via SSH"}
+
+
+@router.post("/bare-metals/{server_id}/power-reset")
+async def power_reset_server(server_id: str, user: str = Query(...), pwd: str = Query(...)):
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    host_ip = server.get("host_ip")
+    if not host_ip:
+        raise HTTPException(status_code=400, detail="host_ip not configured for this server")
+
+    ssh_execute(host_ip, "ipmitool power reset", user, pwd)
+    return {"message": f"Server {server_id} warm rebooted via SSH"}

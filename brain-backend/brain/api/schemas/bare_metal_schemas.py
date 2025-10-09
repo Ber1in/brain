@@ -3,7 +3,7 @@
 
 import re
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Dict, Optional
 from pydantic import validator
 
 
@@ -45,3 +45,9 @@ class BareMetalServer(BaseModel):
     host_ip: Optional[str] = None
     mac: Optional[str] = None
     gateway: Optional[str] = None
+
+
+class BootEntriesResponse(BaseModel):
+    entries: Dict[str, str]
+    current: str
+    next: str = Field(None)
