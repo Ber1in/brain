@@ -420,7 +420,7 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
 
 @router.post("/system-disks/{disk_id}/rebuild", response_model=block_schemas.SystemDisk,
              status_code=status.HTTP_202_ACCEPTED)
-async def rebuild_block_to_dest_image(disk_id: str):
+async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
     existing_disk = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
     if not existing_disk:
         raise HTTPException(
@@ -429,7 +429,7 @@ async def rebuild_block_to_dest_image(disk_id: str):
         )
     rebuild_data = block_schemas.BareMetalCreate(
         system_disk=block_schemas.SystemDiskCreate(
-            image_id=existing_disk["image_id"],
+            image_id=image_id,
             mv200_id=existing_disk["mv200_id"],
             size_gb=existing_disk["size_gb"],
             flatten=existing_disk["flatten"],

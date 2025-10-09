@@ -12,3 +12,4 @@ frozendict
 certifi
 aenum
 paramiko
+pyghmi

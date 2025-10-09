@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { SystemDisk, BareMetalCreate, SystemDiskUpdate, UploadToImage, RebuildToImage } from '@/types/api'
+import type { SystemDisk, BareMetalCreate, SystemDiskUpdate, UploadToImage } from '@/types/api'
 
 export const systemDisksApi = {
   getAll(): Promise<SystemDisk[]> {
@@ -26,8 +26,9 @@ export const systemDisksApi = {
     return apiClient.post(`/system-disks/${id}/upload`, data)
   },
 
-  rebuildFromImage(id: string, data: RebuildToImage): Promise<void> {
-    return apiClient.post(`/system-disks/${id}/rebuild`, data)
+  rebuildFromImage(id: string, imageId: string): Promise<void> {
+    return apiClient.post(`/system-disks/${id}/rebuild`, null, {
+      params: { image_id: imageId }
+    })
   }
-
 }

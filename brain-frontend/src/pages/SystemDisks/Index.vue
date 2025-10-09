@@ -14,20 +14,27 @@
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="镜像名称">
           <template #default="{ row }">
-            {{ getImageName(row.image_id) }} ({{ row.mon_host }})
+            <span class="highlight-name">{{ getImageName(row.image_id) }}</span>
+            <span class="highlight-ip">({{ row.mon_host }})</span>
           </template>
         </el-table-column>
         <el-table-column label="SOC IP">
           <template #default="{ row }">
-            {{ getMV200Name(row.mv200_id) }} ({{ row.mv200_ip }})
+            <span class="highlight-name">{{ getMV200Name(row.mv200_id) }}</span>
+            <span class="highlight-ip">({{ row.mv200_ip }})</span>
           </template>
         </el-table-column>
         <el-table-column label="裸金属服务器">
           <template #default="{ row }">
-            {{ getHostInfo(row.mv200_id) }}
+            <span class="highlight-name">{{ getHostName(row.mv200_id) }}</span>
+            <span class="highlight-ip">({{ getHostIP(row.mv200_id) }})</span>
           </template>
         </el-table-column>
-        <el-table-column prop="size_gb" label="磁盘大小(GB)" width="120" />
+        <el-table-column prop="size_gb" label="磁盘大小(GB)" width="120">
+          <template #default="{ row }">
+            <span class="highlight-size">{{ row.size_gb }} GB</span>
+          </template>
+        </el-table-column>
         <el-table-column label="Flatten" width="120">
           <template #header>
             <span>Flatten</span>
@@ -42,7 +49,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
+            <span :class="row.flatten ? 'highlight-true' : 'highlight-false'">
               {{ row.flatten ? '是' : '否' }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -243,13 +252,22 @@ const getMV200Name = (serverId: string) => {
   return server?.name || serverId
 }
 
-// 根据ID获取裸金属服务器
-const getHostInfo = (mv200_id: string) => {
+// 根据ID获取裸金属服务器名称
+const getHostName = (mv200_id: string) => {
   const server = mv200Map.value.get(mv200_id)
   if (!server || !server.bare_id) return '-'
   
   const bare_info = bareMap.value.get(server.bare_id)
-  return bare_info ? `${bare_info.name} (${bare_info.host_ip})` : '-'
+  return bare_info ? bare_info.name : '-'
+}
+
+// 根据ID获取裸金属服务器IP
+const getHostIP = (mv200_id: string) => {
+  const server = mv200Map.value.get(mv200_id)
+  if (!server || !server.bare_id) return '-'
+  
+  const bare_info = bareMap.value.get(server.bare_id)
+  return bare_info ? bare_info.host_ip : '-'
 }
 
 // 加载数据
@@ -381,10 +399,8 @@ const confirmRebuild = async () => {
   try {
     rebuildLoading.value = true
 
-    // 调用重置镜像的API
-    await systemDisksApi.rebuildFromImage(currentDisk.value.id, {
-      image_id: rebuildForm.image_id || undefined
-    })
+    // 调用重置镜像的API - 通过查询参数传递 image_id
+    await systemDisksApi.rebuildFromImage(currentDisk.value.id, rebuildForm.image_id)
     
     ElMessage.success('重置镜像操作已提交，系统盘将使用新镜像重建')
     rebuildDialogVisible.value = false
@@ -420,6 +436,36 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+
+/* 名称高亮样式 - 只改变字体颜色 */
+.highlight-name {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+/* IP地址高亮样式 - 只改变字体颜色 */
+.highlight-ip {
+  color: #409eff;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+}
+
+/* 磁盘大小高亮样式 - 只改变字体颜色 */
+.highlight-size {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+/* Flatten状态高亮 - 只改变字体颜色 */
+.highlight-true {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.highlight-false {
+  color: #f56c6c;
+  font-weight: 600;
 }
 
 :deep(.danger-item) {

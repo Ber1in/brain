@@ -12,11 +12,27 @@
 
       <el-table :data="servers" v-loading="loading">
         <el-table-column prop="id" label="ID" width="200" />
-        <el-table-column prop="name" label="名称" />
-        <el-table-column prop="host_ip" label="管理IP" />
-        <el-table-column prop="gateway" label="网关" />
-        <el-table-column prop="mac" label="管理口MAC" />
-        <el-table-column prop="description" label="描述" />
+        <el-table-column prop="name" label="名称">
+          <template #default="{ row }">
+            <span class="highlight-name">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="host_ip" label="管理IP">
+          <template #default="{ row }">
+            <span class="highlight-ip">{{ row.host_ip }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="gateway" label="网关">
+          <template #default="{ row }">
+            <span class="highlight-ip">{{ row.gateway }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="mac" label="管理口MAC">
+          <template #default="{ row }">
+            <span class="highlight-mac">{{ row.mac }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-dropdown @command="(command) => handleCommand(command, row)" size="small">
@@ -59,6 +75,14 @@
       title="修改启动项 - 身份认证"
       width="400px"
     >
+      <div class="dialog-tip">
+        <el-alert
+          title="请确保服务器在线且网络连接正常"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+      </div>
       <el-form :model="bootAuthForm" label-width="80px">
         <el-form-item label="用户名" required>
           <el-input
@@ -134,7 +158,15 @@
       :title="resetDialogTitle"
       width="400px"
     >
-      <el-form :model="resetForm" label-width="80px">
+      <div class="dialog-tip">
+        <el-alert
+          :title="resetType === 'cold' ? '冷重启将完全断电后重新启动服务器' : '热重启将保持通电状态重新启动服务器'"
+          type="error"
+          :closable="false"
+          show-icon
+        />
+      </div>
+      <el-form :model="resetForm" label-width="100px">
         <el-form-item label="用户名" required>
           <el-input
             v-model="resetForm.user"
@@ -391,7 +423,7 @@ const confirmReset = async () => {
     resetDialogVisible.value = false
     
   } catch (error) {
-    ElMessage.error('重启失败，请检查用户名和密码')
+    ElMessage.error('重启失败，请检查服务器用户名和密码')
     console.error('重启失败:', error)
   } finally {
     resetLoading.value = false
@@ -408,6 +440,30 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.dialog-tip {
+  margin-bottom: 20px;
+}
+
+/* 名称高亮样式 - 只改变字体颜色 */
+.highlight-name {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+/* IP地址高亮样式 - 只改变字体颜色 */
+.highlight-ip {
+  color: #409eff;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+}
+
+/* MAC地址高亮样式 - 只改变字体颜色 */
+.highlight-mac {
+  color: #e6a23c;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
 }
 
 :deep(.danger-item) {
