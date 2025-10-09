@@ -182,7 +182,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     return disk_dict
 
 
-async def _delete_system_disk(disk_id, cloudinit=True):
+async def _delete_system_disk(disk_id):
     # Check if disk exists
     existing_disks = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
     if not existing_disks:
@@ -195,15 +195,19 @@ async def _delete_system_disk(disk_id, cloudinit=True):
     mon_host = existing_disks["mon_host"]
 
     dpuagentclient = get_dpuagentclient(soc_ip)
-    if cloudinit:
+
+    disks_with_same_ip = db.find(SYSTEM_DISK_COLLECTION, {"mv200_ip": soc_ip})
+    is_last_disk = len(disks_with_same_ip) == 1
+
+    if is_last_disk:
         cloudinit_api = dpuagent_api.CloudinitApi(dpuagentclient)
         try:
             res = cloudinit_api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post()
             if res.code != 0:
-                LOG.warning(f"Failed to create cloudinit datasource for SOC {soc_ip},"
-                            f" message: {res.message}")
+                LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, "
+                            f"message: {res.message}")
         except Exception as e:
-            LOG.warning(f"Failed to create cloudinit datasource for SOC {soc_ip}, error: {e}")
+            LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, error: {e}")
 
     blk_api = dpuagent_api.VblkApi(dpuagentclient)
     try:
@@ -211,7 +215,7 @@ async def _delete_system_disk(disk_id, cloudinit=True):
             dpuagent_api_v1_schemas_vblk_schemas_delete_request={
                 "rbd_path": f"{RBD_POOL}/{disk_id}",
                 "gw_pwd": "yunsilicon",
-                "gw_ip": f"{existing_disks['mon_host']}",
+                "gw_ip": mon_host,
                 "force": True,
                 "bootable": True,
                 "gw_user": "admin",
@@ -441,5 +445,5 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
             password="password"
         )
     )
-    await _delete_system_disk(disk_id, cloudinit=False)
+    await _delete_system_disk(disk_id)
     return await _create_system_disk(rebuild_data, cloudinit=False)
