@@ -55,6 +55,7 @@ class BootEntriesResponse(BaseModel):
     entries: Dict[str, str]
     current: str
     next: str = Field(None)
+    default: str = Field(None)
 
 
 class ServerCredentials(BaseModel):

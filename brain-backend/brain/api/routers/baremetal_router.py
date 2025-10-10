@@ -23,6 +23,61 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 
 
+def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
+    """Execute a command on remote host via SSH"""
+    LOG.debug(f"Executing SSH command on {host}: {command}")
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(host, username=user, password=pwd, timeout=6)
+        stdin, stdout, stderr = ssh.exec_command(command)
+        out = stdout.read().decode()
+        err = stderr.read().decode()
+        ssh.close()
+        if err:
+            LOG.warning(f"Command error on {host}: {err.strip()}")
+        LOG.debug(f"SSH command completed on {host}")
+        return out.strip()
+    except Exception as e:
+        LOG.error(f"SSH execution failed on {host}: {e}")
+        raise HTTPException(status_code=500, detail=f"SSH execution failed on {host}: {e}")
+
+
+def get_bmc_ip(host_ip: str) -> str:
+    """Convert host_ip like 10.0.3.x to BMC ip 10.0.2.x"""
+    parts = host_ip.split(".")
+    if len(parts) != 4:
+        raise ValueError(f"Invalid host_ip format: {host_ip}")
+    parts[2] = "2"  # replace the third octet
+    bmc_ip = ".".join(parts)
+    LOG.debug(f"Converted host_ip {host_ip} to BMC IP {bmc_ip}")
+    return bmc_ip
+
+
+def ipmi_power_action(bmcip: str, action: str):
+    """Execute IPMI power action via ipmitool command"""
+    LOG.info(f"Executing IPMI {action} on BMC {bmcip}")
+
+    if action not in ("cycle", "reset"):
+        raise HTTPException(status_code=400, detail=f"Unsupported IPMI action: {action}")
+
+    cmd = ["ipmitool", "-I", "lanplus", "-H", bmcip, "-U", BMC_USER, "-P", BMC_PASS,
+           "chassis", "power", action]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            LOG.error(f"IPMI {action} failed on BMC {bmcip}: {result.stderr.strip()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"IPMI {action} failed: {result.stderr.strip()}"
+            )
+        LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}: {result.stdout.strip()}")
+    except Exception as e:
+        LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
+        raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
+
+
 @router.post("/bare-metals", response_model=bare_metal_schemas.BareMetalServer,
              status_code=status.HTTP_201_CREATED)
 async def create_bare_metal_server(server_data: bare_metal_schemas.BareMetalServerCreate):
@@ -226,26 +281,6 @@ async def delete_bare_metal_server(server_id: str):
         )
 
 
-def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
-    """Execute a command on remote host via SSH"""
-    LOG.debug(f"Executing SSH command on {host}: {command}")
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(host, username=user, password=pwd, timeout=10)
-        stdin, stdout, stderr = ssh.exec_command(command)
-        out = stdout.read().decode()
-        err = stderr.read().decode()
-        ssh.close()
-        if err:
-            LOG.warning(f"Command error on {host}: {err.strip()}")
-        LOG.debug(f"SSH command completed on {host}")
-        return out.strip()
-    except Exception as e:
-        LOG.error(f"SSH execution failed on {host}: {e}")
-        raise HTTPException(status_code=500, detail=f"SSH execution failed on {host}: {e}")
-
-
 @router.get("/bare-metals/{server_id}/boot-entries",
             response_model=bare_metal_schemas.BootEntriesResponse)
 async def get_boot_entries(
@@ -255,7 +290,7 @@ async def get_boot_entries(
     pwd: str = Query(None)
 ):
     """
-    Get all boot entries (name + parent disk) and current boot
+    Get all boot entries (name + parent disk), current boot, next boot, and default boot
     """
     LOG.info(f"Received request to get boot entries for server {server_id}, use_saved: {use_saved}")
     server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
@@ -298,6 +333,7 @@ async def get_boot_entries(
     entries = {}
     current_boot = None
     next_boot = None
+    default_boot = None
 
     for line in efiboot_output:
         line = line.strip()
@@ -305,6 +341,9 @@ async def get_boot_entries(
             current_boot = line.split(":")[1].strip()
         elif line.startswith("BootNext"):
             next_boot = line.split(":")[1].strip()
+        elif line.startswith("BootOrder"):
+            boot_order_parts = line.split(":")[1].strip().split(",")
+            default_boot = boot_order_parts[0] if boot_order_parts else None
         elif line.startswith("Boot") and "*" in line:
             boot_num, rest = line.split("*", 1)
             boot_num = boot_num.strip().replace("Boot", "")
@@ -321,7 +360,8 @@ async def get_boot_entries(
     return {
         "entries": entries,
         "current": current_boot,
-        "next": next_boot
+        "next": next_boot,
+        "default": default_boot
     }
 
 
@@ -382,50 +422,6 @@ async def set_boot_entry(
 
     return {"message": (f"BootNext set to {boot_id} on {host_ip}"
                         f"{' (default updated)' if set_default else ''}")}
-
-
-def get_bmc_ip(host_ip: str) -> str:
-    """Convert host_ip like 10.0.3.x to BMC ip 10.0.2.x"""
-    parts = host_ip.split(".")
-    if len(parts) != 4:
-        raise ValueError(f"Invalid host_ip format: {host_ip}")
-    parts[2] = "2"  # replace the third octet
-    bmc_ip = ".".join(parts)
-    LOG.debug(f"Converted host_ip {host_ip} to BMC IP {bmc_ip}")
-    return bmc_ip
-
-
-def ipmi_power_action(bmcip: str, action: str):
-    """Execute IPMI power action via ipmitool command"""
-    LOG.info(f"Executing IPMI {action} on BMC {bmcip}")
-
-    if action not in ("cycle", "reset"):
-        raise HTTPException(status_code=400, detail=f"Unsupported IPMI action: {action}")
-
-    # ipmitool chassis power 命令参数
-    cmd = [
-        "ipmitool",
-        "-I", "lanplus",
-        "-H", bmcip,
-        "-U", BMC_USER,
-        "-P", BMC_PASS,
-        "chassis",
-        "power",
-        action
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            LOG.error(f"IPMI {action} failed on BMC {bmcip}: {result.stderr.strip()}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"IPMI {action} failed: {result.stderr.strip()}"
-            )
-        LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}: {result.stdout.strip()}")
-    except Exception as e:
-        LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
-        raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
 
 
 @router.post("/bare-metals/{server_id}/power-cycle")
