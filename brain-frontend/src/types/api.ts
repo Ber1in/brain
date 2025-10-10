@@ -149,4 +149,5 @@ export interface BootEntriesResponse {
   entries: Record<string, string>
   current: string
   next?: string | null
+  default?: string
 }

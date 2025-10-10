@@ -174,6 +174,12 @@
             <el-tag size="small" type="warning">下一次</el-tag>
           </div>
         </el-form-item>
+        <el-form-item label="默认启动" v-if="defaultBootId">
+          <div class="boot-info">
+            <span>{{ defaultBootName }}</span>
+            <el-tag size="small" type="primary">默认</el-tag>
+          </div>
+        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -240,6 +246,7 @@ const credentialCheckLoading = ref(false)
 const currentServer = ref<BareMetalServer | null>(null)
 const bootEntries = ref<Record<string, string>>({})
 const currentBootId = ref('')
+const defaultBootId = ref<string | null>('') 
 const nextBootId = ref<string | null>('')
 const selectedBootId = ref('')
 const setDefaultBoot = ref(false) // 新增：是否设置为默认启动项
@@ -270,11 +277,22 @@ const nextBootName = computed(() => {
   return nextBootId.value || ''
 })
 
+// 计算默认启动项名称
+const defaultBootName = computed(() => {
+  if (defaultBootId.value && bootEntries.value[defaultBootId.value]) {
+    return bootEntries.value[defaultBootId.value]
+  }
+  return defaultBootId.value || '未知'
+})
+
 // 生成启动项下拉框选项标签
 const getBootOptionLabel = (name: string, id: string) => {
   let label = name
   if (id === currentBootId.value) {
     label += ' (当前)'
+  }
+  if (id === defaultBootId.value) {
+    label += ' (默认)'
   }
   if (id === nextBootId.value) {
     label += ' (下一次)'
@@ -340,6 +358,7 @@ const handleBootConfig = async (server: BareMetalServer) => {
   currentServer.value = server
   bootEntries.value = {}
   currentBootId.value = ''
+  defaultBootId.value = ''
   nextBootId.value = ''
   selectedBootId.value = ''
   setDefaultBoot.value = false // 重置勾选状态
@@ -382,6 +401,7 @@ const getBootEntriesWithSavedCredentials = async () => {
     
     bootEntries.value = response.entries
     currentBootId.value = response.current
+    defaultBootId.value = response.default || null
     nextBootId.value = response.next || null
     selectedBootId.value = ''
     
@@ -415,6 +435,7 @@ const handleBootAuth = async () => {
     
     bootEntries.value = response.entries
     currentBootId.value = response.current
+    defaultBootId.value = response.default || null
     nextBootId.value = response.next || null
     selectedBootId.value = ''
     
@@ -483,7 +504,10 @@ const handleSetBoot = async () => {
     
     ElMessage.success(`启动项设置成功${setDefaultBoot.value ? '，并已设置为默认启动项' : ''}`)
     bootSetDialogVisible.value = false
-    
+
+    if (setDefaultBoot.value) {
+      defaultBootId.value = selectedBootId.value
+    }
     // 更新下一次启动项
     nextBootId.value = selectedBootId.value
     
