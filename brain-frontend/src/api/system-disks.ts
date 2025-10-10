@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { SystemDisk, BareMetalCreate, SystemDiskUpdate, UploadToImage } from '@/types/api'
+import type { SystemDisk, BareMetalCreate, SystemDiskUpdate, UploadToImage, DeleteDiskResponse } from '@/types/api'
 
 export const systemDisksApi = {
   getAll(): Promise<SystemDisk[]> {
@@ -10,15 +10,15 @@ export const systemDisksApi = {
     return apiClient.get(`/system-disks/${id}`)
   },
 
-  create(data: BareMetalCreate): Promise<SystemDisk> {
+  create(data: BareMetalCreate): Promise<DeleteDiskResponse> {
     return apiClient.post('/system-disks', data)
   },
 
-  update(id: string, data: SystemDiskUpdate): Promise<SystemDisk> {
+  update(id: string, data: SystemDiskUpdate): Promise<DeleteDiskResponse> {
     return apiClient.put(`/system-disks/${id}`, data)
   },
 
-  delete(id: string): Promise<void> {
+  delete(id: string): Promise<DeleteDiskResponse> {
     return apiClient.delete(`/system-disks/${id}`)
   },
 

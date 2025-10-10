@@ -237,8 +237,26 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
-    await systemDisksApi.create(form.value)
+    const response = await systemDisksApi.create(form.value)
     ElMessage.success('创建成功')
+    if (response.efi_status === 1 || response.cloudinit_status === 1) {
+      let warningMessage = '创建成功，但存在以下问题：\n'
+      
+      if (response.efi_status === 1) {
+        warningMessage += '• 自动注册EFI启动项失败，需要重启系统完成自动注册\n'
+      }
+      
+      if (response.cloudinit_status === 1) {
+        warningMessage += '• cloud-init数据源创建失败\n'
+      }
+      
+      ElMessage.warning({
+        message: warningMessage,
+        duration: 8000, // 延长显示时间
+        showClose: true
+      })
+    }
+    
     window.location.href = '/system-disks'
   } catch (error) {
     ElMessage.error('创建失败')

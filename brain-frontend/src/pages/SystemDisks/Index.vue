@@ -331,9 +331,28 @@ const handleDelete = async (disk: SystemDisk) => {
     loading.value = true
     
     // 执行删除操作
-    await systemDisksApi.delete(disk.id)
+    const response = await systemDisksApi.delete(disk.id)
     
     ElMessage.success('删除成功')
+    
+    // 检查清理状态并提示
+    if (response.efi_status === 1 || response.cloudinit_status === 1) {
+      let warningMessage = '删除成功，但存在以下相关残留问题：\n'
+      
+      if (response.efi_status === 1) {
+        warningMessage += '• 自动清理EFI启动项失败，需要重启系统完成自动清理\n'
+      }
+      
+      if (response.cloudinit_status === 1) {
+        warningMessage += '• cloud-init数据源清理失败\n'
+      }
+      
+      ElMessage.warning({
+        message: warningMessage,
+        duration: 8000, // 延长显示时间
+        showClose: true
+      })
+    }
     
     // 重新加载数据
     await loadData()

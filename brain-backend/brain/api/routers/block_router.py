@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 import logging
@@ -11,7 +12,7 @@ from brain.api.schemas import block_schemas
 from brain.auth import authenticate_user
 from brain import exceptions
 from brain.json_db import JSONDocumentDB
-from brain.utils import get_cephclient, get_dpuagentclient
+from brain.utils import get_cephclient, get_dpuagentclient, ssh_execute
 from brain.clients.ceph import api as ceph_api
 from brain.clients.dpuagent import api as dpuagent_api
 from brain.clients.ceph.exceptions import ApiException
@@ -160,6 +161,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
     disk_dict["blk_id"] = res.uuid
     LOG.info(f"Successfully created virtual block device for disk {disk_id} with UUID: {res.uuid}")
 
+    cloudinit_status = 0
     # Set system user and cloudinit configuration
     if not rebuild:
         LOG.info(f"Configuring cloudinit for disk {disk_id}")
@@ -196,11 +198,13 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
             if res.code != 0:
                 LOG.warning(f"Failed to create cloudinit datasource for SOC {soc_ip} and"
                             f" disk {disk_id}, message: {res.message}")
+                cloudinit_status = 1
             else:
                 LOG.info(f"Successfully configured cloudinit for disk {disk_id}")
         except Exception as e:
             LOG.error("Failed to create cloudinit datasource for SOC"
                       f" {soc_ip} and disk {disk_id}, error: {e}")
+            cloudinit_status = 1
     else:
         LOG.info(f"Skipping cloudinit configuration for disk {disk_id}")
 
@@ -222,7 +226,24 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
     db.insert(SYSTEM_DISK_COLLECTION, disk_dict)
     LOG.info(f"Successfully created system disk {disk_id}")
 
-    return disk_dict
+    efi_status = 0
+    if baremetal.get("os_user") and baremetal.get("os_password"):
+        try:
+            create_efi_boot_entry(host_ip, "root", "ymxl@2021", 40, disk_id, image["name"])
+            LOG.info(f"EFI create succeeded for server {baremetal['id']}")
+        except Exception as e:
+            LOG.warning(
+                f"EFI create failed for server {baremetal['id']}: {e}. "
+                "Frontend will be notified with special code."
+            )
+            efi_status = 1
+    else:
+        LOG.warning(
+            f"Skipping EFI creating for server {baremetal['id']} due to missing credentials"
+        )
+        efi_status = 1
+
+    return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
 
 
 async def _delete_system_disk(disk_id, rebuild=False):
@@ -248,6 +269,8 @@ async def _delete_system_disk(disk_id, rebuild=False):
     is_last_disk = len(disks_with_same_ip) == 1
     LOG.info(f"Disk {disk_id} is {'last' if is_last_disk else 'not last'} disk on SOC {soc_ip}")
 
+    efi_status = 0
+    cloudinit_status = 0
     if is_last_disk and not rebuild:
         LOG.info(f"Deleting cloudinit datasource for SOC {soc_ip} (last disk)")
         cloudinit_api = dpuagent_api.CloudinitApi(dpuagentclient)
@@ -260,6 +283,7 @@ async def _delete_system_disk(disk_id, rebuild=False):
                 LOG.info(f"Successfully deleted cloudinit datasource for SOC {soc_ip}")
         except Exception as e:
             LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, error: {e}")
+            cloudinit_status = 1
 
     # Delete virtual block device
     LOG.info(f"Deleting virtual block device for disk {disk_id}")
@@ -322,10 +346,45 @@ async def _delete_system_disk(disk_id, rebuild=False):
         )
 
     LOG.info(f"Successfully completed deletion of system disk {disk_id}")
+    mv_server = db.find_one(MV_SERVER_COLLECTION, {"id": existing_disks["mv200_id"]})
+    if not mv_server:
+        LOG.warning(
+            f"MV200 server {existing_disks['mv200_id']} not found when creating system disk"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MV200 server {existing_disks['mv200_id']} not found"
+        )
+
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": mv_server["bare_id"]})
+    if not server:
+        LOG.warning(f"Server {mv_server['bare_id']} not found for boot entries query")
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    # Try to cleanup orphaned EFI entries, but capture errors
+    if server.get("os_user") and server.get("os_password"):
+        try:
+            cleanup_orphaned_efi_entries(
+                server.get("host_ip"), server.get("os_user"), server.get("os_password")
+            )
+            LOG.info(f"EFI cleanup succeeded for server {server['id']}")
+        except Exception as e:
+            LOG.warning(
+                f"EFI cleanup failed for server {server['id']}: {e}. "
+                "Frontend will be notified with special code."
+            )
+            efi_status = 1
+    else:
+        LOG.warning(
+            f"Skipping EFI cleanup for server {server['id']} due to missing credentials"
+        )
+        efi_status = 1
+
+    # Return final result to frontend
+    return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
 
 
-@router.post("/system-disks", response_model=block_schemas.SystemDisk,
-             status_code=status.HTTP_201_CREATED)
+@router.post("/system-disks", status_code=status.HTTP_201_CREATED)
 async def create_system_disk(data: block_schemas.BareMetalCreate):
     """
     Create a new system disk RBD from image for specific MV200 server
@@ -334,7 +393,8 @@ async def create_system_disk(data: block_schemas.BareMetalCreate):
              f"with image {data.system_disk.image_id}")
     try:
         result = await _create_system_disk(data)
-        LOG.info(f"Successfully completed system disk creation request for disk {result['id']}")
+        LOG.info(f"Successfully completed system disk creation request "
+                 f"with image {data.system_disk.image_id}")
         return result
     except Exception as e:
         LOG.error(f"Failed to complete system disk creation request: {e}")
@@ -543,8 +603,7 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
     return image_dict
 
 
-@router.post("/system-disks/{disk_id}/rebuild", response_model=block_schemas.SystemDisk,
-             status_code=status.HTTP_202_ACCEPTED)
+@router.post("/system-disks/{disk_id}/rebuild", status_code=status.HTTP_202_ACCEPTED)
 async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
     """
     Rebuild system disk to destination image
@@ -581,3 +640,159 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
     result = await _create_system_disk(rebuild_data, rebuild=False)
     LOG.info(f"Successfully completed rebuild of disk {disk_id} to new image {image_id}")
     return result
+
+
+def create_efi_boot_entry(host_ip: str, username: str, password: str, 
+                          expected_size_gb: int, disk_id: str, image_name: str) -> bool:
+    """
+    Create an EFI boot entry for a cloud system disk. Returns only success status.
+
+    Args:
+        host_ip: IP address of the physical host
+        username: SSH username
+        password: SSH password
+        expected_size_gb: Expected disk size in GB
+        disk_id: Disk ID used to generate the boot entry name
+
+    Returns:
+        bool: True if EFI boot entry is created or exists, False otherwise
+    """
+    LOG.info(f"Creating EFI boot entry for disk {disk_id} on host {host_ip}")
+
+    try:
+        # Wait for the device to be recognized
+        ssh_execute(host_ip, "sleep 3", username, password)
+
+        # Rescan PCIe devices
+        ssh_execute(host_ip, "echo 1 > /sys/bus/pci/rescan", username, password)
+        ssh_execute(host_ip, "sleep 2", username, password)
+
+        # Get virtio disk information
+        disk_info_cmd = (
+            "for dev in /sys/block/vd*; do "
+            "if [ -d \"$dev\" ]; then "
+            "dev_name=$(basename \"$dev\"); "
+            "size=$(cat \"$dev/size\" 2>/dev/null || echo 0); "
+            "size_gb=$((size * 512 / 1024 / 1024 / 1024)); "
+            "add_time=$(stat -c %Y \"$dev\" 2>/dev/null || echo 0); "
+            "echo \"$dev_name $size_gb $add_time\"; "
+            "fi; done"
+        )
+        disk_info_output = ssh_execute(host_ip, disk_info_cmd, username, password)
+
+        # Parse disks and find candidates matching expected size
+        disks = []
+        for line in disk_info_output.splitlines():
+            parts = line.split()
+            if len(parts) >= 3:
+                disk_name, size_gb, add_time = parts[0], int(parts[1]), int(parts[2])
+                if abs(size_gb - expected_size_gb) <= 1:
+                    disks.append({'name': disk_name, 'add_time': add_time})
+
+        if not disks:
+            LOG.warning(f"No disks found matching expected size {expected_size_gb}GB")
+            return False
+
+        # Select the most recently added disk
+        target_device = sorted(disks, key=lambda x: x['add_time'])[-1]['name']
+
+        # Get the first partition of the target disk
+        partitions_output = ssh_execute(
+            host_ip,
+            f"lsblk -nlo NAME /dev/{target_device} | grep -E '{target_device}[0-9]+'",
+            username, password
+        )
+        if not partitions_output:
+            LOG.warning(f"No partitions found on /dev/{target_device}")
+            return False
+        target_partition = partitions_output.splitlines()[0].strip()
+
+        # Get PARTUUID of the partition
+        partuuid_output = ssh_execute(
+            host_ip, f"lsblk -no PARTUUID /dev/{target_partition}", username, password
+        )
+        if not partuuid_output or not partuuid_output.strip():
+            LOG.warning(f"No PARTUUID found for /dev/{target_partition}")
+            return False
+        partuuid = partuuid_output.strip()
+
+        # Check if a boot entry already exists
+        existing_entries = ssh_execute(host_ip, "efibootmgr -v", username, password)
+        for line in existing_entries.splitlines():
+            if partuuid in line:
+                LOG.info(f"Boot entry already exists for PARTUUID {partuuid}")
+                return True
+
+        # Create a new EFI boot entry
+        safe_image_name = re.sub(r'[^A-Za-z0-9-]', '-', image_name)
+        boot_entry_name = f"{safe_image_name}-{disk_id[:8]}"
+        efi_cmd = (
+            f"efibootmgr -c -d /dev/{target_device} -p 1 -L \"{boot_entry_name}\" "
+            f"-l '\\EFI\\ubuntu\\grubx64.efi'"
+        )
+        ssh_execute(host_ip, efi_cmd, username, password)
+
+        # Confirm creation
+        boot_entries = ssh_execute(host_ip, "efibootmgr -v", username, password)
+        for line in boot_entries.splitlines():
+            if boot_entry_name in line and partuuid in line:
+                LOG.info(f"Created EFI boot entry for disk {disk_id}")
+                return True
+
+        LOG.warning("Failed to create EFI boot entry")
+        return False
+
+    except Exception as e:
+        LOG.error(f"Failed to create EFI boot entry for disk {disk_id}: {e}")
+        return False
+
+
+def cleanup_orphaned_efi_entries(host_ip: str, username: str, password: str) -> list:
+    """
+    Cleanup orphaned EFI boot entries. These are entries whose GPT UUID does not exist.
+
+    Args:
+        host_ip: Physical host IP
+        username: SSH username
+        password: SSH password
+
+    Returns:
+        list: Deleted boot entries with boot number and GPT UUID
+    """
+    LOG.info(f"Cleaning up orphaned EFI boot entries on host {host_ip}")
+    deleted_entries = []
+
+    try:
+        # Get existing GPT UUIDs from the system
+        existing_uuids_output = ssh_execute(host_ip, 
+                                            "lsblk -no PARTUUID | grep -v '^$'", 
+                                            username, password)
+        existing_uuids = set(existing_uuids_output.splitlines())
+        LOG.info(f"Existing PARTUUIDs: {existing_uuids}")
+
+        # Get all EFI boot entries
+        efi_entries_output = ssh_execute(host_ip, "efibootmgr -v", username, password)
+
+        for line in efi_entries_output.splitlines():
+            if line.startswith("Boot") and "*" in line:
+                boot_num = line.split()[0].replace("Boot", "").replace("*", "")
+                # Extract GPT UUID from HD(...,GPT,<UUID>,...) format
+                gpt_match = re.search(r'GPT,([a-f0-9-]+)', line)
+                if gpt_match:
+                    gpt_uuid = gpt_match.group(1)
+                    # If GPT UUID is not present on the system, delete the entry
+                    if gpt_uuid not in existing_uuids:
+                        LOG.info(f"Found orphaned boot entry {boot_num} with GPT UUID {gpt_uuid}")
+                        try:
+                            ssh_execute(host_ip, f"efibootmgr -b {boot_num} -B", username, password)
+                            deleted_entries.append({"boot_num": boot_num, "gpt_uuid": gpt_uuid})
+                            LOG.info(f"Deleted orphaned EFI boot entry {boot_num}")
+                        except Exception as e:
+                            LOG.error(f"Failed to delete boot entry {boot_num}: {e}")
+
+        LOG.info(f"Cleaned up {len(deleted_entries)} orphaned EFI entries")
+
+    except Exception as e:
+        LOG.error(f"Failed to cleanup orphaned EFI entries on {host_ip}: {e}")
+
+    return deleted_entries

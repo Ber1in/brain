@@ -151,3 +151,8 @@ export interface BootEntriesResponse {
   next?: string | null
   default?: string
 }
+
+export interface DeleteDiskResponse {
+  efi_status: number
+  cloudinit_status: number
+}
