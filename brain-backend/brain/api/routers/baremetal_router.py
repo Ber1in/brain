@@ -232,7 +232,7 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(host, username=user, password=pwd, timeout=100)
+        ssh.connect(host, username=user, password=pwd, timeout=10)
         stdin, stdout, stderr = ssh.exec_command(command)
         out = stdout.read().decode()
         err = stderr.read().decode()
