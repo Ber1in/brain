@@ -34,15 +34,11 @@ export const bareApi = {
     })
   },
 
-  powerCycle(serverId: string, user: string, pwd: string): Promise<void> {
-    return apiClient.post(`/bare-metals/${serverId}/power-cycle`, null, {
-      params: { user, pwd }
-    })
+  powerCycle(serverId: string): Promise<void> {
+    return apiClient.post(`/bare-metals/${serverId}/power-cycle`)
   },
 
-  powerReset(serverId: string, user: string, pwd: string): Promise<void> {
-    return apiClient.post(`/bare-metals/${serverId}/power-reset`, null, {
-      params: { user, pwd }
-    })
+  powerReset(serverId: string): Promise<void> {
+    return apiClient.post(`/bare-metals/${serverId}/power-reset`)
   }
 }

@@ -2,6 +2,7 @@
 # All rights reserved.
 
 import paramiko
+from pyghmi.ipmi import command
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 import logging
@@ -17,8 +18,8 @@ db = JSONDocumentDB()
 
 # Collection name
 BARE_METAL_SERVER_COLLECTION = "bare_metals"
-BMC_USER = "wubl"
-BMC_PASS = "199610wad14s.."
+BMC_USER = "ipmiadmin"
+BMC_PASS = "ymxl@2022"
 
 
 @router.post("/bare-metals", response_model=bare_metal_schemas.BareMetalServer,
@@ -269,8 +270,31 @@ async def set_boot_entry(server_id: str, boot_id: str = Query(...),
     return {"message": f"BootNext set to {boot_id} on {host_ip}"}
 
 
+def get_bmc_ip(host_ip: str) -> str:
+    """Convert host_ip like 10.0.3.x to BMC ip 10.0.2.x"""
+    parts = host_ip.split(".")
+    if len(parts) != 4:
+        raise ValueError(f"Invalid host_ip format: {host_ip}")
+    parts[2] = "2"  # replace the third octet
+    return ".".join(parts)
+
+
+def ipmi_power_action(bmcip: str, action: str):
+    """Execute IPMI power action via pyghmi"""
+    try:
+        cmd = command.Command(bmc=bmcip, userid=BMC_USER, password=BMC_PASS)
+        if action == "cycle":
+            cmd.set_power("cycle")
+        elif action == "reset":
+            cmd.set_power("reset")
+        else:
+            raise ValueError(f"Unsupported IPMI action: {action}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IPMI {action} failed: {e}")
+
+
 @router.post("/bare-metals/{server_id}/power-cycle")
-async def power_cycle_server(server_id: str, user: str = Query(...), pwd: str = Query(...)):
+async def power_cycle_server(server_id: str):
     server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
     if not server:
         raise HTTPException(status_code=404, detail="bare metal not found")
@@ -279,12 +303,14 @@ async def power_cycle_server(server_id: str, user: str = Query(...), pwd: str = 
     if not host_ip:
         raise HTTPException(status_code=400, detail="host_ip not configured for this server")
 
-    ssh_execute(host_ip, "ipmitool power cycle", user, pwd)
-    return {"message": f"Server {server_id} power cycled via SSH"}
+    bmcip = get_bmc_ip(host_ip)
+    ipmi_power_action(bmcip, "cycle")
+
+    return {"message": f"Server {server_id} power cycled via BMC {bmcip}"}
 
 
 @router.post("/bare-metals/{server_id}/power-reset")
-async def power_reset_server(server_id: str, user: str = Query(...), pwd: str = Query(...)):
+async def power_reset_server(server_id: str):
     server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
     if not server:
         raise HTTPException(status_code=404, detail="bare metal not found")
@@ -293,5 +319,7 @@ async def power_reset_server(server_id: str, user: str = Query(...), pwd: str = 
     if not host_ip:
         raise HTTPException(status_code=400, detail="host_ip not configured for this server")
 
-    ssh_execute(host_ip, "ipmitool power reset", user, pwd)
-    return {"message": f"Server {server_id} warm rebooted via SSH"}
+    bmcip = get_bmc_ip(host_ip)
+    ipmi_power_action(bmcip, "reset")
+
+    return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}

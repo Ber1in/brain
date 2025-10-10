@@ -152,7 +152,7 @@
       </template>
     </el-dialog>
 
-    <!-- 重启认证对话框 -->
+    <!-- 重启确认对话框 -->
     <el-dialog
       v-model="resetDialogVisible"
       :title="resetDialogTitle"
@@ -161,29 +161,14 @@
       <div class="dialog-tip">
         <el-alert
           :title="resetType === 'cold' ? '冷重启将完全断电后重新启动服务器' : '热重启将保持通电状态重新启动服务器'"
-          type="error"
+          type="warning"
           :closable="false"
           show-icon
         />
       </div>
-      <el-form :model="resetForm" label-width="100px">
-        <el-form-item label="用户名" required>
-          <el-input
-            v-model="resetForm.user"
-            placeholder="请输入服务器用户名"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="密码" required>
-          <el-input
-            v-model="resetForm.pwd"
-            type="password"
-            placeholder="请输入服务器密码"
-            clearable
-            show-password
-          />
-        </el-form-item>
-      </el-form>
+      <div class="confirm-message">
+        <p>确定要对服务器 <strong>"{{ currentServer?.name }}"</strong> 执行{{ resetType === 'cold' ? '冷重启' : '热重启' }}吗？</p>
+      </div>
       
       <template #footer>
         <el-button @click="resetDialogVisible = false">取消</el-button>
@@ -191,7 +176,6 @@
           type="primary" 
           @click="confirmReset" 
           :loading="resetLoading"
-          :disabled="!resetForm.user || !resetForm.pwd"
         >
           确认重启
         </el-button>
@@ -230,10 +214,6 @@ const resetDialogVisible = ref(false)
 const resetLoading = ref(false)
 const resetType = ref<'cold' | 'warm'>('cold')
 const resetDialogTitle = ref('')
-const resetForm = reactive({
-  user: '',
-  pwd: ''
-})
 
 // 计算当前启动项名称
 const currentBootName = computed(() => {
@@ -390,8 +370,6 @@ const handleColdReset = (server: BareMetalServer) => {
   currentServer.value = server
   resetType.value = 'cold'
   resetDialogTitle.value = `冷重启 - ${server.name}`
-  resetForm.user = ''
-  resetForm.pwd = ''
   resetDialogVisible.value = true
 }
 
@@ -400,8 +378,6 @@ const handleWarmReset = (server: BareMetalServer) => {
   currentServer.value = server
   resetType.value = 'warm'
   resetDialogTitle.value = `热重启 - ${server.name}`
-  resetForm.user = ''
-  resetForm.pwd = ''
   resetDialogVisible.value = true
 }
 
@@ -413,17 +389,17 @@ const confirmReset = async () => {
     resetLoading.value = true
     
     if (resetType.value === 'cold') {
-      await bareApi.powerCycle(currentServer.value.id, resetForm.user, resetForm.pwd)
+      await bareApi.powerCycle(currentServer.value.id)
       ElMessage.success('冷重启命令已发送')
     } else {
-      await bareApi.powerReset(currentServer.value.id, resetForm.user, resetForm.pwd)
+      await bareApi.powerReset(currentServer.value.id)
       ElMessage.success('热重启命令已发送')
     }
     
     resetDialogVisible.value = false
     
   } catch (error) {
-    ElMessage.error('重启失败，请检查服务器用户名和密码')
+    ElMessage.error('重启失败')
     console.error('重启失败:', error)
   } finally {
     resetLoading.value = false
@@ -444,6 +420,20 @@ onMounted(() => {
 
 .dialog-tip {
   margin-bottom: 20px;
+}
+
+.confirm-message {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.confirm-message p {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.confirm-message strong {
+  color: #67c23a;
 }
 
 /* 名称高亮样式 - 只改变字体颜色 */
