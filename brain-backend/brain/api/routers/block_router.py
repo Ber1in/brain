@@ -495,8 +495,9 @@ async def delete_system_disk(disk_id: str):
     """
     LOG.info(f"Received request to delete system disk {disk_id}")
     try:
-        await _delete_system_disk(disk_id)
+        result = await _delete_system_disk(disk_id)
         LOG.info(f"Successfully completed deletion request for system disk {disk_id}")
+        return result
     except Exception as e:
         LOG.error(f"Failed to complete deletion request for system disk {disk_id}: {e}")
         raise
@@ -637,9 +638,18 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
         )
     )
 
-    await _delete_system_disk(disk_id, rebuild=True)
-    result = await _create_system_disk(rebuild_data, rebuild=False)
+    delete_res = await _delete_system_disk(disk_id, rebuild=True)
+    create_res = await _create_system_disk(rebuild_data, rebuild=True)
     LOG.info(f"Successfully completed rebuild of disk {disk_id} to new image {image_id}")
+    result = {}
+    if delete_res["efi_status"] == create_res["efi_status"]:
+        result["efi_status"] = create_res["efi_status"]
+    else:
+        result["efi_status"] = 1
+    if delete_res["cloudinit_status"] == create_res["cloudinit_status"]:
+        result["cloudinit_status"] = create_res["cloudinit_status"]
+    else:
+        result["cloudinit_status"] = 1
     return result
 
 
@@ -795,5 +805,6 @@ def cleanup_orphaned_efi_entries(host_ip: str, username: str, password: str) -> 
 
     except Exception as e:
         LOG.error(f"Failed to cleanup orphaned EFI entries on {host_ip}: {e}")
+        raise
 
     return deleted_entries

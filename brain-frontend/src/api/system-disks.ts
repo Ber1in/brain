@@ -14,7 +14,7 @@ export const systemDisksApi = {
     return apiClient.post('/system-disks', data)
   },
 
-  update(id: string, data: SystemDiskUpdate): Promise<DeleteDiskResponse> {
+  update(id: string, data: SystemDiskUpdate): Promise<SystemDisk> {
     return apiClient.put(`/system-disks/${id}`, data)
   },
 
@@ -26,7 +26,7 @@ export const systemDisksApi = {
     return apiClient.post(`/system-disks/${id}/upload`, data)
   },
 
-  rebuildFromImage(id: string, imageId: string): Promise<void> {
+  rebuildFromImage(id: string, imageId: string): Promise<DeleteDiskResponse> {
     return apiClient.post(`/system-disks/${id}/rebuild`, null, {
       params: { image_id: imageId }
     })

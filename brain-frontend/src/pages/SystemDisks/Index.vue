@@ -313,12 +313,6 @@ const handleCommand = (command: string, disk: SystemDisk) => {
 }
 
 // 编辑
-const handleEdit = (disk: SystemDisk) => {
-  // 跳转到编辑页面
-  window.location.href = `/system-disks/edit/${disk.id}`
-}
-
-// 删除
 const handleDelete = async (disk: SystemDisk) => {
   try {
     await ElMessageBox.confirm(
@@ -419,9 +413,27 @@ const confirmRebuild = async () => {
     rebuildLoading.value = true
 
     // 调用重置镜像的API - 通过查询参数传递 image_id
-    await systemDisksApi.rebuildFromImage(currentDisk.value.id, rebuildForm.image_id)
+    const response = await systemDisksApi.rebuildFromImage(currentDisk.value.id, rebuildForm.image_id)
     
     ElMessage.success('重置镜像操作已提交，系统盘将使用新镜像重建')
+    // 检查清理状态并提示
+    if (response.efi_status === 1 || response.cloudinit_status === 1) {
+      let warningMessage = '刷新成功，但存在以下相关残留问题：\n'
+      
+      if (response.efi_status === 1) {
+        warningMessage += '• 自动刷新EFI启动项失败，需要重启系统完成自动刷新\n'
+      }
+      
+      if (response.cloudinit_status === 1) {
+        warningMessage += '• cloud-init数据源刷新失败\n'
+      }
+      
+      ElMessage.warning({
+        message: warningMessage,
+        duration: 8000, // 延长显示时间
+        showClose: true
+      })
+    }
     rebuildDialogVisible.value = false
     
     // 重新加载数据以更新状态
