@@ -229,7 +229,8 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
     efi_status = 0
     if baremetal.get("os_user") and baremetal.get("os_password"):
         try:
-            create_efi_boot_entry(host_ip, "root", "ymxl@2021", 40, disk_id, image["name"])
+            create_efi_boot_entry(host_ip, baremetal.get("os_user"),
+                                  baremetal.get("os_password"), 40, disk_id, image["name"])
             LOG.info(f"EFI create succeeded for server {baremetal['id']}")
         except Exception as e:
             LOG.warning(
