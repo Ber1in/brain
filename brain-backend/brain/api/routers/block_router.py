@@ -32,7 +32,7 @@ IMAGE_POOL = "images"
 SNAP_NAME = "brain_snap"
 
 
-async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=True):
+async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False):
     disk_data = data.system_disk
     LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
              f"on MV200 server {disk_data.mv200_id}")
@@ -161,7 +161,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     LOG.info(f"Successfully created virtual block device for disk {disk_id} with UUID: {res.uuid}")
 
     # Set system user and cloudinit configuration
-    if cloudinit:
+    if not rebuild:
         LOG.info(f"Configuring cloudinit for disk {disk_id}")
         system_user = data.system_user
         user_data = {"users": [{"name": system_user.name,
@@ -223,7 +223,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     return disk_dict
 
 
-async def _delete_system_disk(disk_id):
+async def _delete_system_disk(disk_id, rebuild=False):
     LOG.info(f"Starting deletion process for system disk {disk_id}")
 
     # Check if disk exists
@@ -246,7 +246,7 @@ async def _delete_system_disk(disk_id):
     is_last_disk = len(disks_with_same_ip) == 1
     LOG.info(f"Disk {disk_id} is {'last' if is_last_disk else 'not last'} disk on SOC {soc_ip}")
 
-    if is_last_disk:
+    if is_last_disk and not rebuild:
         LOG.info(f"Deleting cloudinit datasource for SOC {soc_ip} (last disk)")
         cloudinit_api = dpuagent_api.CloudinitApi(dpuagentclient)
         try:
@@ -575,7 +575,7 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
         )
     )
 
-    await _delete_system_disk(disk_id)
-    result = await _create_system_disk(rebuild_data, cloudinit=False)
+    await _delete_system_disk(disk_id, rebuild=True)
+    result = await _create_system_disk(rebuild_data, rebuild=False)
     LOG.info(f"Successfully completed rebuild of disk {disk_id} to new image {image_id}")
     return result

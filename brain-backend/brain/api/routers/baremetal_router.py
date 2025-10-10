@@ -3,7 +3,6 @@
 
 import paramiko
 import subprocess
-from pyghmi.ipmi import command
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 import logging
@@ -278,7 +277,8 @@ async def get_boot_entries(
     else:
         if not user or not pwd:
             raise HTTPException(
-                status_code=400, detail="Username and password are required when use_saved is False")
+                status_code=400, 
+                detail="Username and password are required when use_saved is False")
         credentials_user = user
         credentials_pwd = pwd
 
@@ -347,7 +347,8 @@ async def set_boot_entry(
     else:
         if not user or not pwd:
             raise HTTPException(
-                status_code=400, detail="Username and password are required when use_saved is False")
+                status_code=400, 
+                detail="Username and password are required when use_saved is False")
         credentials_user = user
         credentials_pwd = pwd
 
@@ -365,7 +366,8 @@ async def set_boot_entry(
         ssh_execute(host_ip, f"efibootmgr -o {new_order}", credentials_user, credentials_pwd)
         LOG.info(f"Default boot entry set to {boot_id} with order {new_order}")
 
-    return {"message": f"BootNext set to {boot_id} on {host_ip}" + (", default updated" if set_default else "")}
+    return {"message": (f"BootNext set to {boot_id} on {host_ip}"
+                        f"{' (default updated)' if set_default else ''}")}
 
 
 def get_bmc_ip(host_ip: str) -> str:
@@ -492,7 +494,8 @@ async def verify_credentials(
     else:
         if not user or not pwd:
             raise HTTPException(
-                status_code=400, detail="Username and password are required when use_saved is False")
+                status_code=400,
+                detail="Username and password are required when use_saved is False")
         credentials_user = user
         credentials_pwd = pwd
 
