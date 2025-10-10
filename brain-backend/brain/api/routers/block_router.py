@@ -566,7 +566,7 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
             mv200_id=existing_disk["mv200_id"],
             size_gb=existing_disk["size_gb"],
             flatten=existing_disk["flatten"],
-            description=f"Rebuilt from {disk_id} - {existing_disk.get('description', '')}"
+            description=existing_disk.get('description', '')
         ),
         # system_user will not be used because the cloudinit datasource will not be recreated
         system_user=block_schemas.SystemUser(

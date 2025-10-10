@@ -1,5 +1,12 @@
 import apiClient from './client'
-import type { BareMetalServer, BareMetalServerCreate, BareMetalServerUpdate, BootEntriesResponse } from '@/types/api'
+import type { 
+  BareMetalServer, 
+  BareMetalServerCreate, 
+  BareMetalServerUpdate, 
+  BootEntriesResponse,
+  CredentialsVerifyResponse,
+  ServerCredentials 
+} from '@/types/api'
 
 export const bareApi = {
   getAll(): Promise<BareMetalServer[]> {
@@ -22,16 +29,63 @@ export const bareApi = {
     return apiClient.delete(`/bare-metals/${id}`)
   },
 
-  getBootEntries(serverId: string, user: string, pwd: string): Promise<BootEntriesResponse> {
-    return apiClient.get(`/bare-metals/${serverId}/boot-entries`, {
-      params: { user, pwd }
-    })
+  // 获取启动项（支持使用保存的凭据）
+  getBootEntries(
+    serverId: string, 
+    useSaved: boolean = false,
+    user?: string, 
+    pwd?: string
+  ): Promise<BootEntriesResponse> {
+    const params: any = { use_saved: useSaved }
+    if (!useSaved && user && pwd) {
+      params.user = user
+      params.pwd = pwd
+    }
+    
+    return apiClient.get(`/bare-metals/${serverId}/boot-entries`, { params })
   },
 
-  setBootEntry(serverId: string, bootId: string, user: string, pwd: string): Promise<void> {
-    return apiClient.post(`/bare-metals/${serverId}/set-boot`, null, {
-      params: { boot_id: bootId, user, pwd }
-    })
+  // 设置启动项（支持使用保存的凭据）
+  setBootEntry(
+    serverId: string, 
+    bootId: string, 
+    useSaved: boolean = false,
+    setDefault: boolean = false,
+    user?: string, 
+    pwd?: string
+  ): Promise<void> {
+    const params: any = { 
+      boot_id: bootId,
+      use_saved: useSaved,
+      set_default: setDefault
+    }
+    if (!useSaved && user && pwd) {
+      params.user = user
+      params.pwd = pwd
+    }
+    
+    return apiClient.post(`/bare-metals/${serverId}/set-boot`, null, { params })
+  },
+
+  // 验证凭据
+  verifyCredentials(
+    serverId: string, 
+    useSaved: boolean = false,
+    user?: string, 
+    pwd?: string
+  ): Promise<CredentialsVerifyResponse> {
+    const params: any = { use_saved: useSaved }
+    if (!useSaved && user && pwd) {
+      params.user = user
+      params.pwd = pwd
+    }
+    
+    return apiClient.post(`/bare-metals/${serverId}/verify-credentials`, null, { params })
+  },
+
+  // 更新服务器凭据
+  updateServerCredentials(serverId: string, credentials: ServerCredentials): Promise<void> {
+    return apiClient.put(`/bare-metals/${serverId}/credentials`, credentials)
   },
 
   powerCycle(serverId: string): Promise<void> {

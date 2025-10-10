@@ -248,11 +248,16 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
 
 @router.get("/bare-metals/{server_id}/boot-entries",
             response_model=bare_metal_schemas.BootEntriesResponse)
-async def get_boot_entries(server_id: str, user: str = Query(...), pwd: str = Query(...)):
+async def get_boot_entries(
+    server_id: str, 
+    use_saved: bool = Query(False),
+    user: str = Query(None),
+    pwd: str = Query(None)
+):
     """
     Get all boot entries (name only) and current boot
     """
-    LOG.info(f"Received request to get boot entries for server {server_id}")
+    LOG.info(f"Received request to get boot entries for server {server_id}, use_saved: {use_saved}")
     server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
     if not server:
         LOG.warning(f"Server {server_id} not found for boot entries query")
@@ -263,8 +268,22 @@ async def get_boot_entries(server_id: str, user: str = Query(...), pwd: str = Qu
         LOG.error(f"Server {server_id} has no host_ip configured")
         raise HTTPException(status_code=400, detail="host_ip not configured for this server")
 
+    # 确定使用的凭据
+    if use_saved:
+        credentials_user = server.get("os_user")
+        credentials_pwd = server.get("os_password")
+        if not credentials_user or not credentials_pwd:
+            raise HTTPException(
+                status_code=400, detail="No saved OS credentials found for this server")
+    else:
+        if not user or not pwd:
+            raise HTTPException(
+                status_code=400, detail="Username and password are required when use_saved is False")
+        credentials_user = user
+        credentials_pwd = pwd
+
     LOG.info(f"Retrieving boot entries from server {server_id} ({host_ip})")
-    result = ssh_execute(host_ip, "efibootmgr -v", user, pwd).splitlines()
+    result = ssh_execute(host_ip, "efibootmgr -v", credentials_user, credentials_pwd).splitlines()
 
     entries = {}
     current_boot = None
@@ -293,12 +312,22 @@ async def get_boot_entries(server_id: str, user: str = Query(...), pwd: str = Qu
 
 
 @router.post("/bare-metals/{server_id}/set-boot")
-async def set_boot_entry(server_id: str, boot_id: str = Query(...),
-                         user: str = Query(...), pwd: str = Query(...)):
+async def set_boot_entry(
+    server_id: str, 
+    boot_id: str = Query(...),
+    use_saved: bool = Query(False),
+    set_default: bool = Query(False),
+    user: str = Query(None),
+    pwd: str = Query(None)
+):
     """
     Set boot entry for bare metal server
     """
-    LOG.info(f"Received request to set boot entry {boot_id} for server {server_id}")
+    LOG.info(
+        f"Received request to set boot entry {boot_id} for server {server_id}, "
+        f"use_saved: {use_saved}, set_default: {set_default}"
+    )
+
     server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
     if not server:
         LOG.warning(f"Server {server_id} not found for set boot operation")
@@ -309,10 +338,34 @@ async def set_boot_entry(server_id: str, boot_id: str = Query(...),
         LOG.error(f"Server {server_id} has no host_ip configured")
         raise HTTPException(status_code=400, detail="host_ip not configured for this server")
 
-    LOG.info(f"Setting boot entry {boot_id} on server {server_id} ({host_ip})")
-    ssh_execute(host_ip, f"efibootmgr -n {boot_id}", user, pwd)
-    LOG.info(f"Successfully set boot entry {boot_id} for server {server_id}")
-    return {"message": f"BootNext set to {boot_id} on {host_ip}"}
+    if use_saved:
+        credentials_user = server.get("os_user")
+        credentials_pwd = server.get("os_password")
+        if not credentials_user or not credentials_pwd:
+            raise HTTPException(
+                status_code=400, detail="No saved OS credentials found for this server")
+    else:
+        if not user or not pwd:
+            raise HTTPException(
+                status_code=400, detail="Username and password are required when use_saved is False")
+        credentials_user = user
+        credentials_pwd = pwd
+
+    LOG.info(f"Setting next boot entry {boot_id} on server {server_id} ({host_ip})")
+    ssh_execute(host_ip, f"efibootmgr -n {boot_id}", credentials_user, credentials_pwd)
+
+    if set_default:
+        LOG.info(f"Setting default boot entry {boot_id} on server {server_id} ({host_ip})")
+        out = ssh_execute(host_ip, "efibootmgr | grep BootOrder", credentials_user, credentials_pwd)
+        boot_order_line = out.strip().split(":")[-1].strip()
+        boot_list = boot_order_line.split(",")
+        if boot_id in boot_list:
+            boot_list.remove(boot_id)
+        new_order = ",".join([boot_id] + boot_list)
+        ssh_execute(host_ip, f"efibootmgr -o {new_order}", credentials_user, credentials_pwd)
+        LOG.info(f"Default boot entry set to {boot_id} with order {new_order}")
+
+    return {"message": f"BootNext set to {boot_id} on {host_ip}" + (", default updated" if set_default else "")}
 
 
 def get_bmc_ip(host_ip: str) -> str:
@@ -405,3 +458,87 @@ async def power_reset_server(server_id: str):
 
     LOG.info(f"Successfully completed power reset for server {server_id}")
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}
+
+
+@router.post("/bare-metals/{server_id}/verify-credentials")
+async def verify_credentials(
+    server_id: str,
+    use_saved: bool = Query(False),
+    user: str = Query(None),
+    pwd: str = Query(None)
+):
+    """
+    验证服务器操作系统凭据是否有效
+    """
+    LOG.info(f"Verifying OS credentials for server {server_id}, use_saved: {use_saved}")
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    host_ip = server.get("host_ip")
+    if not host_ip:
+        raise HTTPException(status_code=400, detail="host_ip not configured for this server")
+
+    # 确定使用的凭据
+    if use_saved:
+        credentials_user = server.get("os_user")
+        credentials_pwd = server.get("os_password")
+        if not credentials_user or not credentials_pwd:
+            return {
+                "valid": False, 
+                "has_saved_credentials": False,
+                "message": "No saved OS credentials found"
+            }
+    else:
+        if not user or not pwd:
+            raise HTTPException(
+                status_code=400, detail="Username and password are required when use_saved is False")
+        credentials_user = user
+        credentials_pwd = pwd
+
+    try:
+        # 执行一个简单的命令来验证凭据
+        result = ssh_execute(host_ip, "echo 'connection_test'", credentials_user, credentials_pwd)
+        if "connection_test" in result:
+            return {
+                "valid": True, 
+                "has_saved_credentials": use_saved or bool(server.get("os_user")),
+                "message": "OS credentials are valid"
+            }
+        else:
+            return {
+                "valid": False,
+                "has_saved_credentials": use_saved or bool(server.get("os_user")),
+                "message": "Invalid response from server"
+            }
+    except Exception as e:
+        LOG.error(f"OS credential verification failed for server {server_id}: {str(e)}")
+        return {
+            "valid": False,
+            "has_saved_credentials": use_saved or bool(server.get("os_user")),
+            "message": f"SSH connection failed: {str(e)}"
+        }
+
+
+@router.put("/bare-metals/{server_id}/credentials")
+async def update_server_credentials(
+    server_id: str,
+    credentials: bare_metal_schemas.ServerCredentials
+):
+    """
+    更新服务器操作系统凭据
+    """
+    LOG.info(f"Updating OS credentials for server {server_id}")
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    update_data = {
+        "os_user": credentials.user,
+        "os_password": credentials.pwd
+    }
+
+    db.update_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id}, update_data)
+
+    LOG.info(f"Successfully updated OS credentials for server {server_id}")
+    return {"message": "OS credentials updated successfully"}

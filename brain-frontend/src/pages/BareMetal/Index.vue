@@ -72,30 +72,30 @@
     <!-- 启动项认证对话框 -->
     <el-dialog
       v-model="bootAuthDialogVisible"
-      title="修改启动项 - 身份认证"
+      title="修改启动项 - 操作系统身份认证"
       width="400px"
     >
       <div class="dialog-tip">
         <el-alert
-          title="请确保服务器在线且网络连接正常"
+          title="请确保服务器在线且网络连接正常，需要操作系统管理员权限"
           type="warning"
           :closable="false"
           show-icon
         />
       </div>
-      <el-form :model="bootAuthForm" label-width="80px">
-        <el-form-item label="用户名" required>
+      <el-form :model="bootAuthForm" label-width="100px">
+        <el-form-item label="OS用户名" required>
           <el-input
             v-model="bootAuthForm.user"
-            placeholder="请输入服务器用户名"
+            placeholder="请输入服务器操作系统用户名"
             clearable
           />
         </el-form-item>
-        <el-form-item label="密码" required>
+        <el-form-item label="OS密码" required>
           <el-input
             v-model="bootAuthForm.pwd"
             type="password"
-            placeholder="请输入服务器密码"
+            placeholder="请输入服务器操作系统密码"
             clearable
             show-password
           />
@@ -107,10 +107,10 @@
         <el-button 
           type="primary" 
           @click="handleBootAuth" 
-          :loading="bootAuthLoading"
+          :loading="bootAuthLoading || credentialCheckLoading"
           :disabled="!bootAuthForm.user || !bootAuthForm.pwd"
         >
-          查询启动项
+          {{ credentialCheckLoading ? '验证中...' : '查询启动项' }}
         </el-button>
       </template>
     </el-dialog>
@@ -121,8 +121,16 @@
       :title="`修改启动项 - ${currentServer?.name}`"
       width="500px"
     >
+      <div class="dialog-tip" v-if="currentServer?.os_user">
+        <el-alert
+          title="将用缓存的操作系统凭据设置启动项"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+      </div>
       <el-form label-width="100px">
-        <el-form-item label="选择启动项" required>
+        <el-form-item label="下一次启动" required>
           <el-select
             v-model="selectedBootId"
             placeholder="请选择启动项"
@@ -136,6 +144,35 @@
               :value="id"
             />
           </el-select>
+        </el-form-item>
+        
+        <!-- 新增：设置为默认启动项选项 -->
+        <el-form-item>
+          <el-checkbox v-model="setDefaultBoot">
+            同时设置为默认启动项
+          </el-checkbox>
+          <el-tooltip 
+              effect="dark" 
+              content="勾选后会将此启动项调整到启动顺序的最前面"
+              placement="top"
+            >
+              <el-icon style="margin-left: 4px; cursor: help;">
+                <QuestionFilled />
+              </el-icon>
+            </el-tooltip>
+        </el-form-item>
+        
+        <el-form-item label="当前启动项" v-if="currentBootId">
+          <div class="boot-info">
+            <span>{{ currentBootName }}</span>
+            <el-tag size="small" type="success">当前</el-tag>
+          </div>
+        </el-form-item>
+        <el-form-item label="下一次启动" v-if="nextBootId">
+          <div class="boot-info">
+            <span>{{ nextBootName }}</span>
+            <el-tag size="small" type="warning">下一次</el-tag>
+          </div>
         </el-form-item>
       </el-form>
       
@@ -199,11 +236,13 @@ const bootAuthDialogVisible = ref(false)
 const bootSetDialogVisible = ref(false)
 const bootAuthLoading = ref(false)
 const setBootLoading = ref(false)
+const credentialCheckLoading = ref(false)
 const currentServer = ref<BareMetalServer | null>(null)
 const bootEntries = ref<Record<string, string>>({})
 const currentBootId = ref('')
 const nextBootId = ref<string | null>('')
 const selectedBootId = ref('')
+const setDefaultBoot = ref(false) // 新增：是否设置为默认启动项
 const bootAuthForm = reactive({
   user: '',
   pwd: ''
@@ -297,18 +336,71 @@ const handleDelete = async (server: BareMetalServer) => {
 }
 
 // 修改启动项 - 第一步：认证
-const handleBootConfig = (server: BareMetalServer) => {
+const handleBootConfig = async (server: BareMetalServer) => {
   currentServer.value = server
-  bootAuthForm.user = ''
-  bootAuthForm.pwd = ''
   bootEntries.value = {}
   currentBootId.value = ''
   nextBootId.value = ''
   selectedBootId.value = ''
+  setDefaultBoot.value = false // 重置勾选状态
+  // 首先尝试使用保存的凭据
+  if (server.os_user && server.os_password) {
+    try {
+      credentialCheckLoading.value = true
+      ElMessage.info('正在校验操作系统凭据...')
+      
+      // 验证保存的凭据是否仍然有效
+      const verifyResult = await bareApi.verifyCredentials(server.id, true)
+      
+      if (verifyResult.valid) {
+        // 凭据有效，直接获取启动项
+        await getBootEntriesWithSavedCredentials()
+        return
+      } else {
+        ElMessage.warning('缓存的凭据已失效，请重新输入服务器账号密码')
+      }
+    } catch (error) {
+      ElMessage.warning('缓存的凭据验证失败，请重新输入服务器账号密码')
+    } finally {
+      credentialCheckLoading.value = false
+    }
+  }
+  
+  // 没有保存的凭据或凭据无效，显示认证对话框
+  bootAuthForm.user = ''
+  bootAuthForm.pwd = ''
   bootAuthDialogVisible.value = true
 }
 
-// 启动项认证
+// 使用保存的凭据获取启动项
+const getBootEntriesWithSavedCredentials = async () => {
+  if (!currentServer.value) return
+  
+  try {
+    bootAuthLoading.value = true
+    const response = await bareApi.getBootEntries(currentServer.value.id, true)
+    
+    bootEntries.value = response.entries
+    currentBootId.value = response.current
+    nextBootId.value = response.next || null
+    selectedBootId.value = ''
+    
+    // 直接打开设置对话框，不显示认证对话框
+    bootSetDialogVisible.value = true
+    bootAuthDialogVisible.value = false
+    
+    ElMessage.success('启动项查询成功')
+  } catch (error) {
+    ElMessage.error('使用缓存的凭据查询启动项失败')
+    console.error('查询启动项失败:', error)
+    // 失败时显示认证对话框
+    bootAuthDialogVisible.value = true
+  } finally {
+    bootAuthLoading.value = false
+  }
+}
+
+// 启动项认证（输入新凭据的情况）
 const handleBootAuth = async () => {
   if (!currentServer.value) return
   
@@ -316,6 +408,7 @@ const handleBootAuth = async () => {
     bootAuthLoading.value = true
     const response = await bareApi.getBootEntries(
       currentServer.value.id, 
+      false,
       bootAuthForm.user, 
       bootAuthForm.pwd
     )
@@ -323,7 +416,27 @@ const handleBootAuth = async () => {
     bootEntries.value = response.entries
     currentBootId.value = response.current
     nextBootId.value = response.next || null
-    selectedBootId.value = '' // 清空选择
+    selectedBootId.value = ''
+    
+    // 认证成功，保存凭据到服务器
+    try {
+      await bareApi.updateServerCredentials(currentServer.value.id, {
+        user: bootAuthForm.user,
+        pwd: bootAuthForm.pwd
+      })
+      
+      // 更新本地数据
+      const serverIndex = servers.value.findIndex(s => s.id === currentServer.value!.id)
+      if (serverIndex !== -1) {
+        servers.value[serverIndex].os_user = bootAuthForm.user
+        servers.value[serverIndex].os_password = bootAuthForm.pwd
+      }
+      
+      ElMessage.success('操作系统凭据已保存')
+    } catch (saveError) {
+      console.warn('保存凭据失败:', saveError)
+      // 这里不显示错误消息，因为主要功能（获取启动项）已经成功
+    }
     
     // 关闭认证对话框，打开设置对话框
     bootAuthDialogVisible.value = false
@@ -338,20 +451,37 @@ const handleBootAuth = async () => {
   }
 }
 
-// 设置启动项
+// 修改设置启动项逻辑，优先使用保存的凭据
 const handleSetBoot = async () => {
   if (!currentServer.value || !selectedBootId.value) return
   
   try {
     setBootLoading.value = true
-    await bareApi.setBootEntry(
-      currentServer.value.id,
-      selectedBootId.value,
-      bootAuthForm.user,
-      bootAuthForm.pwd
-    )
     
-    ElMessage.success('启动项设置成功')
+    // 如果有保存的凭据，使用保存的凭据，否则使用当前输入的凭据
+    const hasSavedCredentials = !!(currentServer.value.os_user && currentServer.value.os_password)
+    
+    if (hasSavedCredentials) {
+      // 使用保存的凭据
+      await bareApi.setBootEntry(
+        currentServer.value.id,
+        selectedBootId.value,
+        true, // use_saved = true
+        setDefaultBoot.value // 新增参数
+      )
+    } else {
+      // 使用当前输入的凭据
+      await bareApi.setBootEntry(
+        currentServer.value.id,
+        selectedBootId.value,
+        false, // use_saved = false
+        setDefaultBoot.value, // 新增参数
+        bootAuthForm.user,
+        bootAuthForm.pwd
+      )
+    }
+    
+    ElMessage.success(`启动项设置成功${setDefaultBoot.value ? '，并已设置为默认启动项' : ''}`)
     bootSetDialogVisible.value = false
     
     // 更新下一次启动项
@@ -454,6 +584,26 @@ onMounted(() => {
   color: #e6a23c;
   font-weight: 500;
   font-family: 'Courier New', monospace;
+}
+
+/* 新增样式 */
+.option-tip {
+  margin-top: 8px;
+  color: #909399;
+}
+
+.option-tip small {
+  font-size: 12px;
+}
+
+.boot-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.boot-info .el-tag {
+  margin-left: 8px;
 }
 
 :deep(.danger-item) {

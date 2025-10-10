@@ -36,6 +36,8 @@ class BareMetalServerUpdate(BaseModel):
     host_ip: Optional[str] = None
     mac: Optional[str] = None
     gateway: Optional[str] = None
+    os_user: Optional[str] = None
+    os_password: Optional[str] = None 
 
 
 class BareMetalServer(BaseModel):
@@ -44,10 +46,17 @@ class BareMetalServer(BaseModel):
     description: Optional[str] = None
     host_ip: Optional[str] = None
     mac: Optional[str] = None
-    gateway: Optional[str] = None
+    gateway: Optional[str] = None  
+    os_user: Optional[str] = None 
+    os_password: Optional[str] = None
 
 
 class BootEntriesResponse(BaseModel):
     entries: Dict[str, str]
     current: str
     next: str = Field(None)
+
+
+class ServerCredentials(BaseModel):
+    user: str
+    pwd: str

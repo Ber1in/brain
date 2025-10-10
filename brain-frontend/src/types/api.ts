@@ -124,6 +124,19 @@ export interface BareMetalServerUpdate {
   host_ip?: string
   gateway?: string
   mac?: string
+  os_user?: string;
+  os_password?: string;
+}
+
+export interface CredentialsVerifyResponse {
+  valid: boolean;
+  has_saved_credentials: boolean;
+  message: string;
+}
+
+export interface ServerCredentials {
+  user: string;
+  pwd: string;
 }
 
 export interface UploadToImage {
