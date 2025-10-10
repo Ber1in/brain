@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import re
 import paramiko
 import subprocess
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -254,7 +255,7 @@ async def get_boot_entries(
     pwd: str = Query(None)
 ):
     """
-    Get all boot entries (name only) and current boot
+    Get all boot entries (name + parent disk) and current boot
     """
     LOG.info(f"Received request to get boot entries for server {server_id}, use_saved: {use_saved}")
     server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
@@ -267,7 +268,6 @@ async def get_boot_entries(
         LOG.error(f"Server {server_id} has no host_ip configured")
         raise HTTPException(status_code=400, detail="host_ip not configured for this server")
 
-    # 确定使用的凭据
     if use_saved:
         credentials_user = server.get("os_user")
         credentials_pwd = server.get("os_password")
@@ -283,25 +283,39 @@ async def get_boot_entries(
         credentials_pwd = pwd
 
     LOG.info(f"Retrieving boot entries from server {server_id} ({host_ip})")
-    result = ssh_execute(host_ip, "efibootmgr -v", credentials_user, credentials_pwd).splitlines()
+    efiboot_output = ssh_execute(host_ip, "efibootmgr -v",
+                                 credentials_user, credentials_pwd).splitlines()
+    lsblk_output = ssh_execute(host_ip, "lsblk -no PARTUUID,PKNAME",
+                               credentials_user, credentials_pwd).splitlines()
+
+    uuid_to_disk = {}
+    for line in lsblk_output:
+        parts = line.strip().split()
+        if len(parts) == 2:
+            uuid, disk = parts
+            uuid_to_disk[uuid.lower()] = disk
 
     entries = {}
     current_boot = None
     next_boot = None
-    for line in result:
+
+    for line in efiboot_output:
         line = line.strip()
-        # Get current boot entry
         if line.startswith("BootCurrent"):
             current_boot = line.split(":")[1].strip()
         elif line.startswith("BootNext"):
             next_boot = line.split(":")[1].strip()
-        # Only parse system boot entries (exclude PXE / EFI Shell)
         elif line.startswith("Boot") and "*" in line:
             boot_num, rest = line.split("*", 1)
-            boot_num = boot_num.strip().replace("Boot", "")  # Remove Boot prefix
+            boot_num = boot_num.strip().replace("Boot", "")
             name = rest.strip().split("\t")[0]
             if not name.startswith("UEFI: PXE") and "EFI Shell" not in name:
-                entries[boot_num] = name
+                m = re.search(r"GPT,([0-9a-fA-F-]+)", line)
+                disk = ""
+                if m:
+                    uuid = m.group(1).lower()
+                    disk = uuid_to_disk.get(uuid, "")
+                entries[boot_num] = f"{name} ({disk})" if disk else name
 
     LOG.info(f"Found {len(entries)} boot entries for server {server_id}")
     return {

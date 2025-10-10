@@ -165,7 +165,9 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
         LOG.info(f"Configuring cloudinit for disk {disk_id}")
         system_user = data.system_user
         user_data = {"users": [{"name": system_user.name,
-                               "password": system_user.password}]}
+                                "password": system_user.password}]}
+        if baremetal.get("name"):
+            user_data["hostname"] = baremetal.get("name")
 
         network_config = {
             "version": 1,
