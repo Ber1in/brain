@@ -2,6 +2,7 @@
 # All rights reserved.
 
 import paramiko
+import subprocess
 from pyghmi.ipmi import command
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
@@ -326,20 +327,36 @@ def get_bmc_ip(host_ip: str) -> str:
 
 
 def ipmi_power_action(bmcip: str, action: str):
-    """Execute IPMI power action via pyghmi"""
+    """Execute IPMI power action via ipmitool command"""
     LOG.info(f"Executing IPMI {action} on BMC {bmcip}")
+
+    if action not in ("cycle", "reset"):
+        raise HTTPException(status_code=400, detail=f"Unsupported IPMI action: {action}")
+
+    # ipmitool chassis power 命令参数
+    cmd = [
+        "ipmitool",
+        "-I", "lanplus",
+        "-H", bmcip,
+        "-U", BMC_USER,
+        "-P", BMC_PASS,
+        "chassis",
+        "power",
+        action
+    ]
+
     try:
-        cmd = command.Command(bmc=bmcip, userid=BMC_USER, password=BMC_PASS)
-        if action == "cycle":
-            cmd.set_power("cycle")
-        elif action == "reset":
-            cmd.set_power("reset")
-        else:
-            raise ValueError(f"Unsupported IPMI action: {action}")
-        LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            LOG.error(f"IPMI {action} failed on BMC {bmcip}: {result.stderr.strip()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"IPMI {action} failed: {result.stderr.strip()}"
+            )
+        LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}: {result.stdout.strip()}")
     except Exception as e:
-        LOG.error(f"IPMI {action} failed on BMC {bmcip}: {e}")
-        raise HTTPException(status_code=500, detail=f"IPMI {action} failed: {e}")
+        LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
+        raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
 
 
 @router.post("/bare-metals/{server_id}/power-cycle")
