@@ -49,13 +49,13 @@
                     <el-icon><Setting /></el-icon>
                     <span>修改启动项</span>
                   </el-dropdown-item>
+                  <el-dropdown-item command="warmReset">
+                    <el-icon><RefreshRight /></el-icon>
+                    <span>重启</span>
+                  </el-dropdown-item>
                   <el-dropdown-item command="coldReset">
                     <el-icon><RefreshLeft /></el-icon>
                     <span>冷重启</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item command="warmReset">
-                    <el-icon><RefreshRight /></el-icon>
-                    <span>热重启</span>
                   </el-dropdown-item>
                   <el-dropdown-item command="delete" divided class="danger-item">
                     <el-icon><Delete /></el-icon>
