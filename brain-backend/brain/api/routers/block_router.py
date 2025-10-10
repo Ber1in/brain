@@ -34,9 +34,13 @@ SNAP_NAME = "brain_snap"
 
 async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=True):
     disk_data = data.system_disk
+    LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
+             f"on MV200 server {disk_data.mv200_id}")
+
     # Check if image exists
     image = db.find_one(IMAGE_COLLECTION, {"id": disk_data.image_id})
     if not image:
+        LOG.warning(f"Image '{disk_data.image_id}' not found when creating system disk")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Image '{disk_data.image_id}' not found"
@@ -45,6 +49,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     # Check if MV200 server exists
     mv_server = db.find_one(MV_SERVER_COLLECTION, {"id": disk_data.mv200_id})
     if not mv_server:
+        LOG.warning(f"MV200 server '{disk_data.mv200_id}' not found when creating system disk")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"MV200 server '{disk_data.mv200_id}' not found"
@@ -52,6 +57,8 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
 
     baremetal = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": mv_server.get("bare_id")})
     if not baremetal:
+        LOG.warning(f"Bare Metal server {mv_server.get('bare_id')} not"
+                    f" found for MV200 {disk_data.mv200_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Bare Metal server {mv_server.get('bare_id')} not found"
@@ -60,16 +67,19 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     # Generate unique ID and RBD path
     mon_host = image.get("mon_host")
     soc_ip = mv_server.get("ip_address")
-
     host_ip = baremetal.get("host_ip")
     gateway = baremetal.get("gateway")
     mac = baremetal.get("mac")
     disk_id = str(uuid.uuid4())
     rbd_path = f"{RBD_POOL}/{disk_id}"
 
+    LOG.info(f"Generated disk ID: {disk_id}, RBD path: {rbd_path}, "
+             f"mon_host: {mon_host}, soc_ip: {soc_ip}")
+
     # Check if RBD path already exists (should be unique due to UUID)
     existing_rbd = db.find(SYSTEM_DISK_COLLECTION, {"rbd_path": rbd_path})
     if existing_rbd:
+        LOG.error(f"UUID conflict: RBD path {rbd_path} already exists")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Generated RBD path already exists (UUID conflict)"
@@ -89,6 +99,8 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
     }
 
     try:
+        LOG.info(
+            f"Starting RBD clone process for disk {disk_id} from image {image['ceph_location']}")
         cephclient = get_cephclient(mon_host)
         ceph_api.RbdSnapshotApi(
             cephclient).api_block_image_image_spec_snap_snapshot_name_clone_post(
@@ -99,18 +111,28 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
                 "child_image_name": disk_id
             }
         )
+        LOG.info(f"Successfully cloned RBD image for disk {disk_id}")
+
         rbd_api = ceph_api.RbdApi(cephclient)
         if disk_data.flatten:
+            LOG.info(f"Flattening RBD image for disk {disk_id}")
             rbd_api.api_block_image_image_spec_flatten_post(
                 image_spec=quote(f"{RBD_POOL}/{disk_id}", safe=""))
+            LOG.info(f"Successfully flattened RBD image for disk {disk_id}")
+
+        LOG.info(f"Resizing RBD image for disk {disk_id} to {disk_data.size_gb}GB")
         rbd_api.api_block_image_image_spec_put(
             image_spec=quote(f"{RBD_POOL}/{disk_id}", safe=""),
             api_block_image_image_spec_put_request={"size": disk_data.size_gb * 1024 * 1024 * 1024}
         )
+        LOG.info(f"Successfully resized RBD image for disk {disk_id}")
+
     except Exception as e:
         LOG.error(f"Failed to clone system disk {disk_id}, error: {e}")
         raise
 
+    # Create virtual block device
+    LOG.info(f"Creating virtual block device for disk {disk_id} on SOC {soc_ip}")
     dpuagentclient = get_dpuagentclient(soc_ip)
     blk_api = dpuagent_api.VblkApi(dpuagentclient)
     try:
@@ -124,16 +146,23 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
                 "bootable": True,
                 "gw_user": "admin"
             })
+        LOG.info(f"Virtual block device creation response for disk {disk_id}:"
+                 f" code={res.code}, message={res.message}")
     except Exception as e:
-        LOG.error(f"Failed to create virtblk in {soc_ip}, error: {e}")
+        LOG.error(f"Failed to create virtblk for disk {disk_id} in {soc_ip}, error: {e}")
         raise exceptions.VblkCreateException(str(e))
+
     if res.code != 0:
-        LOG.error(f"Failed to create virtblk in {soc_ip}, message: {res.message}")
+        LOG.error(
+            f"Failed to create virtblk for disk {disk_id} in {soc_ip}, message: {res.message}")
         raise exceptions.VblkCreateException(res.message)
 
     disk_dict["blk_id"] = res.uuid
-    # Set system user
+    LOG.info(f"Successfully created virtual block device for disk {disk_id} with UUID: {res.uuid}")
+
+    # Set system user and cloudinit configuration
     if cloudinit:
+        LOG.info(f"Configuring cloudinit for disk {disk_id}")
         system_user = data.system_user
         user_data = {"users": [{"name": system_user.name,
                                "password": system_user.password}]}
@@ -163,29 +192,44 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, cloudinit=Tru
             res = cloudinit_api.create_cloudinit_dpu_agent_v1_cloudinit_create_post(
                 {"user_data": user_data, "network_config": network_config})
             if res.code != 0:
-                LOG.warning(f"Failed to create cloudinit datasource for SOC {soc_ip},"
-                            f" message: {res.message}")
+                LOG.warning(f"Failed to create cloudinit datasource for SOC {soc_ip} and"
+                            f" disk {disk_id}, message: {res.message}")
+            else:
+                LOG.info(f"Successfully configured cloudinit for disk {disk_id}")
         except Exception as e:
-            LOG.error(f"Failed to create cloudinit datasource for SOC {soc_ip}, error: {e}")
+            LOG.error("Failed to create cloudinit datasource for SOC"
+                      f" {soc_ip} and disk {disk_id}, error: {e}")
+    else:
+        LOG.info(f"Skipping cloudinit configuration for disk {disk_id}")
 
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for disk {disk_id}")
     try:
         recoverapi = dpuagent_api.RecoveryApi(dpuagentclient)
         res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
         if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for disk {disk_id}: {res.message}")
             raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for disk {disk_id}")
     except Exception as e:
-        LOG.error(f"Failed to save checkpoint after create block {disk_id}: {e}")
+        LOG.error(f"Failed to save checkpoint after creating block {disk_id}: {e}")
+        raise
 
-    # Insert new system disk
+    # Insert new system disk to database
+    LOG.info(f"Inserting disk {disk_id} into database")
     db.insert(SYSTEM_DISK_COLLECTION, disk_dict)
+    LOG.info(f"Successfully created system disk {disk_id}")
 
     return disk_dict
 
 
 async def _delete_system_disk(disk_id):
+    LOG.info(f"Starting deletion process for system disk {disk_id}")
+
     # Check if disk exists
     existing_disks = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
     if not existing_disks:
+        LOG.warning(f"System disk {disk_id} not found during deletion")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="System disk not found"
@@ -193,22 +237,30 @@ async def _delete_system_disk(disk_id):
 
     soc_ip = existing_disks["mv200_ip"]
     mon_host = existing_disks["mon_host"]
+    LOG.info(f"Found disk {disk_id} with SOC IP: {soc_ip}, mon_host: {mon_host}")
 
     dpuagentclient = get_dpuagentclient(soc_ip)
 
+    # Check if this is the last disk on the SOC
     disks_with_same_ip = db.find(SYSTEM_DISK_COLLECTION, {"mv200_ip": soc_ip})
     is_last_disk = len(disks_with_same_ip) == 1
+    LOG.info(f"Disk {disk_id} is {'last' if is_last_disk else 'not last'} disk on SOC {soc_ip}")
 
     if is_last_disk:
+        LOG.info(f"Deleting cloudinit datasource for SOC {soc_ip} (last disk)")
         cloudinit_api = dpuagent_api.CloudinitApi(dpuagentclient)
         try:
             res = cloudinit_api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post()
             if res.code != 0:
                 LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, "
                             f"message: {res.message}")
+            else:
+                LOG.info(f"Successfully deleted cloudinit datasource for SOC {soc_ip}")
         except Exception as e:
             LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, error: {e}")
 
+    # Delete virtual block device
+    LOG.info(f"Deleting virtual block device for disk {disk_id}")
     blk_api = dpuagent_api.VblkApi(dpuagentclient)
     try:
         res = blk_api.delete_vblk_dpu_agent_v1_vblk_del_post(
@@ -220,36 +272,54 @@ async def _delete_system_disk(disk_id):
                 "bootable": True,
                 "gw_user": "admin",
                 "uuid": existing_disks["blk_id"]})
+        LOG.info("Virtual block device deletion response for disk "
+                 f"{disk_id}: code={res.code}, message={res.message}")
     except Exception as e:
-        LOG.error(f"Failed to delete virtblk in {soc_ip}, error: {e}")
+        LOG.error(f"Failed to delete virtblk for disk {disk_id} in {soc_ip}, error: {e}")
         raise exceptions.VblkDeleteException(str(e))
+
     if res.code != 0:
-        LOG.error(f"Failed to delete virtblk in {soc_ip}, message: {res.message}")
+        LOG.error(
+            f"Failed to delete virtblk for disk {disk_id} in {soc_ip}, message: {res.message}")
         raise exceptions.VblkDeleteException(res.message)
 
+    LOG.info(f"Successfully deleted virtual block device for disk {disk_id}")
+
+    # Save checkpoint after deletion
+    LOG.info(f"Saving checkpoint after deleting disk {disk_id}")
     try:
         recoverapi = dpuagent_api.RecoveryApi(dpuagentclient)
         res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
         if res.code != 0:
+            LOG.error(f"Failed to save checkpoint after deleting disk {disk_id}: {res.message}")
             raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint after deleting disk {disk_id}")
     except Exception as e:
-        LOG.error(f"Failed to save checkpoint after delete block {disk_id}: {e}")
+        LOG.error(f"Failed to save checkpoint after deleting block {disk_id}: {e}")
+        raise
 
+    # Delete RBD image
+    LOG.info(f"Deleting RBD image for disk {disk_id}")
     try:
         cephclient = get_cephclient(mon_host)
         ceph_api.RbdApi(cephclient).api_block_image_image_spec_delete(
             image_spec=quote(existing_disks["rbd_path"], safe=""))
+        LOG.info(f"Successfully deleted RBD image for disk {disk_id}")
     except Exception as e:
-        LOG.error(f"Failed to delete system disk {disk_id}, error: {e}")
+        LOG.error(f"Failed to delete RBD image for system disk {disk_id}, error: {e}")
         raise
 
     # Delete disk record from database
+    LOG.info(f"Deleting disk {disk_id} record from database")
     deleted_count = db.delete(SYSTEM_DISK_COLLECTION, {"id": disk_id})
     if deleted_count == 0:
+        LOG.error(f"Failed to delete disk {disk_id} record from database")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="System disk not found"
         )
+
+    LOG.info(f"Successfully completed deletion of system disk {disk_id}")
 
 
 @router.post("/system-disks", response_model=block_schemas.SystemDisk,
@@ -258,7 +328,15 @@ async def create_system_disk(data: block_schemas.BareMetalCreate):
     """
     Create a new system disk RBD from image for specific MV200 server
     """
-    return await _create_system_disk(data)
+    LOG.info(f"Received request to create system disk for MV200 {data.system_disk.mv200_id} "
+             f"with image {data.system_disk.image_id}")
+    try:
+        result = await _create_system_disk(data)
+        LOG.info(f"Successfully completed system disk creation request for disk {result['id']}")
+        return result
+    except Exception as e:
+        LOG.error(f"Failed to complete system disk creation request: {e}")
+        raise
 
 
 @router.get("/system-disks", response_model=List[block_schemas.SystemDisk])
@@ -266,9 +344,10 @@ async def get_all_system_disks():
     """
     Get all system disks list
     """
+    LOG.info("Received request to get all system disks")
     try:
         disks = db.find(SYSTEM_DISK_COLLECTION, {})
-        # Return all disks with their data (excluding mon_host and rbd_path)
+        LOG.info(f"Retrieved {len(disks)} system disks from database")
         return disks
     except Exception as e:
         LOG.error(f"Failed to get system disks: {e}")
@@ -283,16 +362,20 @@ async def get_system_disk(disk_id: str):
     """
     Get specific system disk by ID
     """
+    LOG.info(f"Received request to get system disk {disk_id}")
     try:
         disk = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
         if not disk:
+            LOG.warning(f"System disk {disk_id} not found")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="System disk not found"
             )
 
-        # Return disk information (excluding mon_host and rbd_path)
+        LOG.info(f"Successfully retrieved system disk {disk_id}")
         return disk
+    except HTTPException:
+        raise
     except Exception as e:
         LOG.error(f"Failed to get system disk {disk_id}: {e}")
         raise HTTPException(
@@ -306,22 +389,30 @@ async def update_system_disk(disk_id: str, update_data: block_schemas.SystemDisk
     """
     Update system disk information by ID
     """
+    LOG.info(f"Received request to update system disk {disk_id} with data: {update_data.dict()}")
     try:
         # Check if disk exists
         existing_disks = db.find(SYSTEM_DISK_COLLECTION, {"id": disk_id})
         if not existing_disks:
+            LOG.warning(f"System disk {disk_id} not found for update")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="System disk not found"
             )
 
         update_dict = {k: v for k, v in update_data.dict(exclude_unset=True).items()}
+        LOG.info(f"Updating system disk {disk_id} with fields: {list(update_dict.keys())}")
 
         if update_dict:
             db.update_one(SYSTEM_DISK_COLLECTION, {"id": disk_id}, update_dict)
-        # Return updated disk information (excluding mon_host and rbd_path)
+            LOG.info(f"Successfully updated system disk {disk_id} in database")
+        else:
+            LOG.info(f"No fields to update for system disk {disk_id}")
+
+        # Return updated disk information
         updated_disks = db.find(SYSTEM_DISK_COLLECTION, {"id": disk_id})
         updated_disk = updated_disks[0]
+        LOG.info(f"Successfully completed update for system disk {disk_id}")
         return updated_disk
 
     except HTTPException:
@@ -339,14 +430,27 @@ async def delete_system_disk(disk_id: str):
     """
     Delete system disk by ID
     """
-    await _delete_system_disk(disk_id)
+    LOG.info(f"Received request to delete system disk {disk_id}")
+    try:
+        await _delete_system_disk(disk_id)
+        LOG.info(f"Successfully completed deletion request for system disk {disk_id}")
+    except Exception as e:
+        LOG.error(f"Failed to complete deletion request for system disk {disk_id}: {e}")
+        raise
 
 
 @router.post("/system-disks/{disk_id}/upload", status_code=status.HTTP_202_ACCEPTED)
 async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImage):
+    """
+    Upload system disk to new image
+    """
+    LOG.info(
+        f"Received request to upload system disk {disk_id} to new image with data: {data.dict()}")
+
     # Check if disk exists
     existing_disk = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
     if not existing_disk:
+        LOG.warning(f"System disk {disk_id} not found for upload to image")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="System disk not found"
@@ -360,9 +464,14 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
     dest_pool = data.dest_pool if data.dest_pool is not None else IMAGE_POOL
     ceph_location = f'{dest_pool}/{dest_name}'
 
+    LOG.info(f"Creating new image from disk {disk_id}: name={dest_name}, pool={dest_pool}, "
+             f"ceph_location={ceph_location}")
+
+    # Check if image name already exists
     existing_image = db.find(IMAGE_COLLECTION, {"name": data.dest_name,
                                                 "mon_host": mon_host})
     if existing_image:
+        LOG.warning(f"Image with name {data.dest_name} already exists in ceph cluster {mon_host}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Image with this name already exists in ceph cluster {mon_host}"
@@ -372,13 +481,17 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
     existing_location = db.find(IMAGE_COLLECTION, {
         "ceph_location": ceph_location, "mon_host": mon_host})
     if existing_location:
+        LOG.warning(
+            f"Image with ceph location {ceph_location} already exists in ceph cluster {mon_host}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=("Image with this ceph location already exists"
                     f" in ceph cluster {mon_host}")
         )
 
+    # Copy RBD image
     try:
+        LOG.info(f"Starting RBD copy from {existing_disk['rbd_path']} to {ceph_location}")
         rbd_api.api_block_image_image_spec_copy_post(
             image_spec=quote(existing_disk["rbd_path"], safe=""),
             api_block_image_image_spec_copy_post_request={
@@ -386,10 +499,12 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
                 "dest_namespace": "",
                 "dest_pool_name": dest_pool
             })
+        LOG.info(f"Successfully copied RBD image to {ceph_location}")
     except Exception as e:
-        LOG.error(f"Failed to copy system disk {disk_id}, error: {e}")
+        LOG.error(f"Failed to copy system disk {disk_id} to {ceph_location}, error: {e}")
         raise
 
+    # Create image record
     image_dict = {
         "id": image_id,
         "name": dest_name,
@@ -400,7 +515,9 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
         "brain": True
     }
 
+    # Create snapshot
     try:
+        LOG.info(f"Creating snapshot {SNAP_NAME} for new image {ceph_location}")
         snap_api = ceph_api.RbdSnapshotApi(ceph_client)
         snap_api.api_block_image_image_spec_snap_post(
             image_spec=quote(ceph_location, safe=""),
@@ -410,13 +527,15 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
             image_spec=quote(ceph_location, safe=""),
             snapshot_name=SNAP_NAME,
             api_block_image_image_spec_snap_snapshot_name_put_request={"is_protected": True})
+        LOG.info(f"Successfully created and protected snapshot {SNAP_NAME} for {ceph_location}")
     except ApiException as e:
-        LOG.error(f"Failed to create snapshot {SNAP_NAME} of the rbd "
-                  f"{ceph_location}: {str(e)}")
+        LOG.error(f"Failed to create snapshot {SNAP_NAME} of the rbd {ceph_location}: {str(e)}")
         raise
     else:
-        # Insert new image
+        # Insert new image to database
+        LOG.info(f"Inserting new image {image_id} into database")
         db.insert(IMAGE_COLLECTION, image_dict)
+        LOG.info(f"Successfully created new image {image_id} from disk {disk_id}")
 
     # Return the created image information
     return image_dict
@@ -425,12 +544,22 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
 @router.post("/system-disks/{disk_id}/rebuild", response_model=block_schemas.SystemDisk,
              status_code=status.HTTP_202_ACCEPTED)
 async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
+    """
+    Rebuild system disk to destination image
+    """
+    LOG.info(f"Received request to rebuild system disk {disk_id} with image {image_id}")
+
     existing_disk = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
     if not existing_disk:
+        LOG.warning(f"Source system disk {disk_id} not found for rebuild")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Source system disk not found"
         )
+
+    LOG.info(f"Rebuilding disk {disk_id} from existing disk: MV200={existing_disk['mv200_id']}, "
+             f"size={existing_disk['size_gb']}GB")
+
     rebuild_data = block_schemas.BareMetalCreate(
         system_disk=block_schemas.SystemDiskCreate(
             image_id=image_id,
@@ -445,5 +574,8 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
             password="password"
         )
     )
+
     await _delete_system_disk(disk_id)
-    return await _create_system_disk(rebuild_data, cloudinit=False)
+    result = await _create_system_disk(rebuild_data, cloudinit=False)
+    LOG.info(f"Successfully completed rebuild of disk {disk_id} to new image {image_id}")
+    return result
