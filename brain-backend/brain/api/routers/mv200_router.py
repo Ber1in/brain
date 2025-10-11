@@ -91,13 +91,14 @@ async def get_all_mv_servers():
     Get all MV servers list
     """
     LOG.info("Received request to get all MV servers")
-    try:
-        servers = db.find(MV_SERVER_COLLECTION, {})
-        LOG.info(f"Retrieved {len(servers)} MV200 servers from database")
-        for server in servers:
-            setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
-            res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get()
-            server["clouddisk_enable"] = False
+    servers = db.find(MV_SERVER_COLLECTION, {})
+    for server in servers:
+        setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
+        server["clouddisk_enable"] = False
+        try:
+            res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
+                _request_timeout=5
+            )
             if res.code != 0:
                 LOG.error(f"Failed to get clouddisk enable status for SOC "
                           f"{server['ip_address']}, message: {res.message}")
@@ -105,15 +106,12 @@ async def get_all_mv_servers():
                 server["clouddisk_enable"] = res.clouddisk_enable
                 LOG.debug(f"Clouddisk enable status for SOC {server['ip_address']}: "
                           f"{res.clouddisk_enable}")
-    
-        LOG.info(f"Successfully retrieved {len(servers)} MV200 servers")
-        return servers
-    except Exception as e:
-        LOG.error(f"Failed to get MV servers: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get MV servers"
-        )
+
+        except Exception as e:
+            LOG.error(f"Failed to get clouddisk_enable for {server['ip_address']}, error: {e}")
+
+    LOG.info(f"Retrieved {len(servers)} MV200 servers from database")
+    return servers
 
 
 @router.get("/mv-servers/{server_id}", response_model=mv200_schemas.MVServer)

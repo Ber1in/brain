@@ -69,9 +69,9 @@ def get_dpuagentclient(mv200_server, username="admin", password="yunsilicon"):
                 return client  # token still valid
 
     # Need to login and get a new token
-    ceph_cfg = DpuConfiguration(f"http://{mv200_server}:8000")
-    ceph_cfg.verify_ssl = False
-    apiclient = DpuApiClient(ceph_cfg)
+    dpuagent_cfg = DpuConfiguration(f"http://{mv200_server}:8000")
+    dpuagent_cfg.verify_ssl = False
+    apiclient = DpuApiClient(dpuagent_cfg)
 
     token_api = dpuagentauth.AuthApi(api_client=apiclient)
     try:
