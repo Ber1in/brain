@@ -93,7 +93,20 @@ async def get_all_mv_servers():
     LOG.info("Received request to get all MV servers")
     try:
         servers = db.find(MV_SERVER_COLLECTION, {})
-        LOG.info(f"Retrieved {len(servers)} MV servers from database")
+        LOG.info(f"Retrieved {len(servers)} MV200 servers from database")
+        for server in servers:
+            setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
+            res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get()
+            server["clouddisk_enable"] = False
+            if res.code != 0:
+                LOG.error(f"Failed to get clouddisk enable status for SOC "
+                          f"{server['ip_address']}, message: {res.message}")
+            else:
+                server["clouddisk_enable"] = res.clouddisk_enable
+                LOG.debug(f"Clouddisk enable status for SOC {server['ip_address']}: "
+                          f"{res.clouddisk_enable}")
+    
+        LOG.info(f"Successfully retrieved {len(servers)} MV200 servers")
         return servers
     except Exception as e:
         LOG.error(f"Failed to get MV servers: {e}")
@@ -117,6 +130,17 @@ async def get_mv_server(server_id: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="MV server not found"
             )
+
+        setting_api = SettingsApi(get_dpuagentclient(server["ip_address"]))
+        res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get()
+        server["clouddisk_enable"] = False
+        if res.code != 0:
+            LOG.error(f"Failed to get clouddisk enable status for SOC "
+                      f"{server['ip_address']}, message: {res.message}")
+        else:
+            server["clouddisk_enable"] = res.clouddisk_enable
+            LOG.info(f"Clouddisk enable status for SOC {server['ip_address']}: "
+                     f"{res.clouddisk_enable}")
 
         LOG.info(f"Successfully retrieved MV server {server_id}")
         return server
