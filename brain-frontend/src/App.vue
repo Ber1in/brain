@@ -48,7 +48,7 @@
             <el-dropdown @command="handleCommand">
               <span class="user-info">
                 <el-icon><User /></el-icon>
-                管理员
+                {{ authStore.username }}
                 <el-icon><ArrowDown /></el-icon>
               </span>
               <template #dropdown>
@@ -71,12 +71,18 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 应用启动时初始化认证状态
+onMounted(() => {
+  authStore.init()
+})
 
 const handleCommand = (command: string) => {
   if (command === 'logout') {

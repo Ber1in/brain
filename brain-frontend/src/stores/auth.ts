@@ -1,16 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { LoginCredentials, TokenResponse } from '@/types/api'
+import { LoginCredentials, TokenResponse, User } from '@/types/api'
 import { authApi } from '@/api/auth'
 import router from '@/router'
+import { ElMessage } from 'element-plus'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string>('')
   const refreshTokenValue = ref<string>('')
   const tokenExpiry = ref<number>(0)
+  const user = ref<User | null>(null)
 
   const isAuthenticated = computed(() => {
     return !!accessToken.value && Date.now() < tokenExpiry.value
+  })
+
+  // 获取当前用户名
+  const username = computed(() => {
+    return user.value?.username || '用户'
   })
 
   // 设置token信息
@@ -32,12 +39,25 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('token_expiry', tokenExpiry.value.toString())
   }
 
+  // 设置用户信息
+  const setUser = (credentials: LoginCredentials) => {
+    user.value = {
+      username: credentials.username
+      // 可以添加其他默认字段
+    }
+    localStorage.setItem('user_info', JSON.stringify(user.value))
+  }
+
   // 登录
   const login = async (credentials: LoginCredentials) => {
     try {
       console.log('开始登录...')
       const response: TokenResponse = await authApi.login(credentials)
       setTokens(response)
+      
+      // 登录成功后直接记录用户名
+      setUser(credentials)
+      
       console.log('登录成功')
       return response
     } catch (error: any) {
@@ -60,7 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('Token刷新成功')
       return true
     } catch (error: any) {
-      console.error('Token刷新失败:', error.response.data)
+      console.error('Token刷新失败:', error.response?.data)
       // 只是抛出错误，不调用 logout
       throw error
     }
@@ -100,10 +120,12 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = ''
     refreshTokenValue.value = ''
     tokenExpiry.value = 0
+    user.value = null
     
     localStorage.removeItem('auth_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('token_expiry')
+    localStorage.removeItem('user_info')
     
     if (message) {
       setTimeout(() => {
@@ -119,14 +141,24 @@ export const useAuthStore = defineStore('auth', () => {
     const storedToken = localStorage.getItem('auth_token')
     const storedRefreshToken = localStorage.getItem('refresh_token')
     const storedExpiry = localStorage.getItem('token_expiry')
+    const storedUser = localStorage.getItem('user_info')
     
     if (storedToken && storedRefreshToken && storedExpiry) {
       accessToken.value = storedToken
       refreshTokenValue.value = storedRefreshToken
       tokenExpiry.value = parseInt(storedExpiry)
+
+      if (storedUser) {
+        try {
+          user.value = JSON.parse(storedUser)
+        } catch (error) {
+          console.error('解析用户信息失败:', error)
+        }
+      }
       
-      console.log('从localStorage恢复Token状态:', {
-        expiryTime: new Date(parseInt(storedExpiry)).toLocaleString()
+      console.log('从localStorage恢复状态:', {
+        expiryTime: new Date(parseInt(storedExpiry)).toLocaleString(),
+        user: user.value
       })
     }
   }
@@ -134,7 +166,9 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     accessToken,
     refreshToken: refreshTokenValue,
+    user,
     isAuthenticated,
+    username,
     login,
     refreshToken,
     checkAndRefreshToken,
