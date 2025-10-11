@@ -27,7 +27,7 @@
             <span class="highlight-name">{{ getBareName(row.bare_id) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="clouddisk_enable" label="支持云盘启动">
+        <el-table-column prop="clouddisk_enable" label="支持云盘启动" width="140">
           <template #header>
             <span>支持云盘启动</span>
             <el-tooltip 
@@ -41,9 +41,15 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-tag :type="row.clouddisk_enable ? 'success' : 'danger'">
-              {{ row.clouddisk_enable ? '是' : '否' }}
-            </el-tag>
+            <el-switch
+              v-model="row.clouddisk_enable"
+              :loading="row.switchLoading"
+              @change="(value) => handleSwitchChange(value, row)"
+              active-text="是"
+              inactive-text="否"
+              active-color="#67c23a"
+              inactive-color="#f56c6c"
+            />
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -82,7 +88,7 @@ import { bareApi } from '@/api/bare'
 import type { MVServer, BareMetalServer } from '@/types/api'
 
 const loading = ref(false)
-const servers = ref<MVServer[]>([])
+const servers = ref<(MVServer & { switchLoading?: boolean })[]>([])
 const bares = ref<BareMetalServer[]>([])
 
 const loadData = async () => {
@@ -92,7 +98,11 @@ const loadData = async () => {
       bareApi.getAll(),
       mv200Api.getAll()
     ])
-    servers.value = serversResponse
+    // 为每个服务器添加switchLoading状态
+    servers.value = serversResponse.map(server => ({
+      ...server,
+      switchLoading: false
+    }))
     bares.value = baresResponse
   } catch (error) {
     ElMessage.error('加载MV200服务器列表失败')
@@ -114,6 +124,25 @@ const bareMap = computed(() => {
 const getBareName = (bareId: string) => {
   const bare = bareMap.value.get(bareId)
   return bare ? `${bare.name} (${bare.host_ip})` : bareId
+}
+
+// 处理开关状态变化
+const handleSwitchChange = async (value: boolean, server: MVServer & { switchLoading?: boolean }) => {
+  if (server.switchLoading) return
+  
+  server.switchLoading = true
+  try {
+    await mv200Api.update(server.id, {
+      clouddisk_enable: value
+    })
+    ElMessage.success(`已${value ? '启用' : '禁用'}云盘启动支持`)
+  } catch (error) {
+    // 更新失败，恢复原来的状态
+    server.clouddisk_enable = !value
+    ElMessage.error('状态更新失败')
+  } finally {
+    server.switchLoading = false
+  }
 }
 
 // 下拉菜单命令处理

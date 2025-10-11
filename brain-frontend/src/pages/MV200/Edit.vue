@@ -19,11 +19,7 @@
           <div class="readonly-info">裸金属名称: {{ getBareName(originalData.bare_id) }}</div>
         </el-form-item>
 
-        <el-form-item label="服务器名称" prop="name">
-          <el-input v-model="form.name" placeholder="输入服务器名称" />
-        </el-form-item>
-
-        <el-form-item label="支持云盘启动" prop="clouddisk_enable">
+        <el-form-item label="支持云盘启动">
           <template #label>
             <span>支持云盘启动</span>
             <el-tooltip 
@@ -36,11 +32,13 @@
               </el-icon>
             </el-tooltip>
           </template>
-          <el-radio-group v-model="form.clouddisk_enable">
-            <el-radio :label="true">是</el-radio>
-            <el-radio :label="false">否</el-radio>
-          </el-radio-group>
+          <el-input :value="originalData.clouddisk_enable ? '是' : '否'" disabled />
         </el-form-item>
+
+        <el-form-item label="服务器名称" prop="name">
+          <el-input v-model="form.name" placeholder="输入服务器名称" />
+        </el-form-item>
+
 
         <el-form-item label="描述">
           <el-input 
@@ -89,8 +87,7 @@ const originalData = reactive({
 
 const form = ref<MVServerUpdate>({
   name: '',
-  description: '',
-  clouddisk_enable: false
+  description: ''
 })
 
 const rules: FormRules = {
@@ -114,7 +111,6 @@ const loadServerData = async () => {
 
     form.value.name = server.name
     form.value.description = server.description || ''
-    form.value.clouddisk_enable = server.clouddisk_enable || false
   } catch (error) {
     ElMessage.error('加载服务器数据失败')
     router.push('/mv200')
@@ -154,3 +150,11 @@ onMounted(() => {
   loadServerData()
 })
 </script>
+
+<style scoped>
+.readonly-info {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+</style>
