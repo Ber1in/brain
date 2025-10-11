@@ -18,7 +18,7 @@
               </template>
             </el-input>
             <el-button type="primary" @click="$router.push('/bare/create')">
-              录入裸金属服务器
+              纳管裸金属服务器
             </el-button>
           </div>
         </div>

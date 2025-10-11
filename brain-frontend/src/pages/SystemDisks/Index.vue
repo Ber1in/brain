@@ -9,7 +9,7 @@
               v-model="searchKeyword"
               placeholder="搜索ID、镜像名、SOC IP、裸金属服务器、创建人或描述"
               clearable
-              style="width: 450px; margin-right: 16px;"
+              style="width: 410px; margin-right: 16px;"
               @input="handleSearch"
               @clear="handleSearch"
             >
@@ -18,7 +18,7 @@
               </template>
             </el-input>
             <el-button type="primary" @click="$router.push('/system-disks/create')">
-              创建系统磁盘
+              创建云系统盘
             </el-button>
           </div>
         </div>

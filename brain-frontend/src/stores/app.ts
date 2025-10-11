@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export const useAppStore = defineStore('app', () => {
   const loading = ref(false)
-  const pageTitle = ref('Brain 管理系统')
+  const pageTitle = ref('云服务器管理系统')
 
   const setLoading = (value: boolean) => {
     loading.value = value

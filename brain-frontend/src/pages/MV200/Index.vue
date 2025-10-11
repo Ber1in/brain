@@ -18,7 +18,7 @@
               </template>
             </el-input>
             <el-button type="primary" @click="$router.push('/mv200/create')">
-              录入MV200服务器
+              纳管MV200
             </el-button>
           </div>
         </div>

@@ -13,7 +13,7 @@ LDAP_SERVER = 'ldaps://it-srv-idc001.yunsilicon.com:636'
 LDAP_DN_SUFFIX = "@yunsilicon.com"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 1
+REFRESH_TOKEN_EXPIRE_DAYS = 3
 
 ACCESS_SECRET_KEY_FILE = "/opt/brain/keys/access.key"
 REFRESH_SECRET_KEY_FILE = "/opt/brain/keys/refresh.key"

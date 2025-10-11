@@ -137,12 +137,15 @@ router.beforeEach(async (to, from, next) => {
     if (authStore.isAuthenticated) {
       next()
     } else {
-      // 检查是否可以刷新token
-      const canRefresh = await authStore.checkAndRefreshToken()
-      if (canRefresh) {
-        next()
-      } else {
-        next('/login')
+      try {
+        const canRefresh = await authStore.checkAndRefreshToken()
+        if (canRefresh) {
+          next()
+        } else {
+          authStore.logout('登录已过期，请重新登录')
+        }
+      } catch (error) {
+        authStore.logout('登录状态异常，请重新登录')
       }
     }
   } else if (to.path === '/login' && authStore.isAuthenticated) {

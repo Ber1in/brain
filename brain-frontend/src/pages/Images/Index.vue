@@ -17,7 +17,7 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-button type="primary" @click="$router.push('/images/create')"> 录入镜像 </el-button>
+            <el-button type="primary" @click="$router.push('/images/create')"> 纳管系统镜像 </el-button>
           </div>
         </div>
       </template>

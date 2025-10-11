@@ -3,7 +3,7 @@
     <el-container v-if="$route.path !== '/login'" class="layout-container">
       <el-aside width="200px" class="sidebar">
         <div class="logo">
-          <h2>Brain 管理系统</h2>
+          <h2>云服务器管理系统</h2>
         </div>
         <el-menu
           router

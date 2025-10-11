@@ -10,6 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshTokenValue = ref<string>('')
   const tokenExpiry = ref<number>(0)
   const user = ref<User | null>(null)
+  const autoLogin = ref<boolean>(false) // 添加自动登录标志
 
   const isAuthenticated = computed(() => {
     return !!accessToken.value && Date.now() < tokenExpiry.value
@@ -37,21 +38,23 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('auth_token', response.access_token)
     localStorage.setItem('refresh_token', response.refresh_token)
     localStorage.setItem('token_expiry', tokenExpiry.value.toString())
+    localStorage.setItem('auto_login', autoLogin.value.toString()) // 保存自动登录设置
   }
 
   // 设置用户信息
   const setUser = (credentials: LoginCredentials) => {
     user.value = {
       username: credentials.username
-      // 可以添加其他默认字段
     }
     localStorage.setItem('user_info', JSON.stringify(user.value))
   }
 
   // 登录
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials, rememberMe: boolean = false) => {
     try {
-      console.log('开始登录...')
+      console.log('开始登录...', { rememberMe })
+      autoLogin.value = rememberMe // 设置自动登录标志
+      
       const response: TokenResponse = await authApi.login(credentials)
       setTokens(response)
       
@@ -66,8 +69,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 刷新 token - 简化版本
+  // 刷新 token
   const refreshToken = async (): Promise<boolean> => {
+    // 检查是否启用了自动登录
+    if (!autoLogin.value) {
+      console.log('自动登录未启用，不刷新token')
+      throw new Error('自动登录未启用')
+    }
+
     const storedRefreshToken = localStorage.getItem('refresh_token')
     if (!storedRefreshToken) {
       throw new Error('没有可用的refresh_token')
@@ -81,7 +90,6 @@ export const useAuthStore = defineStore('auth', () => {
       return true
     } catch (error: any) {
       console.error('Token刷新失败:', error.response?.data)
-      // 只是抛出错误，不调用 logout
       throw error
     }
   }
@@ -89,25 +97,26 @@ export const useAuthStore = defineStore('auth', () => {
   // 检查token状态，如果需要则刷新
   const checkAndRefreshToken = async (): Promise<boolean> => {
     if (!accessToken.value) {
-      logout('请重新登录')
+      console.log('没有access_token')
       return false
     }
 
     const timeUntilExpiry = tokenExpiry.value - Date.now()
     console.log('Token状态检查:', {
       剩余时间: Math.round(timeUntilExpiry / 1000) + '秒',
-      需要刷新: timeUntilExpiry < 2 * 60 * 1000 // 10分钟内过期就刷新
+      需要刷新: timeUntilExpiry < 5 * 60 * 1000, // 5分钟内过期就刷新
+      自动登录启用: autoLogin.value
     })
 
-    // 如果token在10分钟内过期，提前刷新
-    if (timeUntilExpiry < 2 * 60 * 1000) {
+    // 如果token在5分钟内过期且启用了自动登录，提前刷新
+    if (timeUntilExpiry < 5 * 60 * 1000 && autoLogin.value) {
       try {
         await refreshToken()
         return true
       } catch (error) {
         console.error('自动刷新token失败')
-        logout('登录已过期，请重新登录')
-        return false
+        // 自动刷新失败，但不立即退出，等到真正过期再处理
+        return timeUntilExpiry > 0
       }
     }
 
@@ -121,11 +130,13 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokenValue.value = ''
     tokenExpiry.value = 0
     user.value = null
+    autoLogin.value = false // 清除自动登录设置
     
     localStorage.removeItem('auth_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('token_expiry')
     localStorage.removeItem('user_info')
+    localStorage.removeItem('auto_login')
     
     if (message) {
       setTimeout(() => {
@@ -142,6 +153,7 @@ export const useAuthStore = defineStore('auth', () => {
     const storedRefreshToken = localStorage.getItem('refresh_token')
     const storedExpiry = localStorage.getItem('token_expiry')
     const storedUser = localStorage.getItem('user_info')
+    const storedAutoLogin = localStorage.getItem('auto_login')
     
     if (storedToken && storedRefreshToken && storedExpiry) {
       accessToken.value = storedToken
@@ -156,9 +168,15 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
       
+      // 恢复自动登录设置
+      if (storedAutoLogin) {
+        autoLogin.value = storedAutoLogin === 'true'
+      }
+      
       console.log('从localStorage恢复状态:', {
         expiryTime: new Date(parseInt(storedExpiry)).toLocaleString(),
-        user: user.value
+        user: user.value,
+        autoLogin: autoLogin.value
       })
     }
   }
@@ -167,6 +185,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     refreshToken: refreshTokenValue,
     user,
+    autoLogin,
     isAuthenticated,
     username,
     login,
