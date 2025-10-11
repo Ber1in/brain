@@ -106,7 +106,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
         ceph_api.RbdSnapshotApi(
             cephclient).api_block_image_image_spec_snap_snapshot_name_clone_post(
             image_spec=quote(image["ceph_location"], safe=""),
-                snapshot_name=SNAP_NAME,
+            snapshot_name=SNAP_NAME,
             api_block_image_image_spec_snap_snapshot_name_clone_post_request={
                 "child_pool_name": RBD_POOL,
                 "child_image_name": disk_id
@@ -445,6 +445,35 @@ async def get_system_disk(disk_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get system disk"
         )
+
+
+@router.post("/system-disks/{disk_id}/flatten", response_model=block_schemas.SystemDisk)
+async def flatten_system_disk(disk_id: str):
+    LOG.info(f"Flattening RBD image for disk {disk_id}")
+
+    # Check if disk exists
+    existing_disk = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
+    if not existing_disk:
+        LOG.warning(f"System disk {disk_id} not found for upload to image")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="System disk not found"
+        )
+    try:
+        cephclient = get_cephclient(existing_disk["mon_host"])
+        rbd_api = ceph_api.RbdApi(cephclient)
+        rbd_api.api_block_image_image_spec_flatten_post(
+            image_spec=quote(f"{RBD_POOL}/{disk_id}", safe=""))
+        existing_disk["flatten"] = True
+    except Exception as e:
+        LOG.error(f"Failed to flatten rbd image for disk {disk_id}, error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+    db.update_one(SYSTEM_DISK_COLLECTION, {"id": disk_id}, existing_disk)
+    LOG.info(f"Successfully flattened RBD image for disk {disk_id}")
+    return existing_disk
 
 
 @router.put("/system-disks/{disk_id}", response_model=block_schemas.SystemDisk)

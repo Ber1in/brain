@@ -30,5 +30,10 @@ export const systemDisksApi = {
     return apiClient.post(`/system-disks/${id}/rebuild`, null, {
       params: { image_id: imageId }
     })
+  },
+
+  // api/system-disks.ts
+  flatten(id: string): Promise<void> {
+    return apiClient.post(`/system-disks/${id}/flatten`)
   }
 }

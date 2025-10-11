@@ -14,8 +14,13 @@
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="镜像名称">
           <template #default="{ row }">
-            <span class="highlight-name">{{ getImageName(row.image_id) }}</span>
-            <span class="highlight-ip">({{ row.mon_host }})</span>
+            <template v-if="imageMap.get(row.image_id)">
+              <span class="highlight-name">{{ getImageName(row.image_id) }}</span>
+              <span class="highlight-ip">({{ row.mon_host }})</span>
+            </template>
+            <template v-else>
+              <span class="highlight-deleted">镜像已删除</span>
+            </template>
           </template>
         </el-table-column>
         <el-table-column label="SOC IP">
@@ -74,6 +79,23 @@
                   <el-dropdown-item command="rebuild">
                     <el-icon><Refresh /></el-icon>
                     <span>重置镜像</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item 
+                    command="flatten" 
+                    :disabled="row.flatten"
+                  >
+                    <el-icon><Operation /></el-icon>
+                    <span>Flatten</span>
+                    <el-tooltip 
+                      v-if="row.flatten" 
+                      effect="dark" 
+                      content="该云盘已经flatten" 
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;">
+                        <InfoFilled />
+                      </el-icon>
+                    </el-tooltip>
                   </el-dropdown-item>
                   <el-dropdown-item command="delete" divided class="danger-item">
                     <el-icon><Delete /></el-icon>
@@ -180,13 +202,44 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Flatten确认对话框 -->
+    <el-dialog
+      v-model="flattenDialogVisible"
+      title="确认Flatten操作"
+      width="400px"
+    >
+      <div class="warning-message">
+        <el-alert
+          title="重要提示"
+          type="warning"
+          :closable="false"
+          description="Flatten操作完成后将不再依赖镜像，提升系统盘性能。但Flatten过程中磁盘性能可能有所下降"
+          show-icon
+        />
+      </div>
+      <div class="confirm-message">
+        <p>确定要对系统磁盘 <strong>"{{ currentDisk?.id }}"</strong> 执行Flatten操作吗？</p>
+      </div>
+      
+      <template #footer>
+        <el-button @click="flattenDialogVisible = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="confirmFlatten" 
+          :loading="flattenLoading"
+        >
+          确认Flatten
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete } from '@element-plus/icons-vue'
+import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete, Operation, InfoFilled } from '@element-plus/icons-vue'
 import { systemDisksApi } from '@/api/system-disks'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
@@ -216,6 +269,10 @@ const rebuildForm = reactive({
   image_id: ''
 })
 
+// Flatten相关
+const flattenDialogVisible = ref(false)
+const flattenLoading = ref(false)
+
 // 计算属性：创建ID到名称的映射
 const imageMap = computed(() => {
   const map = new Map<string, string>()
@@ -243,7 +300,7 @@ const bareMap = computed(() => {
 
 // 根据ID获取镜像名称
 const getImageName = (imageId: string) => {
-  return imageMap.value.get(imageId) || imageId
+  return imageMap.value.get(imageId) || "镜像已删除"
 }
 
 // 根据ID获取SOC IP名称
@@ -306,6 +363,9 @@ const handleCommand = (command: string, disk: SystemDisk) => {
     case 'rebuild':
       handleRebuildFromImage(disk)
       break
+    case 'flatten':
+      handleFlatten(disk)
+      break
     case 'delete':
       handleDelete(disk)
       break
@@ -313,6 +373,11 @@ const handleCommand = (command: string, disk: SystemDisk) => {
 }
 
 // 编辑
+const handleEdit = (disk: SystemDisk) => {
+  window.location.href = `/system-disks/edit/${disk.id}`
+}
+
+// 删除
 const handleDelete = async (disk: SystemDisk) => {
   try {
     await ElMessageBox.confirm(
@@ -447,6 +512,36 @@ const confirmRebuild = async () => {
   }
 }
 
+// Flatten操作
+const handleFlatten = (disk: SystemDisk) => {
+  currentDisk.value = disk
+  flattenDialogVisible.value = true
+}
+
+// 确认Flatten操作
+const confirmFlatten = async () => {
+  if (!currentDisk.value) return
+  
+  try {
+    flattenLoading.value = true
+    
+    // 调用Flatten API
+    await systemDisksApi.flatten(currentDisk.value.id)
+    
+    ElMessage.success('Flatten操作已提交，系统盘性能将得到提升')
+    flattenDialogVisible.value = false
+    
+    // 重新加载数据以更新状态
+    await loadData()
+    
+  } catch (error) {
+    ElMessage.error('Flatten操作失败')
+    console.error('Flatten操作失败:', error)
+  } finally {
+    flattenLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadData()
 })
@@ -469,6 +564,20 @@ onMounted(() => {
   margin-top: 4px;
 }
 
+.confirm-message {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.confirm-message p {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.confirm-message strong {
+  color: #67c23a;
+}
+
 /* 名称高亮样式 - 只改变字体颜色 */
 .highlight-name {
   color: #67c23a;
@@ -480,6 +589,13 @@ onMounted(() => {
   color: #409eff;
   font-weight: 500;
   font-family: 'Courier New', monospace;
+}
+
+/* 已删除镜像样式 - 置灰显示 */
+.highlight-deleted {
+  color: #c0c4cc;
+  font-weight: 500;
+  font-style: italic;
 }
 
 /* 磁盘大小高亮样式 - 只改变字体颜色 */
@@ -512,5 +628,14 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled) {
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled:hover) {
+  background-color: transparent;
 }
 </style>
