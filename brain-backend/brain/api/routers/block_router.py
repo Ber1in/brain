@@ -169,7 +169,8 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
         user_data = {"users": [{"name": system_user.name,
                                 "password": system_user.password}]}
         if baremetal.get("name"):
-            user_data["hostname"] = baremetal.get("name")
+            user_data["hostname"] = re.sub(
+                r'[^A-Za-z0-9-]', '', baremetal.get("name", "")) or "default-host"
 
         network_config = {
             "version": 1,

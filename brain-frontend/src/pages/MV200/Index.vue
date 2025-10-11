@@ -4,13 +4,27 @@
       <template #header>
         <div class="card-header">
           <span>MV200卡管理</span>
-          <el-button type="primary" @click="$router.push('/mv200/create')">
-            录入MV200服务器
-          </el-button>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索ID、名称、SOC IP、裸金属服务器或描述"
+              clearable
+              style="width: 350px; margin-right: 16px;"
+              @input="handleSearch"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="$router.push('/mv200/create')">
+              录入MV200服务器
+            </el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="servers" v-loading="loading">
+      <el-table :data="filteredServers" v-loading="loading">
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column prop="name" label="名称">
           <template #default="{ row }">
@@ -82,7 +96,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, MoreFilled, Edit, Delete } from '@element-plus/icons-vue'
+import { QuestionFilled, MoreFilled, Edit, Delete, Search } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { bareApi } from '@/api/bare'
 import type { MVServer, BareMetalServer } from '@/types/api'
@@ -90,6 +104,7 @@ import type { MVServer, BareMetalServer } from '@/types/api'
 const loading = ref(false)
 const servers = ref<(MVServer & { switchLoading?: boolean })[]>([])
 const bares = ref<BareMetalServer[]>([])
+const searchKeyword = ref('')
 
 const loadData = async () => {
   loading.value = true
@@ -120,10 +135,43 @@ const bareMap = computed(() => {
   return map
 })
 
+// 计算属性：过滤服务器列表
+const filteredServers = computed(() => {
+  if (!searchKeyword.value) {
+    return servers.value
+  }
+  
+  const keyword = searchKeyword.value.toLowerCase()
+  return servers.value.filter(server => {
+    // 搜索ID
+    if (server.id.toLowerCase().includes(keyword)) return true
+    
+    // 搜索MV200名称
+    if (server.name.toLowerCase().includes(keyword)) return true
+    
+    // 搜索SOC IP
+    if (server.ip_address.toLowerCase().includes(keyword)) return true
+    
+    // 搜索裸金属服务器信息
+    const bareInfo = getBareName(server.bare_id).toLowerCase()
+    if (bareInfo.includes(keyword)) return true
+    
+    // 搜索描述
+    if (server.description && server.description.toLowerCase().includes(keyword)) return true
+    
+    return false
+  })
+})
+
 // 根据ID获取裸金属服务器信息
 const getBareName = (bareId: string) => {
   const bare = bareMap.value.get(bareId)
   return bare ? `${bare.name} (${bare.host_ip})` : bareId
+}
+
+// 处理搜索
+const handleSearch = () => {
+  // 搜索逻辑已经在 computed 属性中处理，这里可以留空或添加其他逻辑
 }
 
 // 处理开关状态变化
@@ -184,6 +232,11 @@ onMounted(() => {
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
   align-items: center;
 }
 

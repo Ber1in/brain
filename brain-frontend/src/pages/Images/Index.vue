@@ -4,11 +4,25 @@
       <template #header>
         <div class="card-header">
           <span>镜像管理</span>
-          <el-button type="primary" @click="$router.push('/images/create')"> 录入镜像 </el-button>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索ID、镜像名、Ceph位置或描述"
+              clearable
+              style="width: 350px; margin-right: 16px;"
+              @input="handleSearch"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="$router.push('/images/create')"> 录入镜像 </el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="images" v-loading="loading">
+      <el-table :data="filteredImages" v-loading="loading">
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column prop="name" label="名称">
           <template #default="{ row }">
@@ -75,7 +89,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled, Edit, Delete } from '@element-plus/icons-vue'
+import { MoreFilled, Edit, Delete, Search, InfoFilled } from '@element-plus/icons-vue'
 import { imagesApi } from '@/api/images'
 import { systemDisksApi } from '@/api/system-disks'
 import type { Image, SystemDisk } from '@/types/api'
@@ -83,6 +97,31 @@ import type { Image, SystemDisk } from '@/types/api'
 const loading = ref(false)
 const images = ref<Image[]>([])
 const systemDisks = ref<SystemDisk[]>([])
+const searchKeyword = ref('')
+
+// 计算属性：过滤镜像列表
+const filteredImages = computed(() => {
+  if (!searchKeyword.value) {
+    return images.value
+  }
+  
+  const keyword = searchKeyword.value.toLowerCase()
+  return images.value.filter(image => {
+    // 搜索ID
+    if (image.id.toLowerCase().includes(keyword)) return true
+    
+    // 搜索镜像名
+    if (image.name.toLowerCase().includes(keyword)) return true
+    
+    // 搜索Ceph位置
+    if (image.ceph_location.toLowerCase().includes(keyword)) return true
+    
+    // 搜索描述
+    if (image.description && image.description.toLowerCase().includes(keyword)) return true
+    
+    return false
+  })
+})
 
 // 计算属性：获取依赖当前镜像的未flatten系统盘
 const getDependentDisks = (imageId: string) => {
@@ -121,6 +160,11 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 处理搜索
+const handleSearch = () => {
+  // 搜索逻辑已经在 computed 属性中处理，这里可以留空或添加其他逻辑
 }
 
 // 下拉菜单命令处理
@@ -179,6 +223,11 @@ onMounted(() => {
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
   align-items: center;
 }
 

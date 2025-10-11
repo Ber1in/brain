@@ -4,13 +4,27 @@
       <template #header>
         <div class="card-header">
           <span>裸金属云系统磁盘</span>
-          <el-button type="primary" @click="$router.push('/system-disks/create')">
-            创建系统磁盘
-          </el-button>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索ID、镜像名、SOC IP、裸金属服务器或描述"
+              clearable
+              style="width: 350px; margin-right: 16px;"
+              @input="handleSearch"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="$router.push('/system-disks/create')">
+              创建系统磁盘
+            </el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="disks" v-loading="loading" style="width: 100%">
+      <el-table :data="filteredDisks" v-loading="loading" style="width: 100%">
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="镜像名称">
           <template #default="{ row }">
@@ -239,7 +253,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete, Operation, InfoFilled } from '@element-plus/icons-vue'
+import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete, Operation, InfoFilled, Search } from '@element-plus/icons-vue'
 import { systemDisksApi } from '@/api/system-disks'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
@@ -251,6 +265,7 @@ const disks = ref<SystemDisk[]>([])
 const images = ref<Image[]>([])
 const mv200Servers = ref<MVServer[]>([])
 const bares = ref<BareMetalServer[]>([])
+const searchKeyword = ref('')
 
 // 上传为镜像相关
 const uploadDialogVisible = ref(false)
@@ -296,6 +311,36 @@ const bareMap = computed(() => {
     map.set(bare.id, bare)
   })
   return map
+})
+
+// 计算属性：过滤磁盘列表
+const filteredDisks = computed(() => {
+  if (!searchKeyword.value) {
+    return disks.value
+  }
+  
+  const keyword = searchKeyword.value.toLowerCase()
+  return disks.value.filter(disk => {
+    // 搜索ID
+    if (disk.id.toLowerCase().includes(keyword)) return true
+    
+    // 搜索镜像名
+    const imageName = getImageName(disk.image_id).toLowerCase()
+    if (imageName.includes(keyword)) return true
+    
+    // 搜索SOC IP
+    if (disk.mv200_ip.toLowerCase().includes(keyword)) return true
+    
+    // 搜索裸金属服务器信息
+    const hostName = getHostName(disk.mv200_id).toLowerCase()
+    const hostIP = getHostIP(disk.mv200_id).toLowerCase()
+    if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
+    
+    // 搜索描述
+    if (disk.description && disk.description.toLowerCase().includes(keyword)) return true
+    
+    return false
+  })
 })
 
 // 根据ID获取镜像名称
@@ -349,6 +394,11 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 处理搜索
+const handleSearch = () => {
+  // 搜索逻辑已经在 computed 属性中处理，这里可以留空或添加其他逻辑
 }
 
 // 下拉菜单命令处理
@@ -528,7 +578,7 @@ const confirmFlatten = async () => {
     // 调用Flatten API
     await systemDisksApi.flatten(currentDisk.value.id)
     
-    ElMessage.success('Flatten操作已提交，系统盘性能将得到提升')
+    ElMessage.success('Flatten操作已提交')
     flattenDialogVisible.value = false
     
     // 重新加载数据以更新状态
@@ -551,6 +601,11 @@ onMounted(() => {
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
   align-items: center;
 }
 

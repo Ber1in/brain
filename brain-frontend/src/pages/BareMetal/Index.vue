@@ -4,13 +4,27 @@
       <template #header>
         <div class="card-header">
           <span>裸金属服务器管理</span>
-          <el-button type="primary" @click="$router.push('/bare/create')">
-            录入裸金属服务器
-          </el-button>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索ID、名称、管理IP、MAC或描述"
+              clearable
+              style="width: 350px; margin-right: 16px;"
+              @input="handleSearch"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="$router.push('/bare/create')">
+              录入裸金属服务器
+            </el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="servers" v-loading="loading">
+      <el-table :data="filteredServers" v-loading="loading">
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column prop="name" label="名称">
           <template #default="{ row }">
@@ -230,12 +244,13 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled, Edit, Delete, Setting, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
+import { MoreFilled, Edit, Delete, Setting, RefreshLeft, RefreshRight, Search, QuestionFilled } from '@element-plus/icons-vue'
 import { bareApi } from '@/api/bare'
 import type { BareMetalServer } from '@/types/api'
 
 const loading = ref(false)
 const servers = ref<BareMetalServer[]>([])
+const searchKeyword = ref('')
 
 // 启动项相关
 const bootAuthDialogVisible = ref(false)
@@ -260,6 +275,33 @@ const resetDialogVisible = ref(false)
 const resetLoading = ref(false)
 const resetType = ref<'cold' | 'warm'>('cold')
 const resetDialogTitle = ref('')
+
+// 计算属性：过滤服务器列表
+const filteredServers = computed(() => {
+  if (!searchKeyword.value) {
+    return servers.value
+  }
+  
+  const keyword = searchKeyword.value.toLowerCase()
+  return servers.value.filter(server => {
+    // 搜索ID
+    if (server.id.toLowerCase().includes(keyword)) return true
+    
+    // 搜索名称
+    if (server.name.toLowerCase().includes(keyword)) return true
+    
+    // 搜索管理IP
+    if (server.host_ip.toLowerCase().includes(keyword)) return true
+    
+    // 搜索MAC地址
+    if (server.mac.toLowerCase().includes(keyword)) return true
+    
+    // 搜索描述
+    if (server.description && server.description.toLowerCase().includes(keyword)) return true
+    
+    return false
+  })
+})
 
 // 计算当前启动项名称
 const currentBootName = computed(() => {
@@ -310,6 +352,11 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 处理搜索
+const handleSearch = () => {
+  // 搜索逻辑已经在 computed 属性中处理，这里可以留空或添加其他逻辑
 }
 
 // 下拉菜单命令处理
@@ -569,6 +616,11 @@ onMounted(() => {
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
   align-items: center;
 }
 
