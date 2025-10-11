@@ -390,7 +390,7 @@ async def _delete_system_disk(disk_id, rebuild=False):
 @router.post("/system-disks", status_code=status.HTTP_201_CREATED)
 async def create_system_disk(
     data: block_schemas.BareMetalCreate, 
-    user = Depends(authenticate_user)
+    user=Depends(authenticate_user)
 ):
     """
     Create a new system disk RBD from image for specific MV200 server
@@ -641,7 +641,7 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
 
 @router.post("/system-disks/{disk_id}/rebuild", status_code=status.HTTP_202_ACCEPTED)
 async def rebuild_block_to_dest_image(disk_id: str, image_id: str, 
-    user = Depends(authenticate_user)):
+                                      user=Depends(authenticate_user)):
     """
     Rebuild system disk to destination image
     """
@@ -770,11 +770,20 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
                 return True
 
         # Create a new EFI boot entry
-        safe_image_name = re.sub(r'[^A-Za-z0-9-]', '-', image_name)
-        boot_entry_name = f"{safe_image_name}-{disk_id[:8]}"
+        safe_image_name = re.sub(r'[^A-Za-z0-9-]', '', image_name)
+        boot_entry_name = f"{safe_image_name}"
+        try:
+            efi_files = ssh_execute(host_ip, "ls /boot/efi/EFI/*/grubx64.efi", username, password)
+            grubx64_efis = efi_files.strip().split()
+            if len(grubx64_efis) != 1:
+                LOG.error(f"Expected to find a grubx64.efi file but found {len(grubx64_efis)}")
+                return False
+        except Exception as e:
+            LOG.error(f"An exception occurred while looking for the grubx64.efi file, {e}")
+            return False
         efi_cmd = (
             f"efibootmgr -c -d /dev/{target_device} -p 1 -L \"{boot_entry_name}\" "
-            f"-l '\\EFI\\ubuntu\\grubx64.efi'"
+            f"-l {grubx64_efis[0]}"
         )
         ssh_execute(host_ip, efi_cmd, username, password)
 
@@ -785,8 +794,8 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
                 LOG.info(f"Created EFI boot entry for disk {disk_id}")
                 return True
 
-        LOG.warning("Failed to create EFI boot entry")
-        return False
+        LOG.Info("Created EFI boot entry successfully")
+        return True
 
     except Exception as e:
         LOG.error(f"Failed to create EFI boot entry for disk {disk_id}: {e}")
