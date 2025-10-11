@@ -40,6 +40,7 @@ class SystemDisk(BaseModel):
     rbd_path: str = Field(..., description="Target rbd in ceph cluster")
     blk_id: int = Field(..., description="Target blk uuid in soc")
     description: Optional[str] = Field(None, description="Disk description")
+    creator: Optional[str] = Field(None, description="Creator")
 
 
 class UploadToImage(BaseModel):

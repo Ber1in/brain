@@ -24,6 +24,10 @@
           <el-input :value="`${originalData.size_gb} GB`" disabled />
         </el-form-item>
 
+        <el-form-item label="创建人">
+          <el-input :value="originalData.creator" disabled />
+        </el-form-item>
+
         <el-form-item label="描述" prop="description">
           <el-input 
             v-model="form.description" 
@@ -70,6 +74,8 @@ const originalData = reactive({
   mv200_id: '',
   mv200_ip: '',
   size_gb: 0,
+  mon_host: '',
+  creator: '',
   description: ''
 })
 
@@ -147,6 +153,7 @@ const loadDiskData = async () => {
     originalData.mv200_ip = disk.mv200_ip
     originalData.size_gb = disk.size_gb
     originalData.mon_host = disk.mon_host
+    originalData.creator = disk.creator || ''
     originalData.description = disk.description || ''
     
     form.value.description = disk.description || ''
@@ -186,4 +193,3 @@ onMounted(async () => {
   await loadDiskData()
 })
 </script>
-

@@ -7,9 +7,9 @@
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索ID、镜像名、SOC IP、裸金属服务器或描述"
+              placeholder="搜索ID、镜像名、SOC IP、裸金属服务器、创建人或描述"
               clearable
-              style="width: 350px; margin-right: 16px;"
+              style="width: 450px; margin-right: 16px;"
               @input="handleSearch"
               @clear="handleSearch"
             >
@@ -74,6 +74,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
+        <el-table-column prop="creator" label="创建人" width="90">
+          <template #default="{ row }">
+            <span class="highlight-creator">{{ row.creator }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-dropdown @command="(command) => handleCommand(command, row)" size="small">
@@ -335,6 +340,9 @@ const filteredDisks = computed(() => {
     const hostName = getHostName(disk.mv200_id).toLowerCase()
     const hostIP = getHostIP(disk.mv200_id).toLowerCase()
     if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
+    
+    // 搜索创建人
+    if (disk.creator && disk.creator.toLowerCase().includes(keyword)) return true
     
     // 搜索描述
     if (disk.description && disk.description.toLowerCase().includes(keyword)) return true
@@ -663,6 +671,11 @@ onMounted(() => {
 .highlight-true {
   color: #67c23a;
   font-weight: 600;
+}
+
+.highlight-creator {
+  color: #13c2c2;
+  font-weight: 500;
 }
 
 .highlight-false {

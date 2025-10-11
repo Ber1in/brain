@@ -68,6 +68,7 @@ export interface SystemDisk {
   rbd_path: string
   blk_id: number
   description?: string
+  creator?: string
 }
 
 export interface SystemDiskCreate {

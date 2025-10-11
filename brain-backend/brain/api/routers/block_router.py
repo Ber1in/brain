@@ -33,10 +33,10 @@ IMAGE_POOL = "images"
 SNAP_NAME = "brain_snap"
 
 
-async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False):
+async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str, rebuild=False):
     disk_data = data.system_disk
     LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
-             f"on MV200 server {disk_data.mv200_id}")
+             f"on MV200 server {disk_data.mv200_id}, creator: {creator}")
 
     # Check if image exists
     image = db.find_one(IMAGE_COLLECTION, {"id": disk_data.image_id})
@@ -96,7 +96,8 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, rebuild=False
         "mon_host": mon_host,
         "size_gb": disk_data.size_gb,
         "flatten": disk_data.flatten,
-        "description": disk_data.description
+        "description": disk_data.description,
+        "creator": creator
     }
 
     try:
@@ -387,14 +388,17 @@ async def _delete_system_disk(disk_id, rebuild=False):
 
 
 @router.post("/system-disks", status_code=status.HTTP_201_CREATED)
-async def create_system_disk(data: block_schemas.BareMetalCreate):
+async def create_system_disk(
+    data: block_schemas.BareMetalCreate, 
+    user = Depends(authenticate_user)
+):
     """
     Create a new system disk RBD from image for specific MV200 server
     """
     LOG.info(f"Received request to create system disk for MV200 {data.system_disk.mv200_id} "
-             f"with image {data.system_disk.image_id}")
+             f"with image {data.system_disk.image_id}, creator: {user}")
     try:
-        result = await _create_system_disk(data)
+        result = await _create_system_disk(data, user)
         LOG.info(f"Successfully completed system disk creation request "
                  f"with image {data.system_disk.image_id}")
         return result
@@ -636,7 +640,8 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
 
 
 @router.post("/system-disks/{disk_id}/rebuild", status_code=status.HTTP_202_ACCEPTED)
-async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
+async def rebuild_block_to_dest_image(disk_id: str, image_id: str, 
+    user = Depends(authenticate_user)):
     """
     Rebuild system disk to destination image
     """
@@ -669,7 +674,7 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str):
     )
 
     delete_res = await _delete_system_disk(disk_id, rebuild=True)
-    create_res = await _create_system_disk(rebuild_data, rebuild=True)
+    create_res = await _create_system_disk(rebuild_data, user, rebuild=True)
     LOG.info(f"Successfully completed rebuild of disk {disk_id} to new image {image_id}")
     result = {}
     if delete_res["efi_status"] == create_res["efi_status"]:
