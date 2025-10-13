@@ -57,16 +57,20 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
 
         # Get clouddisk enable status from SOC
         LOG.info(f"Getting clouddisk enable status from SOC {server_data.ip_address}")
-        setting_api = SettingsApi(get_dpuagentclient(server_data.ip_address))
-        res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get()
         server_dict["clouddisk_enable"] = False
-        if res.code != 0:
-            LOG.error(f"Failed to get clouddisk enable status for SOC "
-                      f"{server_data.ip_address}, message: {res.message}")
-        else:
-            server_dict["clouddisk_enable"] = res.clouddisk_enable
-            LOG.info(f"Clouddisk enable status for SOC {server_data.ip_address}: "
-                     f"{res.clouddisk_enable}")
+        try:
+            setapi = SettingsApi(get_dpuagentclient(server_data.ip_address))
+            res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
+                _request_timeout=3)
+            if res.code != 0:
+                LOG.error(f"Failed to get clouddisk enable status for SOC "
+                          f"{server_data.ip_address}, message: {res.message}")
+            else:
+                server_dict["clouddisk_enable"] = res.clouddisk_enable
+                LOG.info(f"Clouddisk enable status for SOC {server_data.ip_address}: "
+                         f"{res.clouddisk_enable}")
+        except Exception as e:
+            LOG.error(f"Failed to get clouddisk_enable for {server_data.ip_address}, error: {e}")
 
         # Insert new server
         db.insert(MV_SERVER_COLLECTION, server_dict)
@@ -97,8 +101,7 @@ async def get_all_mv_servers():
         try:
             setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
             res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
-                _request_timeout=5
-            )
+                _request_timeout=3)
             if res.code != 0:
                 LOG.error(f"Failed to get clouddisk enable status for SOC "
                           f"{server['ip_address']}, message: {res.message}")
@@ -120,18 +123,19 @@ async def get_mv_server(server_id: str):
     Get specific MV server by ID
     """
     LOG.info(f"Received request to get MV server {server_id}")
-    try:
-        server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
-        if not server:
-            LOG.warning(f"MV server {server_id} not found")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="MV server not found"
-            )
+    server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        LOG.warning(f"MV server {server_id} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MV server not found"
+        )
 
+    server["clouddisk_enable"] = False
+    try:
         setting_api = SettingsApi(get_dpuagentclient(server["ip_address"]))
-        res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get()
-        server["clouddisk_enable"] = False
+        res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
+            _request_timeout=3)
         if res.code != 0:
             LOG.error(f"Failed to get clouddisk enable status for SOC "
                       f"{server['ip_address']}, message: {res.message}")
@@ -140,16 +144,10 @@ async def get_mv_server(server_id: str):
             LOG.info(f"Clouddisk enable status for SOC {server['ip_address']}: "
                      f"{res.clouddisk_enable}")
 
-        LOG.info(f"Successfully retrieved MV server {server_id}")
-        return server
-    except HTTPException:
-        raise
     except Exception as e:
-        LOG.error(f"Failed to get MV server {server_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get MV server"
-        )
+        LOG.warning(f"Failed to get clouddisk_enable for {server['ip_address']}, error: {e}")
+    LOG.info(f"Successfully retrieved MV server {server_id}")
+    return server
 
 
 @router.put("/mv-servers/{server_id}", response_model=mv200_schemas.MVServer)
