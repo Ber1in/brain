@@ -42,7 +42,7 @@ const router = createRouter({
       name: 'MV200',
       component: () => import('@/pages/MV200/Index.vue'),
       meta: {
-        title: 'MV200卡管理',
+        title: 'MV200管理',
         requiresAuth: true,
       },
     },

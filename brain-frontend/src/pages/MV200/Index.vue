@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>MV200卡管理</span>
+          <span>MV200管理</span>
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"

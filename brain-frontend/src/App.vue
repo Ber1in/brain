@@ -27,7 +27,7 @@
           </el-menu-item>
           <el-menu-item index="/mv200">
             <el-icon><Cpu /></el-icon>
-            <span>MV200卡管理</span>
+            <span>MV200管理</span>
           </el-menu-item>
           <el-menu-item index="/system-disks">
             <el-icon><DataBoard /></el-icon>
