@@ -29,24 +29,24 @@
         <el-table-column label="镜像名称">
           <template #default="{ row }">
             <template v-if="imageMap.get(row.image_id)">
-              <span class="highlight-name">{{ getImageName(row.image_id) }}</span>
-              <span class="highlight-ip">({{ row.mon_host }})</span>
+              <div class="highlight-name">{{ getImageName(row.image_id) }}</div>
+              <div class="highlight-ip">({{ row.mon_host }})</div>
             </template>
             <template v-else>
-              <span class="highlight-deleted">源镜像已删除</span>
+              <div class="highlight-deleted">源镜像已删除</div>
             </template>
           </template>
         </el-table-column>
         <el-table-column label="SOC IP">
           <template #default="{ row }">
-            <span class="highlight-name">{{ getMV200Name(row.mv200_id) }}</span>
-            <span class="highlight-ip">({{ row.mv200_ip }})</span>
+            <div class="highlight-name">{{ getMV200Name(row.mv200_id) }}</div>
+            <div class="highlight-ip">({{ row.mv200_ip }})</div>
           </template>
         </el-table-column>
         <el-table-column label="裸金属服务器">
           <template #default="{ row }">
-            <span class="highlight-name">{{ getHostName(row.mv200_id) }}</span>
-            <span class="highlight-ip">({{ getHostIP(row.mv200_id) }})</span>
+            <div class="highlight-name">{{ getHostName(row.mv200_id) }}</div>
+            <div class="highlight-ip">({{ getHostIP(row.mv200_id) }})</div>
           </template>
         </el-table-column>
         <el-table-column prop="size_gb" label="磁盘大小(GB)" width="120">
