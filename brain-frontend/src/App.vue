@@ -17,18 +17,27 @@
             <el-icon><House /></el-icon>
             <span>仪表板</span>
           </el-menu-item>
-          <el-menu-item index="/images">
-            <el-icon><Picture /></el-icon>
-            <span>镜像管理</span>
-          </el-menu-item>
-          <el-menu-item index="/bare">
-            <el-icon><Monitor /></el-icon>
-            <span>裸金属服务器管理</span>
-          </el-menu-item>
-          <el-menu-item index="/mv200">
-            <el-icon><Cpu /></el-icon>
-            <span>MV200管理</span>
-          </el-menu-item>
+          
+          <!-- 资源纳管子菜单 -->
+          <el-sub-menu index="resource-management">
+            <template #title>
+              <el-icon><Management /></el-icon>
+              <span>资源纳管</span>
+            </template>
+            <el-menu-item index="/images">
+              <el-icon><Picture /></el-icon>
+              <span>镜像管理</span>
+            </el-menu-item>
+            <el-menu-item index="/bare">
+              <el-icon><Monitor /></el-icon>
+              <span>裸金属服务器管理</span>
+            </el-menu-item>
+            <el-menu-item index="/mv200">
+              <el-icon><Cpu /></el-icon>
+              <span>MV200管理</span>
+            </el-menu-item>
+          </el-sub-menu>
+
           <el-menu-item index="/system-disks">
             <el-icon><DataBoard /></el-icon>
             <span>云系统盘管理</span>
