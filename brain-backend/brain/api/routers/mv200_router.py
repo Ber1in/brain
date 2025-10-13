@@ -93,9 +93,9 @@ async def get_all_mv_servers():
     LOG.info("Received request to get all MV servers")
     servers = db.find(MV_SERVER_COLLECTION, {})
     for server in servers:
-        setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
         server["clouddisk_enable"] = False
         try:
+            setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
             res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
                 _request_timeout=5
             )
