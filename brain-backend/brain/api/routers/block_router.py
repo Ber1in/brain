@@ -794,32 +794,85 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
                 LOG.info(f"Boot entry already exists for PARTUUID {partuuid}")
                 return True
 
-        # Create a new EFI boot entry
-        safe_image_name = re.sub(r'[^A-Za-z0-9-]', '', image_name)
-        boot_entry_name = f"{safe_image_name}"
+        partition_number = target_partition[len(target_device):]  
+
         try:
-            efi_files = ssh_execute(host_ip, "ls /boot/efi/EFI/*/grubx64.efi", username, password)
-            grubx64_efis = efi_files.strip().split()
-            if len(grubx64_efis) != 1:
-                LOG.error(f"Expected to find a grubx64.efi file but found {len(grubx64_efis)}")
-                return False
+            # Create temporary mount point
+            mount_point_cmd = "mktemp -d"
+            mount_point = ssh_execute(host_ip, mount_point_cmd, username, password).strip()
+
+            # Mount the EFI partition of the target device
+            mount_cmd = f"mount /dev/{target_partition} {mount_point}"
+            ssh_execute(host_ip, mount_cmd, username, password)
+
+            try:
+                # Preferentially search for shimx64.efi (Secure Boot compatible)
+                efi_files = ssh_execute(
+                    host_ip,
+                    f"find {mount_point} -name shimx64.efi -type f", username, password)
+                shim_efis = efi_files.strip().split('\n')
+                shim_efis = [efi for efi in shim_efis if efi]
+
+                if shim_efis:
+                    # Prefer using shimx64.efi
+                    selected_efi = shim_efis[0]
+                    LOG.info("Using shimx64.efi for Secure Boot compatibility")
+                else:
+                    # Fall back to grubx64.efi if shim is not found
+                    efi_files = ssh_execute(
+                        host_ip,
+                        f"find {mount_point} -name grubx64.efi -type f", username, password)
+                    grub_efis = efi_files.strip().split('\n')
+                    grub_efis = [efi for efi in grub_efis if efi]
+
+                    if grub_efis:
+                        selected_efi = grub_efis[0]
+                        LOG.info("Using grubx64.efi (Secure Boot may be disabled)")
+                    else:
+                        LOG.error(f"No suitable EFI files found on /dev/{target_partition}")
+                        return False
+
+                # Convert absolute path to relative path within the EFI partition
+                relative_efi_path = selected_efi.replace(mount_point, "").replace("/", "\\")
+                LOG.info(f"Selected EFI file: {selected_efi}, UEFI path: {relative_efi_path}")
+
+                # Determine boot entry name based on EFI path
+                if "centos" in relative_efi_path.lower():
+                    boot_entry_name = "CentOS Boot Manager"
+                elif "ubuntu" in relative_efi_path.lower():
+                    boot_entry_name = "Ubuntu"
+                elif "redhat" in relative_efi_path.lower():
+                    boot_entry_name = "Red Hat Enterprise Linux"
+                elif "rocky" in relative_efi_path.lower():
+                    boot_entry_name = "Rocky Linux"
+                elif "alma" in relative_efi_path.lower():
+                    boot_entry_name = "AlmaLinux"
+                elif "debian" in relative_efi_path.lower():
+                    boot_entry_name = "Debian"
+                else:
+                    safe_image_name = re.sub(r'[^A-Za-z0-9-]', '', image_name)
+                    boot_entry_name = f"{safe_image_name}"
+
+                # Create EFI boot entry
+                efi_cmd = (
+                    f"efibootmgr -c -d /dev/{target_device} -p {partition_number} "
+                    f"-L \"{boot_entry_name}\" -l \"{relative_efi_path}\""
+                )
+                result = ssh_execute(host_ip, efi_cmd, username, password)
+                LOG.info(f"EFI boot entry creation result: {result}")
+
+            finally:
+                # Cleanup: unmount partition and remove temporary directory
+                umount_cmd = f"umount {mount_point}"
+                ssh_execute(host_ip, umount_cmd, username, password)
+                rmdir_cmd = f"rmdir {mount_point}"
+                ssh_execute(host_ip, rmdir_cmd, username, password)
+
         except Exception as e:
-            LOG.error(f"An exception occurred while looking for the grubx64.efi file, {e}")
+            LOG.error(f"An exception occurred while creating EFI boot entry: {e}")
             return False
-        efi_cmd = (
-            f"efibootmgr -c -d /dev/{target_device} -p 1 -L \"{boot_entry_name}\" "
-            f"-l {grubx64_efis[0]}"
-        )
-        ssh_execute(host_ip, efi_cmd, username, password)
 
-        # Confirm creation
-        boot_entries = ssh_execute(host_ip, "efibootmgr -v", username, password)
-        for line in boot_entries.splitlines():
-            if boot_entry_name in line and partuuid in line:
-                LOG.info(f"Created EFI boot entry for disk {disk_id}")
-                return True
-
-        LOG.Info("Created EFI boot entry successfully")
+        LOG.info("Created EFI boot entry successfully")
         return True
 
     except Exception as e:
