@@ -587,7 +587,6 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
                     f" in ceph cluster {mon_host}")
         )
 
-    
     snap_api = ceph_api.RbdSnapshotApi(ceph_client)
     # Copy RBD image
     try:
@@ -600,14 +599,31 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
             image_spec=quote(existing_disk['rbd_path'], safe=""),
             snapshot_name=SNAP_NAME,
             api_block_image_image_spec_snap_snapshot_name_put_request={"is_protected": True})
-        rbd_api.api_block_image_image_spec_copy_post(
-            image_spec=quote(existing_disk["rbd_path"], safe=""),
-            api_block_image_image_spec_copy_post_request={
-                "dest_image_name": dest_name,
-                "dest_namespace": "",
-                "dest_pool_name": dest_pool
-            })
-        LOG.info(f"Successfully copied RBD image to {ceph_location}")
+        LOG.info(f"The system disk snapshot {existing_disk['rbd_path']}@{SNAP_NAME} "
+                 "has been created")
+        snap_api.api_block_image_image_spec_snap_snapshot_name_clone_post(
+            image_spec=quote(existing_disk['rbd_path'], safe=""),
+            snapshot_name=SNAP_NAME,
+            api_block_image_image_spec_snap_snapshot_name_clone_post_request={
+                "child_pool_name": dest_pool,
+                "child_image_name": dest_name
+            }
+        )
+        LOG.info(f"Successfully cloned a new image {dest_pool}/{dest_name} from the system disk "
+                 f"snapshot {existing_disk['rbd_path']}@{SNAP_NAME}")
+        rbd_api.api_block_image_image_spec_flatten_post(
+            image_spec=quote(f"{dest_pool}/{dest_name}", safe=""))
+        LOG.info(f"The new image {dest_pool}/{dest_name} has been successfully flattened")
+
+        snap_api.api_block_image_image_spec_snap_snapshot_name_put(
+            image_spec=quote(existing_disk['rbd_path'], safe=""),
+            snapshot_name=SNAP_NAME,
+            api_block_image_image_spec_snap_snapshot_name_put_request={"is_protected": False})
+        snap_api.api_block_image_image_spec_snap_snapshot_name_delete(
+            image_spec=quote(existing_disk['rbd_path'], safe=""), 
+            snapshot_name=SNAP_NAME)
+        LOG.info(f"The system disk snapshot {existing_disk['rbd_path']}@{SNAP_NAME} "
+                 "has been deleted")
     except Exception as e:
         LOG.error(f"Failed to copy system disk {disk_id} to {ceph_location}, error: {e}")
         raise
