@@ -33,7 +33,7 @@
               <span class="highlight-ip">({{ row.mon_host }})</span>
             </template>
             <template v-else>
-              <span class="highlight-deleted">镜像已删除</span>
+              <span class="highlight-deleted">源镜像已删除</span>
             </template>
           </template>
         </el-table-column>
@@ -59,7 +59,7 @@
             <span>Flatten</span>
             <el-tooltip 
               effect="dark" 
-              content="已经flatten过的系统盘性能会有所提升"
+              content="已经flatten过的系统盘会脱离对镜像的依赖，性能会有所提升"
               placement="top"
             >
               <el-icon style="margin-left: 4px; cursor: help;">
@@ -108,7 +108,7 @@
                     <el-tooltip 
                       v-if="row.flatten" 
                       effect="dark" 
-                      content="该云盘已经flatten" 
+                      content="当前云硬盘已经flatten" 
                       placement="top"
                     >
                       <el-icon style="margin-left: 4px;">

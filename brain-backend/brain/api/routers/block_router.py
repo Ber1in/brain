@@ -587,9 +587,19 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
                     f" in ceph cluster {mon_host}")
         )
 
+    
+    snap_api = ceph_api.RbdSnapshotApi(ceph_client)
     # Copy RBD image
     try:
         LOG.info(f"Starting RBD copy from {existing_disk['rbd_path']} to {ceph_location}")
+        snap_api.api_block_image_image_spec_snap_post(
+            image_spec=quote(existing_disk['rbd_path'], safe=""),
+            api_block_image_image_spec_snap_post_request={"snapshot_name": SNAP_NAME,
+                                                          "mirrorImageSnapshot": False})
+        snap_api.api_block_image_image_spec_snap_snapshot_name_put(
+            image_spec=quote(existing_disk['rbd_path'], safe=""),
+            snapshot_name=SNAP_NAME,
+            api_block_image_image_spec_snap_snapshot_name_put_request={"is_protected": True})
         rbd_api.api_block_image_image_spec_copy_post(
             image_spec=quote(existing_disk["rbd_path"], safe=""),
             api_block_image_image_spec_copy_post_request={
@@ -616,7 +626,6 @@ async def save_block_to_new_image(disk_id: str, data: block_schemas.UploadToImag
     # Create snapshot
     try:
         LOG.info(f"Creating snapshot {SNAP_NAME} for new image {ceph_location}")
-        snap_api = ceph_api.RbdSnapshotApi(ceph_client)
         snap_api.api_block_image_image_spec_snap_post(
             image_spec=quote(ceph_location, safe=""),
             api_block_image_image_spec_snap_post_request={"snapshot_name": SNAP_NAME,
