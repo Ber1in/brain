@@ -71,10 +71,6 @@
                   v-model="row.clouddisk_enable"
                   :loading="row.switchLoading"
                   @change="(value) => handleSwitchChange(value, row)"
-                  active-text="是"
-                  inactive-text="否"
-                  active-color="#67c23a"
-                  inactive-color="#f56c6c"
                 />
               </template>
             </div>
