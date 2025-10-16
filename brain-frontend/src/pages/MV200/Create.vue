@@ -6,13 +6,13 @@
       </template>
       
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="服务器名称" prop="name">
+        <el-form-item label="名称" prop="name">
           <el-input 
             v-model="form.name" 
-            placeholder="输入服务器名称" 
+            placeholder="输入名称" 
             clearable
           />
-          <div class="form-tip">用于标识MV200服务器的唯一名称</div>
+          <div class="form-tip">用于标识MV200的唯一名称</div>
         </el-form-item>
 
         <el-form-item label="SOC IP地址" prop="ip_address">
@@ -21,7 +21,7 @@
             placeholder="输入SOC IP地址" 
             clearable
           />
-          <div class="form-tip">MV200服务器的SOC IP地址</div>
+          <div class="form-tip">MV200的SOC IP地址</div>
         </el-form-item>
 
 

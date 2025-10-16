@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 import logging
 import uuid
+import urllib3
 
 from brain.json_db import JSONDocumentDB
 from brain.auth import authenticate_user
@@ -61,7 +62,7 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
         try:
             setapi = SettingsApi(get_dpuagentclient(server_data.ip_address))
             res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
-                _request_timeout=3)
+                _request_timeout=2)
             if res.code != 0:
                 LOG.error(f"Failed to get clouddisk enable status for SOC "
                           f"{server_data.ip_address}, message: {res.message}")
@@ -96,22 +97,6 @@ async def get_all_mv_servers():
     """
     LOG.info("Received request to get all MV servers")
     servers = db.find(MV_SERVER_COLLECTION, {})
-    for server in servers:
-        server["clouddisk_enable"] = False
-        try:
-            setapi = SettingsApi(get_dpuagentclient(server["ip_address"]))
-            res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
-                _request_timeout=3)
-            if res.code != 0:
-                LOG.error(f"Failed to get clouddisk enable status for SOC "
-                          f"{server['ip_address']}, message: {res.message}")
-            else:
-                server["clouddisk_enable"] = res.clouddisk_enable
-                LOG.debug(f"Clouddisk enable status for SOC {server['ip_address']}: "
-                          f"{res.clouddisk_enable}")
-
-        except Exception as e:
-            LOG.error(f"Failed to get clouddisk_enable for {server['ip_address']}, error: {e}")
 
     LOG.info(f"Retrieved {len(servers)} MV200 servers from database")
     return servers
@@ -131,11 +116,10 @@ async def get_mv_server(server_id: str):
             detail="MV server not found"
         )
 
-    server["clouddisk_enable"] = False
     try:
         setting_api = SettingsApi(get_dpuagentclient(server["ip_address"]))
         res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
-            _request_timeout=3)
+            _request_timeout=2)
         if res.code != 0:
             LOG.error(f"Failed to get clouddisk enable status for SOC "
                       f"{server['ip_address']}, message: {res.message}")
@@ -144,8 +128,12 @@ async def get_mv_server(server_id: str):
             LOG.info(f"Clouddisk enable status for SOC {server['ip_address']}: "
                      f"{res.clouddisk_enable}")
 
-    except Exception as e:
-        LOG.warning(f"Failed to get clouddisk_enable for {server['ip_address']}, error: {e}")
+    except (urllib3.exceptions.ConnectTimeoutError, urllib3.exceptions.MaxRetryError):
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=f"Failed to connect to DPU agent at {server['ip_address']}"
+        )
+
     LOG.info(f"Successfully retrieved MV server {server_id}")
     return server
 

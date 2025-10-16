@@ -2,11 +2,11 @@
   <div class="mv200-edit">
     <el-card>
       <template #header>
-        <h2>编辑MV200服务器</h2>
+        <h2>编辑MV200</h2>
       </template>
       
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="服务器ID">
+        <el-form-item label="ID">
           <el-input v-model="serverId" disabled />
         </el-form-item>
 
@@ -35,8 +35,8 @@
           <el-input :value="originalData.clouddisk_enable ? '是' : '否'" disabled />
         </el-form-item>
 
-        <el-form-item label="服务器名称" prop="name">
-          <el-input v-model="form.name" placeholder="输入服务器名称" />
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="form.name" placeholder="输入名称" />
         </el-form-item>
 
 

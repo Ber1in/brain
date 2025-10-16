@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from urllib3.util import Retry, Timeout
 import time
 import logging
 from threading import Lock
@@ -73,10 +74,23 @@ def get_dpuagentclient(mv200_server, username="admin", password="yunsilicon"):
     dpuagent_cfg.verify_ssl = False
     apiclient = DpuApiClient(dpuagent_cfg)
 
+    # --- disable urllib3 retry globally ---
+    if hasattr(apiclient.rest_client, "pool_manager"):
+        pool = apiclient.rest_client.pool_manager
+        if hasattr(pool, "connection_pool_kw"):
+            pool.connection_pool_kw["retries"] = Retry(
+                total=0,       # no retries at all
+                connect=False,
+                read=False,
+                redirect=False,
+                status=False
+            )
+            pool.connection_pool_kw["timeout"] = Timeout(connect=2, read=2)
+
     token_api = dpuagentauth.AuthApi(api_client=apiclient)
     try:
         res = token_api.login_for_access_token_token_post(
-            username=username, password=password, _request_timeout=5)
+            username=username, password=password, _request_timeout=2)
         apiclient.configuration.access_token = res.access_token
     except Exception as e:
         LOG.error(f"Failed to log in to the dpuagent {mv200_server}, error: {e}")
@@ -87,4 +101,3 @@ def get_dpuagentclient(mv200_server, username="admin", password="yunsilicon"):
         _dpuagent_client_pool[mv200_server] = (apiclient, now)
 
     return apiclient
-

@@ -69,7 +69,9 @@ apiClient.interceptors.response.use(
     }
     
     // 其他错误处理
-    if (error.response?.status >= 500) {
+    if (error.response?.status == 504) {
+       //504 only means that there is an offline server, no action is required
+    } else if (error.response?.status >= 500) {
       ElMessage.error('服务器错误，请稍后重试')
     } else if (error.response?.status >= 400) {
       const message = error.response?.data?.detail || '请求错误，请检查输入'

@@ -55,15 +55,29 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-switch
-              v-model="row.clouddisk_enable"
-              :loading="row.switchLoading"
-              @change="(value) => handleSwitchChange(value, row)"
-              active-text="是"
-              inactive-text="否"
-              active-color="#67c23a"
-              inactive-color="#f56c6c"
-            />
+            <div class="clouddisk-status">
+              <template v-if="row.clouddiskStatusLoading">
+                <el-icon class="loading-icon"><Loading /></el-icon>
+                <span class="status-text">查询中...</span>
+              </template>
+              <template v-else-if="row.clouddiskStatusError">
+                <el-tooltip effect="dark" content="无法获取状态，设备可能离线，请稍后刷新重试" placement="top">
+                  <el-icon class="error-icon"><Warning /></el-icon>
+                </el-tooltip>
+                <span class="status-text">离线</span>
+              </template>
+              <template v-else>
+                <el-switch
+                  v-model="row.clouddisk_enable"
+                  :loading="row.switchLoading"
+                  @change="(value) => handleSwitchChange(value, row)"
+                  active-text="是"
+                  inactive-text="否"
+                  active-color="#67c23a"
+                  inactive-color="#f56c6c"
+                />
+              </template>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -96,16 +110,21 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, MoreFilled, Edit, Delete, Search } from '@element-plus/icons-vue'
+import { QuestionFilled, MoreFilled, Edit, Delete, Search, Warning, Loading } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { bareApi } from '@/api/bare'
 import type { MVServer, BareMetalServer } from '@/types/api'
 
 const loading = ref(false)
-const servers = ref<(MVServer & { switchLoading?: boolean })[]>([])
+const servers = ref<(MVServer & { 
+  switchLoading?: boolean; 
+  clouddiskStatusLoading?: boolean;
+  clouddiskStatusError?: boolean;
+})[]>([])
 const bares = ref<BareMetalServer[]>([])
 const searchKeyword = ref('')
 
+// 加载基础列表数据
 const loadData = async () => {
   loading.value = true
   try {
@@ -113,17 +132,51 @@ const loadData = async () => {
       bareApi.getAll(),
       mv200Api.getAll()
     ])
-    // 为每个服务器添加switchLoading状态
+    
+    // 初始化服务器数据，云盘启动状态先不设置
     servers.value = serversResponse.map(server => ({
       ...server,
-      switchLoading: false
+      switchLoading: false,
+      clouddiskStatusLoading: true, // 初始状态为加载中
+      clouddiskStatusError: false
     }))
+    
     bares.value = baresResponse
+    
+    // 列表加载完成后，loading 状态结束，用户可以立即看到列表
+    loading.value = false
+    
+    // 然后异步加载每个服务器的云盘启动状态
+    loadCloudDiskStatus()
+    
   } catch (error) {
     ElMessage.error('加载MV200服务器列表失败')
-  } finally {
     loading.value = false
   }
+}
+
+// 异步加载云盘启动状态
+const loadCloudDiskStatus = async () => {
+  const promises = servers.value.map(async (server) => {
+    try {
+      // 调用单个服务器详情接口获取云盘启动状态
+      const serverDetail = await mv200Api.getById(server.id)
+      // 更新该服务器的云盘启动状态
+      server.clouddisk_enable = serverDetail.clouddisk_enable || false
+      server.clouddiskStatusLoading = false
+      server.clouddiskStatusError = false
+    } catch (error) {
+      console.error(`获取服务器 ${server.name} 的云盘启动状态失败:`, error)
+      server.clouddiskStatusLoading = false
+      server.clouddiskStatusError = true
+      server.clouddisk_enable = false
+    }
+  })
+  
+  // 并行加载所有服务器的状态，不阻塞界面
+  Promise.allSettled(promises).then(() => {
+    console.log('所有服务器的云盘启动状态加载完成')
+  })
 }
 
 // 计算属性：创建ID到名称的映射
@@ -175,7 +228,10 @@ const handleSearch = () => {
 }
 
 // 处理开关状态变化
-const handleSwitchChange = async (value: boolean, server: MVServer & { switchLoading?: boolean }) => {
+const handleSwitchChange = async (value: boolean, server: MVServer & { 
+  switchLoading?: boolean; 
+  clouddiskStatusError?: boolean;
+}) => {
   if (server.switchLoading) return
   
   server.switchLoading = true
@@ -183,11 +239,12 @@ const handleSwitchChange = async (value: boolean, server: MVServer & { switchLoa
     await mv200Api.update(server.id, {
       clouddisk_enable: value
     })
+    server.clouddisk_enable = value
     ElMessage.success(`已${value ? '启用' : '禁用'}云盘启动支持`)
   } catch (error) {
     // 更新失败，恢复原来的状态
     server.clouddisk_enable = !value
-    ElMessage.error('状态更新失败')
+    ElMessage.error('状态更新失败，设备可能离线')
   } finally {
     server.switchLoading = false
   }
@@ -251,6 +308,32 @@ onMounted(() => {
   color: #409eff;
   font-weight: 500;
   font-family: 'Courier New', monospace;
+}
+
+/* 云盘状态样式 */
+.clouddisk-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-icon {
+  color: #409eff;
+  animation: spin 1s linear infinite;
+}
+
+.error-icon {
+  color: #f56c6c;
+}
+
+.status-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 :deep(.danger-item) {

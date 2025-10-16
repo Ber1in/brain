@@ -172,12 +172,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (storedAutoLogin) {
         autoLogin.value = storedAutoLogin === 'true'
       }
-      
-      console.log('从localStorage恢复状态:', {
-        expiryTime: new Date(parseInt(storedExpiry)).toLocaleString(),
-        user: user.value,
-        autoLogin: autoLogin.value
-      })
+
     }
   }
 
