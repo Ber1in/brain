@@ -65,48 +65,39 @@ async def create_bare_metal_server(server_data: bare_metal_schemas.BareMetalServ
     Create a new bare metal
     """
     LOG.info(f"Received request to create bare metal server: {server_data.name}")
-    try:
-        # Check if name already exists
-        existing_server = db.find(BARE_METAL_SERVER_COLLECTION, {"name": server_data.name})
-        if existing_server:
-            LOG.warning(f"Server name {server_data.name} already exists")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Server with this name already exists"
-            )
 
-        # Check if IP address already exists
-        existing_ip = db.find(BARE_METAL_SERVER_COLLECTION, {"host_ip": server_data.host_ip})
-        if existing_ip:
-            LOG.warning(f"Server IP {server_data.host_ip} already exists")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Server with this IP address already exists"
-            )
-
-        # Generate unique ID and create server document
-        server_id = str(uuid.uuid4())
-        server_dict = {
-            "id": server_id,
-            **server_data.dict()
-        }
-
-        LOG.info(f"Creating bare metal server {server_id} with name {server_data.name}")
-        # Insert new server
-        db.insert(BARE_METAL_SERVER_COLLECTION, server_dict)
-        LOG.info(f"Successfully created bare metal server {server_id}")
-
-        # Return the created server information
-        return server_dict
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        LOG.error(f"Failed to create bare metal {server_data.name}: {e}")
+    # Check if name already exists
+    existing_server = db.find(BARE_METAL_SERVER_COLLECTION, {"name": server_data.name})
+    if existing_server:
+        LOG.warning(f"Server name {server_data.name} already exists")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create bare metal: {e}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Server with this name already exists"
         )
+
+    # Check if IP address already exists
+    existing_ip = db.find(BARE_METAL_SERVER_COLLECTION, {"host_ip": server_data.host_ip})
+    if existing_ip:
+        LOG.warning(f"Server IP {server_data.host_ip} already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Server with this IP address already exists"
+        )
+
+    # Generate unique ID and create server document
+    server_id = str(uuid.uuid4())
+    server_dict = {
+        "id": server_id,
+        **server_data.dict()
+    }
+
+    LOG.info(f"Creating bare metal server {server_id} with name {server_data.name}")
+    # Insert new server
+    db.insert(BARE_METAL_SERVER_COLLECTION, server_dict)
+    LOG.info(f"Successfully created bare metal server {server_id}")
+
+    # Return the created server information
+    return server_dict
 
 
 @router.get("/bare-metals", response_model=List[bare_metal_schemas.BareMetalServer])
@@ -133,25 +124,17 @@ async def get_bare_metal_server(server_id: str):
     Get specific bare metal by ID
     """
     LOG.info(f"Received request to get bare metal server {server_id}")
-    try:
-        server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
-        if not server:
-            LOG.warning(f"Bare metal server {server_id} not found")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="bare metal not found"
-            )
 
-        LOG.info(f"Successfully retrieved bare metal server {server_id}")
-        return server
-    except HTTPException:
-        raise
-    except Exception as e:
-        LOG.error(f"Failed to get bare metal {server_id}: {e}")
+    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not server:
+        LOG.warning(f"Bare metal server {server_id} not found")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get bare metal"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="bare metal not found"
         )
+
+    LOG.info(f"Successfully retrieved bare metal server {server_id}")
+    return server
 
 
 @router.put("/bare-metals/{server_id}", response_model=bare_metal_schemas.BareMetalServer)
@@ -161,66 +144,57 @@ async def update_bare_metal_server(
     Update bare metal information by ID
     """
     LOG.info(f"Received request to update bare metal server {server_id}")
-    try:
-        # Check if server exists
-        existing_server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
-        if not existing_server:
-            LOG.warning(f"Bare metal server {server_id} not found for update")
+
+    # Check if server exists
+    existing_server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not existing_server:
+        LOG.warning(f"Bare metal server {server_id} not found for update")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="bare metal not found"
+        )
+
+    # If updating name, check if name conflicts with other servers
+    if update_data.name and update_data.name != existing_server.get("name"):
+        same_name_servers = db.find(BARE_METAL_SERVER_COLLECTION, {"name": update_data.name})
+        if same_name_servers:
+            LOG.warning(f"Name {update_data.name} conflicts with existing server")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Another server with this name already exists"
+            )
+
+    # If updating IP address, check if IP conflicts with other servers
+    if update_data.host_ip and update_data.host_ip != existing_server.get("host_ip"):
+        same_ip_servers = db.find(BARE_METAL_SERVER_COLLECTION,
+                                  {"host_ip": update_data.host_ip})
+        if same_ip_servers:
+            LOG.warning(f"IP {update_data.host_ip} conflicts with existing server")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Another server with this IP address already exists"
+            )
+
+    # Update server information (excluding ID field)
+    update_dict = {k: v for k, v in update_data.dict(
+        exclude_unset=True).items() if v is not None}
+    if update_dict:
+        LOG.info(f"Updating server {server_id} with fields: {list(update_dict.keys())}")
+        updated_count = db.update(BARE_METAL_SERVER_COLLECTION, {"id": server_id}, update_dict)
+        if updated_count == 0:
+            LOG.error(f"Failed to update server {server_id} in database")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="bare metal not found"
             )
+        LOG.info(f"Successfully updated server {server_id} in database")
+    else:
+        LOG.info(f"No fields to update for server {server_id}")
 
-        # If updating name, check if name conflicts with other servers
-        if update_data.name and update_data.name != existing_server.get("name"):
-            same_name_servers = db.find(BARE_METAL_SERVER_COLLECTION, {"name": update_data.name})
-            if same_name_servers:
-                LOG.warning(f"Name {update_data.name} conflicts with existing server")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Another server with this name already exists"
-                )
-
-        # If updating IP address, check if IP conflicts with other servers
-        if update_data.host_ip and update_data.host_ip != existing_server.get("host_ip"):
-            same_ip_servers = db.find(BARE_METAL_SERVER_COLLECTION,
-                                      {"host_ip": update_data.host_ip})
-            if same_ip_servers:
-                LOG.warning(f"IP {update_data.host_ip} conflicts with existing server")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Another server with this IP address already exists"
-                )
-
-        # Update server information (excluding ID field)
-        update_dict = {k: v for k, v in update_data.dict(
-            exclude_unset=True).items() if v is not None}
-        if update_dict:
-            LOG.info(f"Updating server {server_id} with fields: {list(update_dict.keys())}")
-            updated_count = db.update(BARE_METAL_SERVER_COLLECTION, {"id": server_id}, update_dict)
-            if updated_count == 0:
-                LOG.error(f"Failed to update server {server_id} in database")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="bare metal not found"
-                )
-            LOG.info(f"Successfully updated server {server_id} in database")
-        else:
-            LOG.info(f"No fields to update for server {server_id}")
-
-        # Return updated server information
-        updated_server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
-        LOG.info(f"Successfully completed update for server {server_id}")
-        return updated_server
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        LOG.error(f"Failed to update bare metal {server_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update bare metal"
-        )
+    # Return updated server information
+    updated_server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    LOG.info(f"Successfully completed update for server {server_id}")
+    return updated_server
 
 
 @router.delete("/bare-metals/{server_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -229,36 +203,28 @@ async def delete_bare_metal_server(server_id: str):
     Delete bare metal by ID
     """
     LOG.info(f"Received request to delete bare metal server {server_id}")
-    try:
-        # Check if server exists
-        existing_servers = db.find(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
-        if not existing_servers:
-            LOG.warning(f"Bare metal server {server_id} not found for deletion")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="bare metal not found"
-            )
 
-        server_name = existing_servers[0].get("name", "unknown")
-        LOG.info(f"Deleting bare metal server {server_id} ({server_name})")
-        # Delete server
-        deleted_count = db.delete(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
-        if deleted_count == 0:
-            LOG.error(f"Failed to delete server {server_id} from database")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="bare metal not found"
-            )
-
-        LOG.info(f"Successfully deleted bare metal server {server_id}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        LOG.error(f"Failed to delete bare metal {server_id}: {e}")
+    # Check if server exists
+    existing_servers = db.find(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if not existing_servers:
+        LOG.warning(f"Bare metal server {server_id} not found for deletion")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete bare metal"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="bare metal not found"
         )
+
+    server_name = existing_servers[0].get("name", "unknown")
+    LOG.info(f"Deleting bare metal server {server_id} ({server_name})")
+    # Delete server
+    deleted_count = db.delete(BARE_METAL_SERVER_COLLECTION, {"id": server_id})
+    if deleted_count == 0:
+        LOG.error(f"Failed to delete server {server_id} from database")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="bare metal not found"
+        )
+
+    LOG.info(f"Successfully deleted bare metal server {server_id}")
 
 
 @router.get("/bare-metals/{server_id}/boot-entries",
