@@ -60,17 +60,19 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
     # Get clouddisk enable status from SOC
     LOG.info(f"Getting clouddisk enable status from SOC {server_data.ip_address}")
     server_dict["clouddisk_enable"] = False
-    try:
-        dpuagentclient = get_dpuagentclient(server_data.ip_address)
-        # Temporary code until
-        # https://git-sha.yunsilicon.com/yunsilicon-software/meta-cloud/-/merge_requests/7748
-        # is merged
-        versionapi = dpuagentApi.VersionApi(dpuagentclient)
-        res = versionapi.get_version_dpu_agent_v1_version_get(_request_timeout=30)
-        if res.dpuagent != '0.0.1':
-            raise exceptions.DpuagentVersionError(
-                "Need to use a temporary version that supports cloudinit networkconfig v1")
 
+    dpuagentclient = get_dpuagentclient(server_data.ip_address)
+
+    # Temporary code until
+    # https://git-sha.yunsilicon.com/yunsilicon-software/meta-cloud/-/merge_requests/7748
+    # is merged
+    versionapi = dpuagentApi.VersionApi(dpuagentclient)
+    res = versionapi.get_version_dpu_agent_v1_version_get(_request_timeout=30)
+    if res.dpuagent != '0.0.1':
+        raise exceptions.DpuagentVersionError(
+            "Need to use a temporary version that supports cloudinit networkconfig v1")
+
+    try:
         setapi = dpuagentApi.SettingsApi(dpuagentclient)
         res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
             _request_timeout=2)
