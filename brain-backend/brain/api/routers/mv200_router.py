@@ -6,11 +6,12 @@ from typing import List
 import logging
 import uuid
 import urllib3
+from brain import exceptions
 
 from brain.json_db import JSONDocumentDB
 from brain.auth import authenticate_user
 from brain.api.schemas import mv200_schemas
-from brain.clients.dpuagent import SettingsApi
+from brain.clients.dpuagent import api as dpuagentApi
 from brain.utils.get_client import get_dpuagentclient
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -60,7 +61,17 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
         LOG.info(f"Getting clouddisk enable status from SOC {server_data.ip_address}")
         server_dict["clouddisk_enable"] = False
         try:
-            setapi = SettingsApi(get_dpuagentclient(server_data.ip_address))
+            dpuagentclient = get_dpuagentclient(server_data.ip_address)
+            # Temporary code until
+            # https://git-sha.yunsilicon.com/yunsilicon-software/meta-cloud/-/merge_requests/7748
+            # is merged
+            versionapi = dpuagentApi.VersionApi(dpuagentclient)
+            res = versionapi.get_version_dpu_agent_v1_version_get(_request_timeout=30)
+            if res.dpuagent != '0.0.1':
+                raise exceptions.DpuagentVersionError(
+                    "Need to use a temporary version that supports cloudinit networkconfig v1")
+
+            setapi = dpuagentApi.SettingsApi(dpuagentclient)
             res = setapi.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
                 _request_timeout=2)
             if res.code != 0:
@@ -117,7 +128,7 @@ async def get_mv_server(server_id: str):
         )
 
     try:
-        setting_api = SettingsApi(get_dpuagentclient(server["ip_address"]))
+        setting_api = dpuagentApi.SettingsApi(get_dpuagentclient(server["ip_address"]))
         res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
             _request_timeout=2)
         if res.code != 0:
@@ -186,7 +197,7 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
                 soc_ip = existing_server["ip_address"]
                 new_status = update_data.clouddisk_enable
                 LOG.info(f"Updating clouddisk enable status for SOC {soc_ip} to {new_status}")
-                setting_api = SettingsApi(get_dpuagentclient(soc_ip))
+                setting_api = dpuagentApi.SettingsApi(get_dpuagentclient(soc_ip))
                 res = setting_api.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put(
                     {"clouddisk_enable": update_data.clouddisk_enable})
                 if res.code != 0:

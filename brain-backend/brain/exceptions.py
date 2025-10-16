@@ -64,3 +64,7 @@ class VblkDeleteException(BrainException):
 
 class CheckPointSaveException(BrainException):
     message = "Failed to save checkpoint due to: %(reason)s"
+
+
+class DpuagentVersionError(BrainException):
+    message = "The dpuagent version is not supported: %(reason)s"
