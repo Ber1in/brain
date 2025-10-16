@@ -103,19 +103,23 @@
                     command="flatten" 
                     :disabled="row.flatten"
                   >
-                    <el-icon><Operation /></el-icon>
-                    <span>Flatten</span>
                     <el-tooltip 
                       v-if="row.flatten" 
                       effect="dark" 
                       content="当前云硬盘已经flatten" 
                       placement="top"
                     >
-                      <el-icon style="margin-left: 4px;">
-                        <InfoFilled />
-                      </el-icon>
+                      <div class="dropdown-item-content">
+                        <el-icon><Operation /></el-icon>
+                        <span>Flatten</span>
+                      </div>
                     </el-tooltip>
+                    <div v-else class="dropdown-item-content">
+                      <el-icon><Operation /></el-icon>
+                      <span>Flatten</span>
+                    </div>
                   </el-dropdown-item>
+
                   <el-dropdown-item command="delete" divided class="danger-item">
                     <el-icon><Delete /></el-icon>
                     <span>删除</span>
@@ -696,6 +700,24 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled) {
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled:hover) {
+  background-color: transparent;
+}
+
+
+/* 下拉菜单项样式 */
+.dropdown-item-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 :deep(.el-dropdown-menu__item.is-disabled) {

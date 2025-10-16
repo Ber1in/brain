@@ -89,9 +89,36 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="edit">
-                    <el-icon><Edit /></el-icon>
-                    <span>编辑</span>
+                  <el-dropdown-item 
+                    command="edit" 
+                    :disabled="row.clouddiskStatusLoading || row.clouddiskStatusError"
+                  >
+                    <el-tooltip
+                      v-if="row.clouddiskStatusLoading"
+                      effect="dark"
+                      content="设备状态查询中，请稍候..."
+                      placement="left"
+                    >
+                      <div class="dropdown-item-content">
+                        <el-icon><Edit /></el-icon>
+                        <span>编辑</span>
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip
+                      v-else-if="row.clouddiskStatusError"
+                      effect="dark"
+                      content="设备离线，无法编辑，设备在线后刷新重试"
+                      placement="left"
+                    >
+                      <div class="dropdown-item-content">
+                        <el-icon><Edit /></el-icon>
+                        <span>编辑</span>
+                      </div>
+                    </el-tooltip>
+                    <div v-else class="dropdown-item-content">
+                      <el-icon><Edit /></el-icon>
+                      <span>编辑</span>
+                    </div>
                   </el-dropdown-item>
                   <el-dropdown-item command="delete" divided class="danger-item">
                     <el-icon><Delete /></el-icon>
@@ -133,7 +160,7 @@ const loadData = async () => {
       mv200Api.getAll()
     ])
     
-    // 初始化服务器数据，云盘启动状态先不设置
+    // 初始化服务器数据，默认禁用编辑按钮直到状态查询完成
     servers.value = serversResponse.map(server => ({
       ...server,
       switchLoading: false,
@@ -251,7 +278,10 @@ const handleSwitchChange = async (value: boolean, server: MVServer & {
 }
 
 // 下拉菜单命令处理
-const handleCommand = (command: string, server: MVServer) => {
+const handleCommand = (command: string, server: MVServer & { 
+  clouddiskStatusLoading?: boolean; 
+  clouddiskStatusError?: boolean;
+}) => {
   switch (command) {
     case 'edit':
       handleEdit(server)
@@ -262,7 +292,19 @@ const handleCommand = (command: string, server: MVServer) => {
   }
 }
 
-const handleEdit = (server: MVServer) => {
+const handleEdit = (server: MVServer & { 
+  clouddiskStatusLoading?: boolean; 
+  clouddiskStatusError?: boolean;
+}) => {
+  // 检查设备状态
+  if (server.clouddiskStatusLoading) {
+    ElMessage.warning('设备状态查询中，请稍候...')
+    return
+  }
+  if (server.clouddiskStatusError) {
+    ElMessage.warning('设备离线，无法编辑')
+    return
+  }
   window.location.href = `/mv200/edit/${server.id}`
 }
 
@@ -349,5 +391,22 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 下拉菜单项样式 */
+.dropdown-item-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled) {
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled:hover) {
+  background-color: transparent;
 }
 </style>

@@ -63,18 +63,21 @@
                     class="danger-item"
                     :disabled="!row.canDelete"
                   >
-                    <el-icon><Delete /></el-icon>
-                    <span>删除</span>
                     <el-tooltip
                       v-if="!row.canDelete"
                       effect="dark"
                       content="仍有未flatten的云系统盘依赖此镜像，暂不允许删除"
                       placement="left"
                     >
-                      <el-icon style="margin-left: 4px;">
-                        <InfoFilled />
-                      </el-icon>
+                      <div class="dropdown-item-content">
+                        <el-icon><Delete /></el-icon>
+                        <span>删除</span>
+                      </div>
                     </el-tooltip>
+                    <div v-else class="dropdown-item-content">
+                      <el-icon><Delete /></el-icon>
+                      <span>删除</span>
+                    </div>
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -290,9 +293,4 @@ onMounted(() => {
   width: 100%;
 }
 
-/* 确保tooltip内容正确显示 */
-:deep(.el-tooltip__trigger) {
-  display: block;
-  width: 100%;
-}
 </style>
