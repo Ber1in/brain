@@ -42,6 +42,11 @@
             <el-icon><DataBoard /></el-icon>
             <span>云系统盘管理</span>
           </el-menu-item>
+
+          <el-menu-item index="/xsc-interface">
+            <el-icon><Connection /></el-icon>
+            <span>XSC网口管理</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 

@@ -6,7 +6,6 @@ from typing import List
 import logging
 import uuid
 import urllib3
-from brain import exceptions
 
 from brain.json_db import JSONDocumentDB
 from brain.auth import authenticate_user

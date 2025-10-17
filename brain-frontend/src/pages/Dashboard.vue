@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard">
     <el-row :gutter="20">
-      <el-col :span="6">
+      <el-col :span="4">
         <el-card class="stat-card" @click="goToPage('images')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #409eff">
@@ -14,7 +14,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="4">
         <el-card class="stat-card" @click="goToPage('mv200')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #67c23a">
@@ -27,7 +27,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="4">
         <el-card class="stat-card" @click="goToPage('baremetal')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #67c23a">
@@ -35,12 +35,12 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ bareCount }}</div>
-              <div class="stat-label">裸金属服务器数量</div>
+              <div class="stat-label">裸金属数量</div>
             </div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="4">
         <el-card class="stat-card" @click="goToPage('blocks')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #e6a23c">
@@ -49,6 +49,19 @@
             <div class="stat-info">
               <div class="stat-value">{{ diskCount }}</div>
               <div class="stat-label">云系统盘数量</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="4">
+        <el-card class="stat-card" @click="goToPage('xsc-interface')" style="cursor: pointer;">
+          <div class="stat-content">
+            <div class="stat-icon" style="background: #f56c6c">
+              <el-icon><Connection /></el-icon>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ xscInterfaceCount }}</div>
+              <div class="stat-label">XSC网口数量</div>
             </div>
           </div>
         </el-card>
@@ -100,7 +113,8 @@ import { mv200Api } from '@/api/mv200'
 import { bareApi } from '@/api/bare'
 import { useRouter } from 'vue-router'
 import { systemDisksApi } from '@/api/system-disks'
-import type { Image, MVServer, SystemDisk } from '@/types/api'
+import { networkApi } from '@/api/network'
+import type { Image, MVServer, SystemDisk, InterfaceInfo } from '@/types/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -108,11 +122,13 @@ const images = ref<Image[]>([])
 const mv200Servers = ref<MVServer[]>([])
 const bareServers = ref<BareMetalServer[]>([])
 const disks = ref<SystemDisk[]>([])
+const xscInterfaces = ref<InterfaceInfo[]>([])
 
 const imageCount = computed(() => images.value.length)
 const mv200Count = computed(() => mv200Servers.value.length)
 const bareCount = computed(() => bareServers.value.length)
 const diskCount = computed(() => disks.value.length)
+const xscInterfaceCount = computed(() => xscInterfaces.value.length)
 const recentDisks = computed(() => disks.value.slice(0, 5))
 
 const getImageName = (row: SystemDisk) => {
@@ -125,7 +141,7 @@ const getMV200Name = (row: SystemDisk) => {
   return server?.name || row.mv200_id
 }
 
-const goToPage = (pageType) => {
+const goToPage = (pageType: string) => {
   switch (pageType) {
     case 'images':
       router.push('/images')
@@ -134,10 +150,13 @@ const goToPage = (pageType) => {
       router.push('/mv200')
       break
     case 'baremetal':
-      router.push('/bare') // 如果没有裸金属页面，可以用 '/mv200' 或其他
+      router.push('/bare')
       break
     case 'blocks':
       router.push('/system-disks')
+      break
+    case 'xsc-interface':
+      router.push('/xsc-interface')
       break
     default:
       console.warn('未知的页面类型:', pageType)
@@ -147,17 +166,19 @@ const goToPage = (pageType) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const [imagesResponse, serversResponse, disksResponse, bareResponse] = await Promise.all([
+    const [imagesResponse, serversResponse, disksResponse, bareResponse, interfacesResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
       systemDisksApi.getAll(),
       bareApi.getAll(),
+      networkApi.getAll(),
     ])
 
     images.value = imagesResponse
     mv200Servers.value = serversResponse
     disks.value = disksResponse
     bareServers.value = bareResponse
+    xscInterfaces.value = interfacesResponse
   } catch (error) {
     console.error('加载数据失败:', error)
   } finally {

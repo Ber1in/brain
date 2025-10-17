@@ -157,3 +157,38 @@ export interface DeleteDiskResponse {
   efi_status: number
   cloudinit_status: number
 }
+
+// XSC网口相关类型
+export interface InterfaceInfo {
+  mv200_id: string
+  ip: string
+  vlan_tag: number
+  gateway: string
+  mtu?: number
+  mac?: string
+  dns?: string[]
+  description?: string
+  id: string
+  ifname?: string
+}
+
+export interface InterfaceCreate {
+  mv200_id: string
+  ip: string
+  vlan_tag: number
+  gateway: string
+  mtu?: number
+  mac?: string
+  dns?: string[]
+  description?: string
+}
+
+export interface InterfaceUpdate {
+  id: string
+  description?: string
+}
+
+export interface InterfaceDelete {
+  mv200_id: string
+  id: string
+}

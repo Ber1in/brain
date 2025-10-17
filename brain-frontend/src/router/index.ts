@@ -127,6 +127,34 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    // 新增：XSC网口管理路由
+    {
+      path: '/xsc-interface',
+      name: 'XSCInterface',
+      component: () => import('@/pages/XSC/Index.vue'),
+      meta: {
+        title: 'XSC网口管理',
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/xsc-interface/create',
+      name: 'XSCInterfaceCreate',
+      component: () => import('@/pages/XSC/Create.vue'),
+      meta: {
+        title: '创建XSC网口',
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/xsc-interface/edit/:id',
+      name: 'XSCInterfaceEdit',
+      component: () => import('@/pages/XSC/Edit.vue'),
+      meta: {
+        title: '编辑XSC网口',
+        requiresAuth: true,
+      },
+    },
   ],
 })
 
