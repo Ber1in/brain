@@ -138,14 +138,14 @@ router.beforeEach(async (to, from, next) => {
       next()
     } else {
       try {
-        const canRefresh = await authStore.checkAndRefreshToken()
+        const canRefresh = await authStore.checkAndRefreshToken(true)
         if (canRefresh) {
           next()
         } else {
-          authStore.logout('登录已过期，请重新登录')
+          next('/login')
         }
       } catch (error) {
-        authStore.logout('登录状态异常，请重新登录')
+        next('/login')
       }
     }
   } else if (to.path === '/login' && authStore.isAuthenticated) {

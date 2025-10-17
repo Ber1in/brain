@@ -10,23 +10,46 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshTokenValue = ref<string>('')
   const tokenExpiry = ref<number>(0)
   const user = ref<User | null>(null)
-  const autoLogin = ref<boolean>(false) // 添加自动登录标志
+  const autoLogin = ref<boolean>(false)
+  const isTabActive = ref<boolean>(true)
 
   const isAuthenticated = computed(() => {
     return !!accessToken.value && Date.now() < tokenExpiry.value
   })
 
-  // 获取当前用户名
   const username = computed(() => {
     return user.value?.username || '用户'
   })
 
-  // 设置token信息
+  // 设置标签页活跃状态
+  const setTabActive = (active: boolean) => {
+    isTabActive.value = active
+    const timestamp = new Date().toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+    console.log(`[${timestamp}] 标签页状态: ${active ? '活跃' : '闲置'}`)
+  }
+
+  // 检查是否需要刷新token（只在活跃状态下）
+  const shouldRefreshToken = computed(() => {
+    if (!isTabActive.value || !autoLogin.value) {
+      return false
+    }
+    
+    const timeUntilExpiry = tokenExpiry.value - Date.now()
+    // 只在5分钟内过期且标签页活跃时刷新
+    return timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0
+  })
+
   const setTokens = (response: TokenResponse) => {
     accessToken.value = response.access_token
     refreshTokenValue.value = response.refresh_token
-    
-    // access_token 30分钟过期 (1800秒)
     tokenExpiry.value = Date.now() + (response.expires_in * 1000)
     
     console.log('Token设置成功:', {
@@ -34,14 +57,12 @@ export const useAuthStore = defineStore('auth', () => {
       expiryTime: new Date(tokenExpiry.value).toLocaleString()
     })
     
-    // 存储到 localStorage
     localStorage.setItem('auth_token', response.access_token)
     localStorage.setItem('refresh_token', response.refresh_token)
     localStorage.setItem('token_expiry', tokenExpiry.value.toString())
-    localStorage.setItem('auto_login', autoLogin.value.toString()) // 保存自动登录设置
+    localStorage.setItem('auto_login', autoLogin.value.toString())
   }
 
-  // 设置用户信息
   const setUser = (credentials: LoginCredentials) => {
     user.value = {
       username: credentials.username
@@ -49,16 +70,13 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('user_info', JSON.stringify(user.value))
   }
 
-  // 登录
   const login = async (credentials: LoginCredentials, rememberMe: boolean = false) => {
     try {
       console.log('开始登录...', { rememberMe })
-      autoLogin.value = rememberMe // 设置自动登录标志
+      autoLogin.value = rememberMe
       
       const response: TokenResponse = await authApi.login(credentials)
       setTokens(response)
-      
-      // 登录成功后直接记录用户名
       setUser(credentials)
       
       console.log('登录成功')
@@ -69,9 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 刷新 token
   const refreshToken = async (): Promise<boolean> => {
-    // 检查是否启用了自动登录
     if (!autoLogin.value) {
       console.log('自动登录未启用，不刷新token')
       throw new Error('自动登录未启用')
@@ -94,8 +110,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 检查token状态，如果需要则刷新
-  const checkAndRefreshToken = async (): Promise<boolean> => {
+  // 修改：只在需要时刷新（考虑标签页状态）
+  const checkAndRefreshToken = async (force: boolean = false): Promise<boolean> => {
     if (!accessToken.value) {
       console.log('没有access_token')
       return false
@@ -104,18 +120,18 @@ export const useAuthStore = defineStore('auth', () => {
     const timeUntilExpiry = tokenExpiry.value - Date.now()
     console.log('Token状态检查:', {
       剩余时间: Math.round(timeUntilExpiry / 1000) + '秒',
-      需要刷新: timeUntilExpiry < 5 * 60 * 1000, // 5分钟内过期就刷新
-      自动登录启用: autoLogin.value
+      需要刷新: timeUntilExpiry < 5 * 60 * 1000,
+      自动登录启用: autoLogin.value,
+      标签页活跃: isTabActive.value,
+      强制刷新: force
     })
 
-    // 如果token在5分钟内过期且启用了自动登录，提前刷新
-    if (timeUntilExpiry < 5 * 60 * 1000 && autoLogin.value) {
+    if (force || shouldRefreshToken.value) {
       try {
         await refreshToken()
         return true
       } catch (error) {
-        console.error('自动刷新token失败')
-        // 自动刷新失败，但不立即退出，等到真正过期再处理
+        console.error('刷新token失败')
         return timeUntilExpiry > 0
       }
     }
@@ -123,14 +139,40 @@ export const useAuthStore = defineStore('auth', () => {
     return timeUntilExpiry > 0
   }
 
-  // 退出登录
+  // 新增：当标签页从闲置恢复时的检查
+  const onTabActivated = async (): Promise<boolean> => {
+    if (!accessToken.value) {
+      return false
+    }
+
+    const timeUntilExpiry = tokenExpiry.value - Date.now()
+    console.log('标签页激活，检查token状态:', {
+      剩余时间: Math.round(timeUntilExpiry / 1000) + '秒',
+      是否过期: timeUntilExpiry <= 0
+    })
+
+    // 如果token已经过期，尝试刷新
+    if (timeUntilExpiry <= 0 && autoLogin.value) {
+      try {
+        await refreshToken()
+        return true
+      } catch (error) {
+        console.error('标签页激活时刷新token失败')
+        return false
+      }
+    }
+
+    return timeUntilExpiry > 0
+  }
+
   const logout = (message?: string) => {
     console.log('执行退出登录')
     accessToken.value = ''
     refreshTokenValue.value = ''
     tokenExpiry.value = 0
     user.value = null
-    autoLogin.value = false // 清除自动登录设置
+    autoLogin.value = false
+    isTabActive.value = true
     
     localStorage.removeItem('auth_token')
     localStorage.removeItem('refresh_token')
@@ -144,10 +186,11 @@ export const useAuthStore = defineStore('auth', () => {
       }, 100)
     }
     
-    router.push('/login')
+    if (router.currentRoute.value.path !== '/login') {
+      router.push('/login')
+    }
   }
 
-  // 初始化时从 localStorage 恢复状态
   const init = () => {
     const storedToken = localStorage.getItem('auth_token')
     const storedRefreshToken = localStorage.getItem('refresh_token')
@@ -168,11 +211,9 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
       
-      // 恢复自动登录设置
       if (storedAutoLogin) {
         autoLogin.value = storedAutoLogin === 'true'
       }
-
     }
   }
 
@@ -181,11 +222,15 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken: refreshTokenValue,
     user,
     autoLogin,
+    isTabActive,
     isAuthenticated,
     username,
+    shouldRefreshToken,
     login,
     refreshToken,
     checkAndRefreshToken,
+    onTabActivated,
+    setTabActive,
     logout,
     init
   }

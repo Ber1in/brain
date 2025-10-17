@@ -24,15 +24,42 @@ app.use(ElementPlus)
 const authStore = useAuthStore()
 authStore.init()
 
-// 设置定时token检查（每5分钟检查一次）
-setInterval(async () => {
-  if (authStore.accessToken) {
-    try {
-      await authStore.checkAndRefreshToken()
-    } catch (error) {
-      console.error('定时token检查失败:', error)
+const setupPageVisibility = () => {
+  const handleVisibilityChange = () => {
+    const isVisible = !document.hidden
+    authStore.setTabActive(isVisible)
+    
+    if (isVisible && authStore.accessToken) {
+      console.log('页面变为可见，检查token状态')
+      authStore.onTabActivated().then(isValid => {
+        if (!isValid && authStore.autoLogin) {
+          authStore.logout('登录已过期，请重新登录')
+        }
+      })
     }
   }
-}, 5 * 60 * 1000) // 5分钟
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  
+  // 页面加载时设置初始状态
+  authStore.setTabActive(!document.hidden)
+}
+
+// 设置定时token检查（只在活跃状态下检查）
+const setupTokenRefreshInterval = () => {
+  setInterval(async () => {
+    if (authStore.accessToken && authStore.isTabActive) {
+      try {
+        await authStore.checkAndRefreshToken()
+      } catch (error) {
+        console.error('定时token检查失败:', error)
+      }
+    }
+  }, 5 * 60 * 1000) // 5分钟
+}
+
+// 初始化
+setupPageVisibility()
+setupTokenRefreshInterval()
 
 app.mount('#app')
