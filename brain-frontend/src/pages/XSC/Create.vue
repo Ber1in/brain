@@ -38,6 +38,7 @@
                 @input="validateIpSegment(0, $event)"
                 @blur="combineIP"
                 @paste="handleIpPaste"
+                @keydown="(e) => handleKeydown(e, 0, 'ip')"
                 style="width: 60px; text-align: center;"
               />
               <span class="ip-dot">.</span>
@@ -47,6 +48,7 @@
                 placeholder=""
                 maxlength="3"
                 @input="validateIpSegment(1, $event)"
+                @keydown="(e) => handleKeydown(e, 1, 'ip')" 
                 @blur="combineIP"
                 style="width: 60px; text-align: center;"
               />
@@ -57,6 +59,7 @@
                 placeholder=""
                 maxlength="3"
                 @input="validateIpSegment(2, $event)"
+                @keydown="(e) => handleKeydown(e, 2, 'ip')"
                 @blur="combineIP"
                 style="width: 60px; text-align: center;"
               />
@@ -67,6 +70,7 @@
                 placeholder=""
                 maxlength="3"
                 @input="validateIpSegment(3, $event)"
+                @keydown="(e) => handleKeydown(e, 3, 'ip')" 
                 @blur="combineIP"
                 style="width: 60px; text-align: center;"
               />
@@ -92,6 +96,7 @@
               placeholder=""
               maxlength="3"
               @input="validateGatewaySegment(0, $event)"
+              @keydown="(e) => handleKeydown(e, 0, 'gateway')" 
               @blur="combineGateway"
               @paste="handleGatewayPaste"
               style="width: 60px; text-align: center;"
@@ -103,6 +108,7 @@
               placeholder=""
               maxlength="3"
               @input="validateGatewaySegment(1, $event)"
+              @keydown="(e) => handleKeydown(e, 1, 'gateway')" 
               @blur="combineGateway"
               style="width: 60px; text-align: center;"
             />
@@ -113,6 +119,7 @@
               placeholder=""
               maxlength="3"
               @input="validateGatewaySegment(2, $event)"
+              @keydown="(e) => handleKeydown(e, 2, 'gateway')" 
               @blur="combineGateway"
               style="width: 60px; text-align: center;"
             />
@@ -123,6 +130,7 @@
               placeholder=""
               maxlength="3"
               @input="validateGatewaySegment(3, $event)"
+              @keydown="(e) => handleKeydown(e, 3, 'gateway')" 
               @blur="combineGateway"
               style="width: 60px; text-align: center;"
             />
@@ -171,6 +179,7 @@
                   placeholder=""
                   maxlength="3"
                   @input="validateDnsSegment(dnsIndex, 0, $event)"
+                  @keydown="(e) => handleKeydown(e, 0, 'dns', dnsIndex)"
                   @blur="combineDns(dnsIndex)"
                   @paste="(e) => handleDnsPaste(dnsIndex, e)"
                   style="width: 60px; text-align: center;"
@@ -182,6 +191,7 @@
                   placeholder=""
                   maxlength="3"
                   @input="validateDnsSegment(dnsIndex, 1, $event)"
+                  @keydown="(e) => handleKeydown(e, 1, 'dns', dnsIndex)"
                   @blur="combineDns(dnsIndex)"
                   style="width: 60px; text-align: center;"
                 />
@@ -192,6 +202,7 @@
                   placeholder=""
                   maxlength="3"
                   @input="validateDnsSegment(dnsIndex, 2, $event)"
+                  @keydown="(e) => handleKeydown(e, 2, 'dns', dnsIndex)"
                   @blur="combineDns(dnsIndex)"
                   style="width: 60px; text-align: center;"
                 />
@@ -202,6 +213,7 @@
                   placeholder=""
                   maxlength="3"
                   @input="validateDnsSegment(dnsIndex, 3, $event)"
+                  @keydown="(e) => handleKeydown(e, 3, 'dns', dnsIndex)"
                   @blur="combineDns(dnsIndex)"
                   style="width: 60px; text-align: center;"
                 />
@@ -372,78 +384,25 @@ const parseAndSetIp = async (text: string, segments: string[], type: 'ip' | 'gat
   }
 }
 
-// IP段验证 - 支持小数点跳转（只有当前格有数字时才跳转）
+// IP段验证 - 只支持小数点跳转
 const validateIpSegment = (index: number, value: string) => {
-  // 如果输入的是小数点且当前框有数字内容，跳到下一个输入框
-  if (value.includes('.') && ipSegments.value[index] && ipSegments.value[index].length > 0) {
-    if (index < 3) {
-      const nextInput = [ipInput2, ipInput3, ipInput4][index]
-      if (nextInput.value) {
-        nextInput.value.focus()
-        // 移除小数点，只保留数字
-        ipSegments.value[index] = ipSegments.value[index].replace('.', '')
-      }
-    }
-    return
-  }
-  
   // 只允许数字
   let cleanValue = value.replace(/[^\d]/g, '')
   ipSegments.value[index] = cleanValue
   
-  // 自动跳到下一个输入框（输入满3位）
-  if (cleanValue.length === 3 && index < 3) {
-    const nextInput = [ipInput2, ipInput3, ipInput4][index]
-    if (nextInput.value) nextInput.value.focus()
-  }
+  // 监听键盘事件来处理小数点跳转
 }
 
-// 网关段验证 - 支持小数点跳转（只有当前格有数字时才跳转）
+// 网关段验证 - 只支持小数点跳转
 const validateGatewaySegment = (index: number, value: string) => {
-  // 如果输入的是小数点且当前框有数字内容，跳到下一个输入框
-  if (value.includes('.') && gatewaySegments.value[index] && gatewaySegments.value[index].length > 0) {
-    if (index < 3) {
-      const nextInput = [gatewayInput2, gatewayInput3, gatewayInput4][index]
-      if (nextInput.value) {
-        nextInput.value.focus()
-        // 移除小数点，只保留数字
-        gatewaySegments.value[index] = gatewaySegments.value[index].replace('.', '')
-      }
-    }
-    return
-  }
-  
   let cleanValue = value.replace(/[^\d]/g, '')
   gatewaySegments.value[index] = cleanValue
-  
-  if (cleanValue.length === 3 && index < 3) {
-    const nextInput = [gatewayInput2, gatewayInput3, gatewayInput4][index]
-    if (nextInput.value) nextInput.value.focus()
-  }
 }
 
-// DNS段验证 - 支持小数点跳转（只有当前格有数字时才跳转）
+// DNS段验证 - 只支持小数点跳转
 const validateDnsSegment = (dnsIndex: number, segmentIndex: number, value: string) => {
-  // 如果输入的是小数点且当前框有数字内容，跳到下一个输入框
-  if (value.includes('.') && dnsList.value[dnsIndex][segmentIndex] && dnsList.value[dnsIndex][segmentIndex].length > 0) {
-    if (segmentIndex < 3) {
-      const nextInput = dnsInputRefs.value[`dns_${dnsIndex}_${segmentIndex + 1}`]
-      if (nextInput) {
-        nextInput.focus()
-        // 移除小数点，只保留数字
-        dnsList.value[dnsIndex][segmentIndex] = dnsList.value[dnsIndex][segmentIndex].replace('.', '')
-      }
-    }
-    return
-  }
-  
   let cleanValue = value.replace(/[^\d]/g, '')
   dnsList.value[dnsIndex][segmentIndex] = cleanValue
-  
-  if (cleanValue.length === 3 && segmentIndex < 3) {
-    const nextInput = dnsInputRefs.value[`dns_${dnsIndex}_${segmentIndex + 1}`]
-    if (nextInput) nextInput.focus()
-  }
 }
 
 // 组合IP地址和掩码
@@ -480,6 +439,38 @@ const combineDns = (dnsIndex: number) => {
     form.dns[dnsIndex] = ''
   }
   console.log('最终form.dns:', form.dns)
+}
+
+
+// 键盘事件处理
+const handleKeydown = (event: KeyboardEvent, index: number, type: 'ip' | 'gateway' | 'dns', dnsIndex?: number) => {
+  // 如果是小数点键
+  if (event.key === '.' || event.key === 'Period') {
+    event.preventDefault() // 阻止默认行为，避免输入小数点
+    
+    if (type === 'ip') {
+      if (index < 3) {
+        const nextInput = [ipInput2, ipInput3, ipInput4][index]
+        if (nextInput.value) {
+          nextInput.value.focus()
+        }
+      }
+    } else if (type === 'gateway') {
+      if (index < 3) {
+        const nextInput = [gatewayInput2, gatewayInput3, gatewayInput4][index]
+        if (nextInput.value) {
+          nextInput.value.focus()
+        }
+      }
+    } else if (type === 'dns' && dnsIndex !== undefined) {
+      if (index < 3) {
+        const nextInput = dnsInputRefs.value[`dns_${dnsIndex}_${index + 1}`]
+        if (nextInput) {
+          nextInput.focus()
+        }
+      }
+    }
+  }
 }
 
 // IP地址验证

@@ -37,9 +37,21 @@
         <!-- 新增网口名列 -->
         <el-table-column label="网口名" width="120">
           <template #default="{ row }">
-            <span :class="getInterfaceNameClass(row.ifname)">
-              {{ getInterfaceName(row.ifname) }}
-            </span>
+            <div class="interface-name-cell">
+              <el-tooltip 
+                v-if="row.ifnameLoading" 
+                content="查询中..." 
+                placement="top"
+              >
+                <el-icon class="loading-icon"><Loading /></el-icon>
+              </el-tooltip>
+              <span 
+                v-else 
+                :class="getInterfaceNameClass(row.ifname)"
+              >
+                {{ getInterfaceName(row.ifname) }}
+              </span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="ip" label="IP地址">
@@ -67,16 +79,6 @@
         <el-table-column prop="mtu" label="MTU" width="80">
           <template #default="{ row }">
             {{ row.mtu || 1500 }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="dns" label="DNS服务器" width="180">
-          <template #default="{ row }">
-            <div v-if="row.dns && row.dns.length > 0" class="dns-list">
-              <div v-for="(dns, index) in row.dns" :key="index" class="dns-item">
-                <span class="dns-ip">{{ dns }}</span>
-              </div>
-            </div>
-            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -132,7 +134,11 @@ import type { InterfaceInfo, MVServer } from '@/types/api'
 
 const router = useRouter()
 const loading = ref(false)
-const interfaces = ref<(InterfaceInfo & { deleting?: boolean; ifname?: string })[]>([])
+const interfaces = ref<(InterfaceInfo & { 
+  deleting?: boolean; 
+  ifname?: string;
+  ifnameLoading?: boolean;
+})[]>([])
 const mv200Servers = ref<MVServer[]>([])
 const searchKeyword = ref('')
 
@@ -145,36 +151,49 @@ const loadData = async () => {
       mv200Api.getAll()
     ])
     
-    // 为每个接口获取详细信息以获取ifname
-    const interfacesWithDetails = await Promise.all(
-      interfacesResponse.map(async (intf) => {
-        try {
-          // 调用getById获取详细信息，其中可能包含ifname
-          const detail = await networkApi.getById(intf.id, intf.mv200_id)
-          return {
-            ...intf,
-            ifname: detail.ifname, // 从详细接口信息中获取ifname
-            deleting: false
-          }
-        } catch (error) {
-          // 如果获取详细信息失败，仍然返回基本数据
-          console.warn(`Failed to get details for interface ${intf.id}:`, error)
-          return {
-            ...intf,
-            ifname: undefined,
-            deleting: false
-          }
-        }
-      })
-    )
+    // 先设置基础数据，不阻塞列表显示
+    interfaces.value = interfacesResponse.map(intf => ({
+      ...intf,
+      deleting: false,
+      ifname: undefined,
+      ifnameLoading: true // 初始状态为加载中
+    }))
     
-    interfaces.value = interfacesWithDetails
     mv200Servers.value = mv200Response
+    
+    // 异步加载网口名信息，不阻塞主流程
+    loadInterfaceNames()
   } catch (error) {
     ElMessage.error('加载XSC网口列表失败')
   } finally {
     loading.value = false
   }
+}
+
+// 异步加载网口名
+const loadInterfaceNames = async () => {
+  const promises = interfaces.value.map(async (intf, index) => {
+    try {
+      const detail = await networkApi.getById(intf.id, intf.mv200_id)
+      // 更新对应的接口信息
+      interfaces.value[index] = {
+        ...interfaces.value[index],
+        ifname: detail.ifname,
+        ifnameLoading: false
+      }
+    } catch (error) {
+      console.warn(`Failed to get interface name for ${intf.id}:`, error)
+      // 即使失败也要更新状态
+      interfaces.value[index] = {
+        ...interfaces.value[index],
+        ifname: undefined,
+        ifnameLoading: false
+      }
+    }
+  })
+  
+  // 可以并行执行所有查询，也可以限制并发数
+  await Promise.allSettled(promises)
 }
 
 // 计算属性：创建MV200 ID到名称的映射
@@ -212,14 +231,11 @@ const filteredInterfaces = computed(() => {
     // 搜索描述
     if (intf.description && intf.description.toLowerCase().includes(keyword)) return true
     
-    // 搜索DNS服务器
-    if (intf.dns && intf.dns.some(dns => dns.toLowerCase().includes(keyword))) return true
-    
     // 搜索MV200服务器信息
     const mv200Name = getMv200Name(intf.mv200_id).toLowerCase()
     const mv200Ip = getMv200Ip(intf.mv200_id).toLowerCase()
     if (mv200Name.includes(keyword) || mv200Ip.includes(keyword)) return true
-    
+
     return false
   })
 })
@@ -332,6 +348,14 @@ onMounted(() => {
   margin-bottom: 2px;
 }
 
+/* 网口名单元格样式 */
+.interface-name-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 24px;
+}
+
 /* 网口名高亮样式 */
 .highlight-ifname {
   color: #13c2c2;
@@ -354,13 +378,15 @@ onMounted(() => {
 
 /* 网关高亮样式 */
 .highlight-gateway {
-  color: #e6a23c;
+  color: #409eff;  /* 改为蓝色 */
   font-weight: 500;
   font-family: 'Courier New', monospace;
 }
 
 /* MAC地址样式 */
 .mac-address {
+  color: #e6a23c;  /* 改为橙色 */
+  font-weight: 500;
   font-family: 'Courier New', monospace;
   font-size: 12px;
 }
@@ -386,6 +412,7 @@ onMounted(() => {
 /* 加载图标样式 */
 .loading-icon {
   animation: spin 1s linear infinite;
+  color: #409eff;
 }
 
 @keyframes spin {
