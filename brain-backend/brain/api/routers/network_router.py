@@ -12,6 +12,7 @@ from brain.json_db import JSONDocumentDB
 from brain.api.schemas import network_schemas
 from brain.clients.dpuagent import api
 from brain.utils.get_client import get_dpuagentclient
+from brain import exceptions
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
@@ -93,6 +94,19 @@ async def create_interface(data: network_schemas.InterfaceCreate):
         LOG.error(f"Exception adding OVS flow for {interface_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for xsc interface {interface_id}")
+    try:
+        recoverapi = api.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for interface {interface_id}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for interface {interface_id}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after creating interface {interface_id}: {e}")
+        raise
+
     interface_data["id"] = interface_id
     db.insert(NETWORK_COLLECTION, interface_data)
     LOG.info(f"Interface {interface_id} inserted into database")
@@ -131,6 +145,19 @@ async def delete_interface(data: network_schemas.InterfaceDelete):
     except Exception as e:
         LOG.error(f"Exception deleting XSC network for {data.id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for xsc interface {data.id}")
+    try:
+        recoverapi = api.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for interface {data.id}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for interface {data.id}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after deleting interface {data.id}: {e}")
+        raise
 
     db.delete(NETWORK_COLLECTION, {"id": data.id})
     LOG.info(f"Interface {data.id} deleted successfully")
