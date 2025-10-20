@@ -26,15 +26,6 @@
 
       <el-table :data="filteredInterfaces" v-loading="loading">
         <el-table-column prop="id" label="ID" width="200" />
-        <el-table-column label="MV200">
-          <template #default="{ row }">
-            <div class="mv200-info">
-              <div class="mv200-name">{{ getMv200Name(row.mv200_id) }}</div>
-              <div class="dns-ip">{{ getMv200Ip(row.mv200_id) }}</div>
-            </div>
-          </template>
-        </el-table-column>
-        <!-- 新增网口名列 -->
         <el-table-column label="网口名" width="120">
           <template #default="{ row }">
             <div class="interface-name-cell">
@@ -51,6 +42,14 @@
               >
                 {{ getInterfaceName(row.ifname) }}
               </span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="SOC IP">
+          <template #default="{ row }">
+            <div class="mv200-info">
+              <div class="mv200-name">{{ getMv200Name(row.mv200_id) }}</div>
+              <div class="dns-ip">{{ getMv200Ip(row.mv200_id) }}</div>
             </div>
           </template>
         </el-table-column>
@@ -146,10 +145,14 @@ const searchKeyword = ref('')
 const loadData = async () => {
   loading.value = true
   try {
-    const [interfacesResponse, mv200Response] = await Promise.all([
-      networkApi.getAll(),
-      mv200Api.getAll()
-    ])
+    const interfacesResponse = await networkApi.getAll()
+    
+    // 如果没有网口数据，直接返回
+    if (!interfacesResponse || interfacesResponse.length === 0) {
+      interfaces.value = []
+      mv200Servers.value = []
+      return
+    }
     
     // 先设置基础数据，不阻塞列表显示
     interfaces.value = interfacesResponse.map(intf => ({
@@ -159,6 +162,8 @@ const loadData = async () => {
       ifnameLoading: true // 初始状态为加载中
     }))
     
+    // 只有当有网口数据时才加载MV200服务器
+    const mv200Response = await mv200Api.getAll()
     mv200Servers.value = mv200Response
     
     // 异步加载网口名信息，不阻塞主流程

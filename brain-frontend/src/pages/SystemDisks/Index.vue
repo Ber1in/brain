@@ -388,8 +388,19 @@ const getHostIP = (mv200_id: string) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const [disksResponse, imagesResponse, serversResponse, baresResponse] = await Promise.all([
-      systemDisksApi.getAll(),
+    const disksResponse = await systemDisksApi.getAll()
+    
+    // 如果没有系统盘数据，直接返回
+    if (!disksResponse || disksResponse.length === 0) {
+      disks.value = []
+      images.value = []
+      mv200Servers.value = []
+      bares.value = []
+      return
+    }
+    
+    // 只有当有系统盘数据时才加载其他数据
+    const [imagesResponse, serversResponse, baresResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
       bareApi.getAll(),

@@ -151,10 +151,17 @@ const searchKeyword = ref('')
 const loadData = async () => {
   loading.value = true
   try {
-    const [baresResponse, serversResponse] = await Promise.all([
-      bareApi.getAll(),
-      mv200Api.getAll()
-    ])
+    const serversResponse = await mv200Api.getAll()
+    
+    // 如果没有MV200服务器数据，直接返回
+    if (!serversResponse || serversResponse.length === 0) {
+      servers.value = []
+      bares.value = []
+      return
+    }
+    
+    // 只有当有MV200服务器数据时才加载裸金属服务器数据
+    const baresResponse = await bareApi.getAll()
     
     // 初始化服务器数据，默认禁用编辑按钮直到状态查询完成
     servers.value = serversResponse.map(server => ({
