@@ -180,7 +180,7 @@ const loadData = async () => {
     loadCloudDiskStatus()
     
   } catch (error) {
-    ElMessage.error('加载MV200服务器列表失败')
+    ElMessage.error('加载MV200列表失败')
     loading.value = false
   }
 }
@@ -313,7 +313,7 @@ const handleEdit = (server: MVServer & {
 
 const handleDelete = async (server: MVServer) => {
   try {
-    await ElMessageBox.confirm(`确定要删除MV200服务器 "${server.name}" 吗？`, '确认删除', {
+    await ElMessageBox.confirm(`确定要删除MV200 "${server.name}" 吗？`, '确认删除', {
       type: 'warning',
     })
 

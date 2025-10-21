@@ -15,7 +15,7 @@
           <div class="readonly-info">镜像名称: {{ getImageName(originalData.image_id) }} ({{ originalData.mon_host }})</div>
         </el-form-item>
 
-        <el-form-item label="MV200服务器">
+        <el-form-item label="MV200">
           <el-input :value="originalData.mv200_id" disabled />
           <div class="readonly-info">SOC IP: {{ originalData.mv200_ip }} 裸金属服务器: {{ getHostIP(originalData.mv200_id) }}</div>
         </el-form-item>

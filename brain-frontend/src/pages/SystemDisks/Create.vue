@@ -31,10 +31,10 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="MV200服务器" prop="system_disk.mv200_id">
+        <el-form-item label="MV200" prop="system_disk.mv200_id">
           <el-select
             v-model="form.system_disk.mv200_id"
-            placeholder="选择MV200服务器"
+            placeholder="选择MV200"
             style="width: 100%"
             filterable
           >
@@ -171,7 +171,7 @@ const minDiskSize = computed(() => {
 
 const rules: FormRules = {
   'system_disk.image_id': [{ required: true, message: '请选择镜像', trigger: 'change' }],
-  'system_disk.mv200_id': [{ required: true, message: '请选择MV200服务器', trigger: 'change' }],
+  'system_disk.mv200_id': [{ required: true, message: '请选择MV200', trigger: 'change' }],
   'system_disk.size_gb': [
     { required: true, message: '请输入磁盘大小', trigger: 'blur' },
     { 

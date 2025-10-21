@@ -7,7 +7,7 @@
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索ID、SOC、IP地址、网关、MTU、VLAN或描述"
+              placeholder="搜索ID、SOC、裸金属服务器、IP地址、MTU、VLAN或描述"
               clearable
               style="width: 400px; margin-right: 16px;"
               @input="handleSearch"
@@ -48,19 +48,20 @@
         <el-table-column label="SOC IP">
           <template #default="{ row }">
             <div class="mv200-info">
-              <div class="mv200-name">{{ getMv200Name(row.mv200_id) }}</div>
-              <div class="dns-ip">{{ getMv200Ip(row.mv200_id) }}</div>
+              <div class="highlight-name">{{ getMv200Name(row.mv200_id) }}</div>
+              <div class="highlight-ip">({{ getMv200Ip(row.mv200_id) }})</div>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="裸金属服务器">
+          <template #default="{ row }">
+            <div class="highlight-name">{{ getHostName(row.mv200_id) }}</div>
+            <div class="highlight-ip">({{ getHostIP(row.mv200_id) }})</div>
           </template>
         </el-table-column>
         <el-table-column prop="ip" label="IP地址">
           <template #default="{ row }">
             <span class="highlight-ip">{{ getIpOnly(row.ip) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="gateway" label="网关">
-          <template #default="{ row }">
-            <span class="highlight-gateway">{{ row.gateway }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="vlan_tag" label="VLAN ID" width="100">
@@ -129,7 +130,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Edit, Delete, Search, Loading } from '@element-plus/icons-vue'
 import { networkApi } from '@/api/network'
 import { mv200Api } from '@/api/mv200'
-import type { InterfaceInfo, MVServer } from '@/types/api'
+import { bareApi } from '@/api/bare'
+import type { InterfaceInfo, MVServer, BareMetalServer } from '@/types/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -140,6 +142,7 @@ const interfaces = ref<(InterfaceInfo & {
 })[]>([])
 const mv200Servers = ref<MVServer[]>([])
 const searchKeyword = ref('')
+const bares = ref<BareMetalServer[]>([])
 
 // 加载数据
 const loadData = async () => {
@@ -161,11 +164,14 @@ const loadData = async () => {
       ifname: undefined,
       ifnameLoading: true // 初始状态为加载中
     }))
-    
-    // 只有当有网口数据时才加载MV200服务器
-    const mv200Response = await mv200Api.getAll()
+
+    const [mv200Response, baresResponse] = await Promise.all([
+      mv200Api.getAll(),
+      bareApi.getAll(),
+    ])
     mv200Servers.value = mv200Response
-    
+    bares.value = baresResponse
+
     // 异步加载网口名信息，不阻塞主流程
     loadInterfaceNames()
   } catch (error) {
@@ -223,9 +229,11 @@ const filteredInterfaces = computed(() => {
     
     // 搜索IP地址
     if (intf.ip.toLowerCase().includes(keyword)) return true
-    
-    // 搜索网关
-    if (intf.gateway.toLowerCase().includes(keyword)) return true
+
+    // 搜索裸金属服务器信息
+    const hostName = getHostName(disk.mv200_id).toLowerCase()
+    const hostIP = getHostIP(disk.mv200_id).toLowerCase()
+    if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
     
     // 搜索VLAN
     if (intf.vlan_tag.toString().includes(keyword)) return true
@@ -255,6 +263,24 @@ const getMv200Name = (mv200Id: string) => {
 const getMv200Ip = (mv200Id: string) => {
   const server = mv200Map.value.get(mv200Id)
   return server ? server.ip_address : '-'
+}
+
+// 根据ID获取裸金属服务器名称
+const getHostName = (mv200_id: string) => {
+  const server = mv200Map.value.get(mv200_id)
+  if (!server || !server.bare_id) return '-'
+  
+  const bare_info = bareMap.value.get(server.bare_id)
+  return bare_info ? bare_info.name : '-'
+}
+
+// 根据ID获取裸金属服务器IP
+const getHostIP = (mv200_id: string) => {
+  const server = mv200Map.value.get(mv200_id)
+  if (!server || !server.bare_id) return '-'
+  
+  const bare_info = bareMap.value.get(server.bare_id)
+  return bare_info ? bare_info.host_ip : '-'
 }
 
 // 获取网口名显示
@@ -290,6 +316,14 @@ const handleCommand = (command: string, intf: InterfaceInfo & { deleting?: boole
       break
   }
 }
+
+const bareMap = computed(() => {
+  const map = new Map<string, BareMetalServer>()
+  bares.value.forEach(bare => {
+    map.set(bare.id, bare)
+  })
+  return map
+})
 
 const handleEdit = (intf: InterfaceInfo) => {
   router.push(`/xsc-interface/edit/${intf.id}`)
@@ -347,12 +381,6 @@ onMounted(() => {
   flex-direction: column;
 }
 
-.mv200-name {
-  color: #67c23a;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
 /* 网口名单元格样式 */
 .interface-name-cell {
   display: flex;
@@ -374,16 +402,15 @@ onMounted(() => {
   font-style: italic;
 }
 
+/* 名称高亮样式 - 只改变字体颜色 */
+.highlight-name {
+  color: #67c23a;
+  font-weight: 600;
+}
+
 /* IP地址高亮样式 */
 .highlight-ip {
   color: #409eff;
-  font-weight: 500;
-  font-family: 'Courier New', monospace;
-}
-
-/* 网关高亮样式 */
-.highlight-gateway {
-  color: #409eff;  /* 改为蓝色 */
   font-weight: 500;
   font-family: 'Courier New', monospace;
 }

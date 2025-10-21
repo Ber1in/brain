@@ -51,7 +51,7 @@ const router = createRouter({
       name: 'MV200Create',
       component: () => import('@/pages/MV200/Create.vue'),
       meta: {
-        title: '录入MV200服务器',
+        title: '录入MV200',
         requiresAuth: true,
       },
     },
@@ -114,7 +114,7 @@ const router = createRouter({
       name: 'MV200Edit',
       component: () => import('@/pages/MV200/Edit.vue'),
       meta: {
-        title: '编辑MV200服务器',
+        title: '编辑MV200',
         requiresAuth: true,
       },
     },

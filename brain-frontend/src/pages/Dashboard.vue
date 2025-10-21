@@ -77,7 +77,7 @@
           <el-table :data="recentDisks" v-loading="loading">
             <el-table-column label="ID" prop="id" width="200" />
             <el-table-column label="镜像" :formatter="getImageName" />
-            <el-table-column label="MV200服务器" :formatter="getMV200Name" />
+            <el-table-column label="MV200" :formatter="getMV200Name" />
             <el-table-column label="大小(GB)" prop="size_gb" width="100" />
           </el-table>
         </el-card>

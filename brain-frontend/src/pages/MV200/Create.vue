@@ -2,7 +2,7 @@
   <div class="mv200-create">
     <el-card>
       <template #header>
-        <h2>录入MV200服务器</h2>
+        <h2>录入MV200</h2>
       </template>
       
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
