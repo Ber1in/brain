@@ -232,9 +232,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.xsc-interface-edit {
-  padding: 20px;
-}
 
 .readonly-info {
   font-size: 12px;
@@ -252,12 +249,4 @@ onMounted(() => {
   font-style: italic;
 }
 
-.el-card {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.el-form {
-  margin-top: 20px;
-}
 </style>
