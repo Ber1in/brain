@@ -24,7 +24,12 @@
         </div>
       </template>
 
-      <el-table :data="filteredDisks" v-loading="loading" style="width: 100%">
+      <el-table 
+        :data="filteredDisks" 
+        v-loading="loading" 
+        style="width: 100%"
+        :default-sort="{ prop: 'mv200_ip', order: 'ascending' }"
+      >
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="镜像名称">
           <template #default="{ row }">
@@ -37,13 +42,22 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="SOC IP">
+        <el-table-column 
+          prop="mv200_ip" 
+          label="SOC IP"
+          sortable
+          :sort-method="ipSortMethod"
+        >
           <template #default="{ row }">
             <div class="highlight-name">{{ getMV200Name(row.mv200_id) }}</div>
             <div class="highlight-ip">({{ row.mv200_ip }})</div>
           </template>
         </el-table-column>
-        <el-table-column label="裸金属服务器">
+        <el-table-column 
+          label="裸金属服务器"
+          sortable
+          :sort-method="hostIpSortMethod"
+        >
           <template #default="{ row }">
             <div class="highlight-name">{{ getHostName(row.mv200_id) }}</div>
             <div class="highlight-ip">({{ getHostIP(row.mv200_id) }})</div>
@@ -74,7 +88,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column prop="creator" label="创建人" width="90">
+        <el-table-column 
+          prop="creator" 
+          label="创建人" 
+          width="90"
+          sortable
+        >
           <template #default="{ row }">
             <span class="highlight-creator">{{ row.creator }}</span>
           </template>
@@ -297,6 +316,55 @@ const rebuildForm = reactive({
 const flattenDialogVisible = ref(false)
 const flattenLoading = ref(false)
 
+// IP地址排序函数 - 正确的数值比较
+const ipSortMethod = (a: SystemDisk, b: SystemDisk) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    // 将IP地址转换为一个可比较的数字
+    // 每段数字占8位，从高位到低位依次是第1段、第2段、第3段、第4段
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const ipA = ipToNumber(a.mv200_ip);
+  const ipB = ipToNumber(b.mv200_ip);
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// 裸金属服务器IP排序函数
+const hostIpSortMethod = (a: SystemDisk, b: SystemDisk) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const getHostIP = (disk: SystemDisk) => {
+    const server = mv200Map.value.get(disk.mv200_id);
+    if (!server || !server.bare_id) return '0.0.0.0';
+    const bare_info = bareMap.value.get(server.bare_id);
+    return bare_info ? bare_info.host_ip : '0.0.0.0';
+  };
+  
+  const ipA = ipToNumber(getHostIP(a));
+  const ipB = ipToNumber(getHostIP(b));
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// 辅助函数：用于数据加载时的排序
+const ipSort = (ipA: string, ipB: string) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  return ipToNumber(ipA) - ipToNumber(ipB);
+};
+
 // 计算属性：创建ID到名称的映射
 const imageMap = computed(() => {
   const map = new Map<string, string>()
@@ -324,35 +392,38 @@ const bareMap = computed(() => {
 
 // 计算属性：过滤磁盘列表
 const filteredDisks = computed(() => {
-  if (!searchKeyword.value) {
-    return disks.value
+  let filtered = disks.value
+  
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    filtered = disks.value.filter(disk => {
+      // 搜索ID
+      if (disk.id.toLowerCase().includes(keyword)) return true
+      
+      // 搜索镜像名
+      const imageName = getImageName(disk.image_id).toLowerCase()
+      if (imageName.includes(keyword)) return true
+      
+      // 搜索SOC IP
+      if (disk.mv200_ip.toLowerCase().includes(keyword)) return true
+      
+      // 搜索裸金属服务器信息
+      const hostName = getHostName(disk.mv200_id).toLowerCase()
+      const hostIP = getHostIP(disk.mv200_id).toLowerCase()
+      if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
+      
+      // 搜索创建人
+      if (disk.creator && disk.creator.toLowerCase().includes(keyword)) return true
+      
+      // 搜索描述
+      if (disk.description && disk.description.toLowerCase().includes(keyword)) return true
+      
+      return false
+    })
   }
   
-  const keyword = searchKeyword.value.toLowerCase()
-  return disks.value.filter(disk => {
-    // 搜索ID
-    if (disk.id.toLowerCase().includes(keyword)) return true
-    
-    // 搜索镜像名
-    const imageName = getImageName(disk.image_id).toLowerCase()
-    if (imageName.includes(keyword)) return true
-    
-    // 搜索SOC IP
-    if (disk.mv200_ip.toLowerCase().includes(keyword)) return true
-    
-    // 搜索裸金属服务器信息
-    const hostName = getHostName(disk.mv200_id).toLowerCase()
-    const hostIP = getHostIP(disk.mv200_id).toLowerCase()
-    if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
-    
-    // 搜索创建人
-    if (disk.creator && disk.creator.toLowerCase().includes(keyword)) return true
-    
-    // 搜索描述
-    if (disk.description && disk.description.toLowerCase().includes(keyword)) return true
-    
-    return false
-  })
+  // 返回过滤后的数据，el-table会处理排序
+  return filtered
 })
 
 // 根据ID获取镜像名称
@@ -406,7 +477,8 @@ const loadData = async () => {
       bareApi.getAll(),
     ])
     
-    disks.value = disksResponse
+    // 按SOC IP排序
+    disks.value = disksResponse.sort((a, b) => ipSort(a.mv200_ip, b.mv200_ip))
     images.value = imagesResponse
     mv200Servers.value = serversResponse
     bares.value = baresResponse
@@ -721,7 +793,6 @@ onMounted(() => {
 :deep(.el-dropdown-menu__item.is-disabled:hover) {
   background-color: transparent;
 }
-
 
 /* 下拉菜单项样式 */
 .dropdown-item-content {

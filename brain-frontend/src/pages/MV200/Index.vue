@@ -24,14 +24,27 @@
         </div>
       </template>
 
-      <el-table :data="filteredServers" v-loading="loading">
+      <el-table 
+        :data="filteredServers" 
+        v-loading="loading"
+        :default-sort="{ prop: 'ip_address', order: 'ascending' }"
+      >
         <el-table-column prop="id" label="ID" width="200" />
-        <el-table-column prop="name" label="名称">
+        <el-table-column 
+          prop="name" 
+          label="名称"
+          sortable
+        >
           <template #default="{ row }">
             <span class="highlight-name">{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="ip_address" label="SOC IP">
+        <el-table-column 
+          prop="ip_address" 
+          label="SOC IP"
+          sortable
+          :sort-method="ipSortMethod"
+        >
           <template #default="{ row }">
             <span class="highlight-ip">{{ row.ip_address }}</span>
           </template>
@@ -147,6 +160,33 @@ const servers = ref<(MVServer & {
 const bares = ref<BareMetalServer[]>([])
 const searchKeyword = ref('')
 
+// IP地址排序函数 - 正确的数值比较
+const ipSortMethod = (a: MVServer, b: MVServer) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    // 将IP地址转换为一个可比较的数字
+    // 每段数字占8位，从高位到低位依次是第1段、第2段、第3段、第4段
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const ipA = ipToNumber(a.ip_address);
+  const ipB = ipToNumber(b.ip_address);
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// 辅助函数：用于数据加载时的排序
+const ipSort = (ipA: string, ipB: string) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  return ipToNumber(ipA) - ipToNumber(ipB);
+};
+
 // 加载基础列表数据
 const loadData = async () => {
   loading.value = true
@@ -164,12 +204,15 @@ const loadData = async () => {
     const baresResponse = await bareApi.getAll()
     
     // 初始化服务器数据，默认禁用编辑按钮直到状态查询完成
-    servers.value = serversResponse.map(server => ({
-      ...server,
-      switchLoading: false,
-      clouddiskStatusLoading: true, // 初始状态为加载中
-      clouddiskStatusError: false
-    }))
+    // 按SOC IP排序（正确的数值排序）
+    servers.value = serversResponse
+      .map(server => ({
+        ...server,
+        switchLoading: false,
+        clouddiskStatusLoading: true, // 初始状态为加载中
+        clouddiskStatusError: false
+      }))
+      .sort((a, b) => ipSort(a.ip_address, b.ip_address))
     
     bares.value = baresResponse
     
@@ -218,32 +261,35 @@ const bareMap = computed(() => {
   return map
 })
 
-// 计算属性：过滤服务器列表
+// 计算属性：过滤并排序服务器列表
 const filteredServers = computed(() => {
-  if (!searchKeyword.value) {
-    return servers.value
+  let filtered = servers.value
+  
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    filtered = servers.value.filter(server => {
+      // 搜索ID
+      if (server.id.toLowerCase().includes(keyword)) return true
+      
+      // 搜索MV200名称
+      if (server.name.toLowerCase().includes(keyword)) return true
+      
+      // 搜索SOC IP
+      if (server.ip_address.toLowerCase().includes(keyword)) return true
+      
+      // 搜索裸金属服务器信息
+      const bareInfo = getBareName(server.bare_id).toLowerCase()
+      if (bareInfo.includes(keyword)) return true
+      
+      // 搜索描述
+      if (server.description && server.description.toLowerCase().includes(keyword)) return true
+      
+      return false
+    })
   }
   
-  const keyword = searchKeyword.value.toLowerCase()
-  return servers.value.filter(server => {
-    // 搜索ID
-    if (server.id.toLowerCase().includes(keyword)) return true
-    
-    // 搜索MV200名称
-    if (server.name.toLowerCase().includes(keyword)) return true
-    
-    // 搜索SOC IP
-    if (server.ip_address.toLowerCase().includes(keyword)) return true
-    
-    // 搜索裸金属服务器信息
-    const bareInfo = getBareName(server.bare_id).toLowerCase()
-    if (bareInfo.includes(keyword)) return true
-    
-    // 搜索描述
-    if (server.description && server.description.toLowerCase().includes(keyword)) return true
-    
-    return false
-  })
+  // 返回过滤后的数据，el-table会处理排序
+  return filtered
 })
 
 // 根据ID获取裸金属服务器信息

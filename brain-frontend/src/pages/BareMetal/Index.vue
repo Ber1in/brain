@@ -24,14 +24,27 @@
         </div>
       </template>
 
-      <el-table :data="filteredServers" v-loading="loading">
+      <el-table 
+        :data="filteredServers" 
+        v-loading="loading"
+        :default-sort="{ prop: 'host_ip', order: 'ascending' }"
+      >
         <el-table-column prop="id" label="ID" width="200" />
-        <el-table-column prop="name" label="名称">
+        <el-table-column 
+          prop="name" 
+          label="名称"
+          sortable
+        >
           <template #default="{ row }">
             <span class="highlight-name">{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="host_ip" label="管理IP">
+        <el-table-column 
+          prop="host_ip" 
+          label="管理IP"
+          sortable
+          :sort-method="ipSortMethod"
+        >
           <template #default="{ row }">
             <span class="highlight-ip">{{ row.host_ip }}</span>
           </template>
@@ -276,31 +289,62 @@ const resetLoading = ref(false)
 const resetType = ref<'cold' | 'warm'>('cold')
 const resetDialogTitle = ref('')
 
+// IP地址排序函数 - 正确的数值比较
+const ipSortMethod = (a: BareMetalServer, b: BareMetalServer) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    // 将IP地址转换为一个可比较的数字
+    // 每段数字占8位，从高位到低位依次是第1段、第2段、第3段、第4段
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const ipA = ipToNumber(a.host_ip);
+  const ipB = ipToNumber(b.host_ip);
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// 辅助函数：用于数据加载时的排序
+const ipSort = (ipA: string, ipB: string) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  return ipToNumber(ipA) - ipToNumber(ipB);
+};
+
 // 计算属性：过滤服务器列表
 const filteredServers = computed(() => {
-  if (!searchKeyword.value) {
-    return servers.value
+  let filtered = servers.value
+  
+  // 搜索过滤
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    filtered = servers.value.filter(server => {
+      // 搜索ID
+      if (server.id.toLowerCase().includes(keyword)) return true
+      
+      // 搜索名称
+      if (server.name.toLowerCase().includes(keyword)) return true
+      
+      // 搜索管理IP
+      if (server.host_ip.toLowerCase().includes(keyword)) return true
+      
+      // 搜索MAC地址
+      if (server.mac.toLowerCase().includes(keyword)) return true
+      
+      // 搜索描述
+      if (server.description && server.description.toLowerCase().includes(keyword)) return true
+      
+      return false
+    })
   }
   
-  const keyword = searchKeyword.value.toLowerCase()
-  return servers.value.filter(server => {
-    // 搜索ID
-    if (server.id.toLowerCase().includes(keyword)) return true
-    
-    // 搜索名称
-    if (server.name.toLowerCase().includes(keyword)) return true
-    
-    // 搜索管理IP
-    if (server.host_ip.toLowerCase().includes(keyword)) return true
-    
-    // 搜索MAC地址
-    if (server.mac.toLowerCase().includes(keyword)) return true
-    
-    // 搜索描述
-    if (server.description && server.description.toLowerCase().includes(keyword)) return true
-    
-    return false
-  })
+  // 返回过滤后的数据，el-table会处理排序
+  return filtered
 })
 
 // 计算当前启动项名称
@@ -346,7 +390,9 @@ const getBootOptionLabel = (name: string, id: string) => {
 const loadData = async () => {
   loading.value = true
   try {
-    servers.value = await bareApi.getAll()
+    const data = await bareApi.getAll()
+    // 加载数据后按管理IP排序
+    servers.value = data.sort((a, b) => ipSort(a.host_ip, b.host_ip))
   } catch (error) {
     ElMessage.error('加载裸金属服务器列表失败')
   } finally {

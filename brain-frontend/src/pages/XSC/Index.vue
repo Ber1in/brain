@@ -24,7 +24,11 @@
         </div>
       </template>
 
-      <el-table :data="filteredInterfaces" v-loading="loading">
+      <el-table 
+        :data="filteredInterfaces" 
+        v-loading="loading"
+        :default-sort="{ prop: 'mv200_ip', order: 'ascending' }"
+      >
         <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="网口名" width="120">
           <template #default="{ row }">
@@ -45,7 +49,11 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="SOC IP">
+        <el-table-column 
+          label="SOC IP"
+          sortable
+          :sort-method="mv200IpSortMethod"
+        >
           <template #default="{ row }">
             <div class="mv200-info">
               <div class="highlight-name">{{ getMv200Name(row.mv200_id) }}</div>
@@ -53,18 +61,32 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="裸金属服务器">
+        <el-table-column 
+          label="裸金属服务器"
+          sortable
+          :sort-method="hostIpSortMethod"
+        >
           <template #default="{ row }">
             <div class="highlight-name">{{ getHostName(row.mv200_id) }}</div>
             <div class="highlight-ip">({{ getHostIP(row.mv200_id) }})</div>
           </template>
         </el-table-column>
-        <el-table-column prop="ip" label="IP地址">
+        <el-table-column 
+          prop="ip" 
+          label="IP地址"
+          sortable
+          :sort-method="ipSortMethod"
+        >
           <template #default="{ row }">
             <span class="highlight-ip">{{ getIpOnly(row.ip) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="vlan_tag" label="VLAN ID" width="100">
+        <el-table-column 
+          prop="vlan_tag" 
+          label="VLAN ID" 
+          width="100"
+          sortable
+        >
           <template #default="{ row }">
             <el-tag v-if="row.vlan_tag" type="info">{{ row.vlan_tag }}</el-tag>
             <span v-else>-</span>
@@ -144,6 +166,63 @@ const mv200Servers = ref<MVServer[]>([])
 const searchKeyword = ref('')
 const bares = ref<BareMetalServer[]>([])
 
+// IP地址排序函数 - 正确的数值比较
+const ipSortMethod = (a: InterfaceInfo, b: InterfaceInfo) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    // 将IP地址转换为一个可比较的数字
+    // 每段数字占8位，从高位到低位依次是第1段、第2段、第3段、第4段
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const ipA = ipToNumber(getIpOnly(a.ip));
+  const ipB = ipToNumber(getIpOnly(b.ip));
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// SOC IP排序函数
+const mv200IpSortMethod = (a: InterfaceInfo, b: InterfaceInfo) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const ipA = ipToNumber(getMv200Ip(a.mv200_id));
+  const ipB = ipToNumber(getMv200Ip(b.mv200_id));
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// 裸金属服务器IP排序函数
+const hostIpSortMethod = (a: InterfaceInfo, b: InterfaceInfo) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  const ipA = ipToNumber(getHostIP(a.mv200_id));
+  const ipB = ipToNumber(getHostIP(b.mv200_id));
+  
+  if (ipA < ipB) return -1;
+  if (ipA > ipB) return 1;
+  return 0;
+};
+
+// 辅助函数：用于数据加载时的排序
+const ipSort = (ipA: string, ipB: string) => {
+  const ipToNumber = (ip: string) => {
+    const parts = ip.split('.').map(part => parseInt(part, 10));
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+  };
+  
+  return ipToNumber(ipA) - ipToNumber(ipB);
+};
+
 // 加载数据
 const loadData = async () => {
   loading.value = true
@@ -171,6 +250,13 @@ const loadData = async () => {
     ])
     mv200Servers.value = mv200Response
     bares.value = baresResponse
+
+    // 按SOC IP排序
+    interfaces.value = interfaces.value.sort((a, b) => {
+      const ipA = getMv200Ip(a.mv200_id);
+      const ipB = getMv200Ip(b.mv200_id);
+      return ipSort(ipA, ipB);
+    });
 
     // 异步加载网口名信息，不阻塞主流程
     loadInterfaceNames()
@@ -216,41 +302,52 @@ const mv200Map = computed(() => {
   return map
 })
 
+const bareMap = computed(() => {
+  const map = new Map<string, BareMetalServer>()
+  bares.value.forEach(bare => {
+    map.set(bare.id, bare)
+  })
+  return map
+})
+
 // 计算属性：过滤网口列表
 const filteredInterfaces = computed(() => {
-  if (!searchKeyword.value) {
-    return interfaces.value
+  let filtered = interfaces.value
+  
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    filtered = interfaces.value.filter(intf => {
+      // 搜索ID
+      if (intf.id.toLowerCase().includes(keyword)) return true
+      
+      // 搜索IP地址
+      if (intf.ip.toLowerCase().includes(keyword)) return true
+
+      // 搜索裸金属服务器信息
+      const hostName = getHostName(intf.mv200_id).toLowerCase()
+      const hostIP = getHostIP(intf.mv200_id).toLowerCase()
+      if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
+      
+      // 搜索VLAN
+      if (intf.vlan_tag.toString().includes(keyword)) return true
+      
+      // 搜索MTU
+      if (intf.mtu?.toString().includes(keyword)) return true
+      
+      // 搜索描述
+      if (intf.description && intf.description.toLowerCase().includes(keyword)) return true
+      
+      // 搜索MV200服务器信息
+      const mv200Name = getMv200Name(intf.mv200_id).toLowerCase()
+      const mv200Ip = getMv200Ip(intf.mv200_id).toLowerCase()
+      if (mv200Name.includes(keyword) || mv200Ip.includes(keyword)) return true
+
+      return false
+    })
   }
   
-  const keyword = searchKeyword.value.toLowerCase()
-  return interfaces.value.filter(intf => {
-    // 搜索ID
-    if (intf.id.toLowerCase().includes(keyword)) return true
-    
-    // 搜索IP地址
-    if (intf.ip.toLowerCase().includes(keyword)) return true
-
-    // 搜索裸金属服务器信息
-    const hostName = getHostName(disk.mv200_id).toLowerCase()
-    const hostIP = getHostIP(disk.mv200_id).toLowerCase()
-    if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
-    
-    // 搜索VLAN
-    if (intf.vlan_tag.toString().includes(keyword)) return true
-    
-    // 搜索MTU
-    if (intf.mtu?.toString().includes(keyword)) return true
-    
-    // 搜索描述
-    if (intf.description && intf.description.toLowerCase().includes(keyword)) return true
-    
-    // 搜索MV200服务器信息
-    const mv200Name = getMv200Name(intf.mv200_id).toLowerCase()
-    const mv200Ip = getMv200Ip(intf.mv200_id).toLowerCase()
-    if (mv200Name.includes(keyword) || mv200Ip.includes(keyword)) return true
-
-    return false
-  })
+  // 返回过滤后的数据，el-table会处理排序
+  return filtered
 })
 
 // 根据ID获取MV200服务器名称
@@ -262,7 +359,7 @@ const getMv200Name = (mv200Id: string) => {
 // 根据ID获取MV200服务器IP
 const getMv200Ip = (mv200Id: string) => {
   const server = mv200Map.value.get(mv200Id)
-  return server ? server.ip_address : '-'
+  return server ? server.ip_address : '0.0.0.0'
 }
 
 // 根据ID获取裸金属服务器名称
@@ -277,10 +374,10 @@ const getHostName = (mv200_id: string) => {
 // 根据ID获取裸金属服务器IP
 const getHostIP = (mv200_id: string) => {
   const server = mv200Map.value.get(mv200_id)
-  if (!server || !server.bare_id) return '-'
+  if (!server || !server.bare_id) return '0.0.0.0'
   
   const bare_info = bareMap.value.get(server.bare_id)
-  return bare_info ? bare_info.host_ip : '-'
+  return bare_info ? bare_info.host_ip : '0.0.0.0'
 }
 
 // 获取网口名显示
@@ -299,10 +396,10 @@ const handleSearch = () => {
 }
 
 const getIpOnly = (ipWithMask: string) => {
-  if (!ipWithMask) return '-'
+  if (!ipWithMask) return '0.0.0.0'
   // 分割IP和掩码，返回IP部分
   const [ip] = ipWithMask.split('/')
-  return ip || '-'
+  return ip || '0.0.0.0'
 }
 
 // 下拉菜单命令处理
@@ -316,14 +413,6 @@ const handleCommand = (command: string, intf: InterfaceInfo & { deleting?: boole
       break
   }
 }
-
-const bareMap = computed(() => {
-  const map = new Map<string, BareMetalServer>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare)
-  })
-  return map
-})
 
 const handleEdit = (intf: InterfaceInfo) => {
   router.push(`/xsc-interface/edit/${intf.id}`)
