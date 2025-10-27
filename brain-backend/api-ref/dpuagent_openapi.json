@@ -1292,6 +1292,33 @@
                 ]
             }
         },
+        "/dpu_agent/v1/recoverymode/query": {
+            "get": {
+                "tags": [
+                    "recovery"
+                ],
+                "summary": "Query Recovery Mode",
+                "description": "Query the current recovery mode.\n\nReturns:\n    - mode (str): Current recovery mode, either \"auto\" or \"manual\".",
+                "operationId": "query_recovery_mode_dpu_agent_v1_recoverymode_query_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecoveryModeResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
         "/dpu_agent/v1/records/clear": {
             "delete": {
                 "tags": [
@@ -1931,7 +1958,7 @@
                         "title": "Version",
                         "type": "integer",
                         "description": "Version 2 requires the system to support netplan",
-                        "default": 2
+                        "default": 1
                     }
                 },
                 "additionalProperties": false
@@ -2283,6 +2310,31 @@
                 },
                 "additionalProperties": false,
                 "description": "Request model for recovery mode"
+            },
+            "RecoveryModeResponse": {
+                "title": "RecoveryModeResponse",
+                "required": [
+                    "code",
+                    "message",
+                    "mode"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "mode": {
+                        "$ref": "#/components/schemas/Mode"
+                    }
+                },
+                "additionalProperties": false
             },
             "RecoveryStatus": {
                 "title": "RecoveryStatus",

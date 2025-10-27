@@ -77,6 +77,7 @@ from brain.clients.dpuagent.models.qos_ratio_request import QosRatioRequest
 from brain.clients.dpuagent.models.qos_response import QosResponse
 from brain.clients.dpuagent.models.qos_set_request import QosSetRequest
 from brain.clients.dpuagent.models.recovery_mode_request import RecoveryModeRequest
+from brain.clients.dpuagent.models.recovery_mode_response import RecoveryModeResponse
 from brain.clients.dpuagent.models.recovery_status import RecoveryStatus
 from brain.clients.dpuagent.models.recovery_status_request import RecoveryStatusRequest
 from brain.clients.dpuagent.models.recovery_status_response import RecoveryStatusResponse

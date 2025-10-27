@@ -20,17 +20,18 @@ import re  # noqa: F401
 import json
 
 
-from typing import List, Optional
-from pydantic import BaseModel, Field, StrictInt, conlist
-from brain.clients.dpuagent.models.ethernet import Ethernet
 
-class NetworkConfig(BaseModel):
+from pydantic import BaseModel, Field, StrictInt, StrictStr
+from brain.clients.dpuagent.models.mode import Mode
+
+class RecoveryModeResponse(BaseModel):
     """
-    NetworkConfig
+    RecoveryModeResponse
     """
-    ethernets: Optional[conlist(Ethernet)] = None
-    version: Optional[StrictInt] = Field(1, description="Version 2 requires the system to support netplan")
-    __properties = ["ethernets", "version"]
+    code: StrictInt = Field(..., description="return code of the API execution result")
+    message: StrictStr = Field(..., description="Detailed execution results")
+    mode: Mode = Field(...)
+    __properties = ["code", "message", "mode"]
 
     class Config:
         """Pydantic configuration"""
@@ -46,8 +47,8 @@ class NetworkConfig(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> NetworkConfig:
-        """Create an instance of NetworkConfig from a JSON string"""
+    def from_json(cls, json_str: str) -> RecoveryModeResponse:
+        """Create an instance of RecoveryModeResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self):
@@ -56,27 +57,21 @@ class NetworkConfig(BaseModel):
                           exclude={
                           },
                           exclude_none=True)
-        # override the default output from pydantic by calling `to_dict()` of each item in ethernets (list)
-        _items = []
-        if self.ethernets:
-            for _item in self.ethernets:
-                if _item:
-                    _items.append(_item.to_dict())
-            _dict['ethernets'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: dict) -> NetworkConfig:
-        """Create an instance of NetworkConfig from a dict"""
+    def from_dict(cls, obj: dict) -> RecoveryModeResponse:
+        """Create an instance of RecoveryModeResponse from a dict"""
         if obj is None:
             return None
 
         if not isinstance(obj, dict):
-            return NetworkConfig.parse_obj(obj)
+            return RecoveryModeResponse.parse_obj(obj)
 
-        _obj = NetworkConfig.parse_obj({
-            "ethernets": [Ethernet.from_dict(_item) for _item in obj.get("ethernets")] if obj.get("ethernets") is not None else None,
-            "version": obj.get("version") if obj.get("version") is not None else 1
+        _obj = RecoveryModeResponse.parse_obj({
+            "code": obj.get("code"),
+            "message": obj.get("message"),
+            "mode": obj.get("mode")
         })
         return _obj
 

@@ -11,7 +11,9 @@ from brain.json_db import JSONDocumentDB
 from brain.auth import authenticate_user
 from brain.api.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
+from brain.clients.dpuagent import exceptions as dpuagentExp
 from brain.utils.get_client import get_dpuagentclient
+from brain.utils.ssh_client import ssh_execute
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
@@ -75,6 +77,26 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
     except Exception as e:
         LOG.error(f"Failed to get clouddisk_enable for {server_data.ip_address}, error: {e}")
 
+    # Get clouddisk enable status from SOC
+    LOG.info(f"Getting recovery mode from SOC {server_data.ip_address}")
+    server_dict["recovery_mode"] = ""
+
+    try:
+        # setapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        # res = setapi.query_recovery_mode_dpu_agent_v1_recoverymode_query_get(
+        #     _request_timeout=2)
+        # if res.code != 0:
+        #     LOG.error(f"Failed to get recovery mode from SOC "
+        #               f"{server_data.ip_address}, message: {res.message}")
+        # else:
+        #     server_dict["recovery_mode"] = res.mode
+        #     LOG.info(f"Recovery mode from SOC {server_data.ip_address}: "
+        #              f"{res.mode}")
+        res = ssh_execute(server_data.ip_address, "cat /opt/dpuagent/mode", "root", "yunsilicon")
+        server_dict["recovery_mode"] = res.strip()
+    except Exception as e:
+        LOG.error(f"Failed to get recovery mode for {server_data.ip_address}, error: {e}")
+
     # Insert new server
     db.insert(MV_SERVER_COLLECTION, server_dict)
     LOG.info(f"Successfully created MV server {server_id}")
@@ -121,11 +143,27 @@ async def get_mv_server(server_id: str):
             LOG.info(f"Clouddisk enable status for SOC {server['ip_address']}: "
                      f"{res.clouddisk_enable}")
 
+        # setting_api = dpuagentApi.RecoveryApi(get_dpuagentclient(server["ip_address"]))
+        # res = setting_api.query_recovery_mode_dpu_agent_v1_recoverymode_query_get(
+        #     _request_timeout=2)
+        # if res.code != 0:
+        #     LOG.error(f"Failed to get recovery mode for SOC "
+        #               f"{server['ip_address']}, message: {res.message}")
+        # else:
+        #     server["recovery_mode"] = res.mode.value
+        #     LOG.info(f"Recovery mode for SOC {server['ip_address']}: "
+        #              f"{res.mode}")
+        res = ssh_execute(server['ip_address'], "cat /opt/dpuagent/mode", "root", "yunsilicon")
+        server["recovery_mode"] = res.strip()
+
     except (urllib3.exceptions.ConnectTimeoutError, urllib3.exceptions.MaxRetryError):
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=f"Failed to connect to DPU agent at {server['ip_address']}"
         )
+    # except dpuagentExp.NotFoundException:
+    #     LOG.warning(f"DPU agent at {server['ip_address']} does not support "
+    #                 "recovery mode query API (possibly old version)")
 
     LOG.info(f"Successfully retrieved MV server {server_id}")
     return server
@@ -174,9 +212,9 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
     if update_dict:
         LOG.info(f"Updating MV server {server_id} with fields: {list(update_dict.keys())}")
 
+        soc_ip = existing_server["ip_address"]
         # Handle clouddisk enable status update
         if update_data.clouddisk_enable != existing_server.get("clouddisk_enable"):
-            soc_ip = existing_server["ip_address"]
             new_status = update_data.clouddisk_enable
             LOG.info(f"Updating clouddisk enable status for SOC {soc_ip} to {new_status}")
             setting_api = dpuagentApi.SettingsApi(get_dpuagentclient(soc_ip))
@@ -190,6 +228,31 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
                             f"{existing_server['clouddisk_enable']}")
             else:
                 LOG.info(f"Successfully updated clouddisk enable status for SOC {soc_ip}")
+
+        if update_data.recovery_mode != existing_server.get("recovery_mode"):
+            new_mode = update_data.recovery_mode
+            LOG.info(f"Updating recovery mode for SOC {soc_ip} to {new_mode}")
+
+            try:
+                recovery_api = dpuagentApi.RecoveryApi(get_dpuagentclient(soc_ip))
+                res = recovery_api.update_recovery_mode_dpu_agent_v1_recoverymode_update_post(
+                    {"mode": new_mode}
+                )
+
+                if res.code != 0:
+                    LOG.error(
+                        f"Failed to update recovery mode for SOC {soc_ip}, message: {res.message}")
+                    update_dict["recovery_mode"] = existing_server["recovery_mode"]
+                    LOG.warning(f"Reverted recovery mode to original value: "
+                                f"{existing_server['recovery_mode']}")
+                else:
+                    LOG.info(f"Successfully updated recovery mode for SOC {soc_ip}")
+
+            except Exception as e:
+                LOG.error(f"Exception while updating recovery mode for SOC {soc_ip}: {e}")
+                update_dict["recovery_mode"] = existing_server["recovery_mode"]
+                LOG.warning(f"Reverted recovery mode to original value: "
+                            f"{existing_server['recovery_mode']}")
 
         updated_count = db.update(MV_SERVER_COLLECTION, {"id": server_id}, update_dict)
         if updated_count == 0:

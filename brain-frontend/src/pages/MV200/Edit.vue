@@ -35,10 +35,26 @@
           <el-input :value="originalData.clouddisk_enable ? '是' : '否'" disabled />
         </el-form-item>
 
+        <!-- 新增恢复模式显示 -->
+        <el-form-item label="恢复模式">
+          <template #label>
+            <span>恢复模式</span>
+            <el-tooltip 
+              effect="dark" 
+              content="自动模式：重启后系统会自动执行资源恢复操作；手动模式：重启后不自动执行恢复，可手动执行"
+              placement="top"
+            >
+              <el-icon style="margin-left: 4px; cursor: help;">
+                <QuestionFilled />
+              </el-icon>
+            </el-tooltip>
+          </template>
+          <el-input :value="getRecoveryModeText(originalData.recovery_mode)" disabled />
+        </el-form-item>
+
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="输入名称" />
         </el-form-item>
-
 
         <el-form-item label="描述">
           <el-input 
@@ -82,12 +98,15 @@ const originalData = reactive({
   ip_address: '',
   bare_id: '',
   description: '',
-  clouddisk_enable: false
+  clouddisk_enable: false,
+  recovery_mode: '' as string | null
 })
 
 const form = ref<MVServerUpdate>({
   name: '',
-  description: ''
+  description: '',
+  clouddisk_enable: false,
+  recovery_mode: null
 })
 
 const rules: FormRules = {
@@ -96,6 +115,14 @@ const rules: FormRules = {
     { min: 2, max: 50, message: '服务器名称长度应在2-50个字符之间', trigger: 'blur' }
   ]
 }
+
+// 获取恢复模式显示文本
+const getRecoveryModeText = (mode: string | null | undefined) => {
+  if (!mode || mode === 'None') return '未知';
+  if (mode === 'auto') return '自动模式';
+  if (mode === 'manual') return '手动模式';
+  return mode;
+};
 
 // 加载服务器数据
 const loadServerData = async () => {
@@ -106,11 +133,14 @@ const loadServerData = async () => {
     originalData.bare_id = server.bare_id || ''
     originalData.description = server.description || ''
     originalData.clouddisk_enable = server.clouddisk_enable || false
+    originalData.recovery_mode = server.recovery_mode || null
     
     bare.value = await bareApi.getById(server.bare_id)
 
     form.value.name = server.name
     form.value.description = server.description || ''
+    form.value.clouddisk_enable = server.clouddisk_enable || false
+    form.value.recovery_mode = server.recovery_mode || null
   } catch (error) {
     ElMessage.error('加载服务器数据失败')
     router.push('/mv200')
@@ -130,7 +160,14 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
-    await mv200Api.update(serverId.value, form.value)
+    await mv200Api.update(serverId.value, {
+      name: form.value.name,
+      ip_address: originalData.ip_address,
+      description: form.value.description,
+      bare_id: originalData.bare_id,
+      clouddisk_enable: originalData.clouddisk_enable,
+      recovery_mode: originalData.recovery_mode
+    })
     ElMessage.success('更新成功')
     router.push('/mv200')
   } catch (error) {

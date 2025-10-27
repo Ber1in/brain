@@ -18,6 +18,7 @@ class MVServerUpdate(BaseModel):
     description: Optional[str] = None
     bare_id: Optional[str] = None
     clouddisk_enable: bool
+    recovery_mode: Optional[str] = None
 
 
 class MVServer(BaseModel):
@@ -29,3 +30,6 @@ class MVServer(BaseModel):
     clouddisk_enable: bool = Field(..., 
                                    description=("The host allows the use of system cloud disk"
                                                 " (waiting for dpu ready when the host starts)"))
+    recovery_mode: Optional[str] = Field(None,
+                                         description="The recovery mode of aidpu, the "
+                                                     "value is one of auto and manual")

@@ -83,7 +83,49 @@
                 <el-switch
                   v-model="row.clouddisk_enable"
                   :loading="row.switchLoading"
+                  active-text="是"
+                  inactive-text="否"
                   @change="(value) => handleSwitchChange(value, row)"
+                />
+              </template>
+            </div>
+          </template>
+        </el-table-column>
+        <!-- 修改恢复模式列为开关形式 -->
+        <el-table-column label="恢复模式" width="140">
+          <template #header>
+            <span>恢复模式</span>
+            <el-tooltip 
+              effect="dark" 
+              content="手动模式：重启后不自动执行恢复，可手动执行；自动模式：重启后系统会自动执行资源恢复操作"
+              placement="top"
+            >
+              <el-icon style="margin-left: 4px; cursor: help;">
+                <QuestionFilled />
+              </el-icon>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <div class="recovery-mode">
+              <template v-if="row.recoveryModeLoading">
+                <el-icon class="loading-icon"><Loading /></el-icon>
+                <span class="status-text">查询中...</span>
+              </template>
+              <template v-else-if="row.recoveryModeError">
+                <el-tooltip effect="dark" content="无法获取恢复模式，设备可能离线" placement="top">
+                  <el-icon class="error-icon"><Warning /></el-icon>
+                </el-tooltip>
+                <span class="status-text">离线</span>
+              </template>
+              <template v-else>
+                <el-switch
+                  v-model="row.recovery_mode"
+                  :loading="row.recoveryModeSwitching"
+                  active-value="auto"
+                  inactive-value="manual"
+                  active-text="自动"
+                  inactive-text="手动"
+                  @change="(value) => handleRecoveryModeChange(value, row)"
                 />
               </template>
             </div>
@@ -156,6 +198,10 @@ const servers = ref<(MVServer & {
   switchLoading?: boolean; 
   clouddiskStatusLoading?: boolean;
   clouddiskStatusError?: boolean;
+  recoveryModeLoading?: boolean;
+  recoveryModeError?: boolean;
+  recoveryModeSwitching?: boolean;
+  recovery_mode?: string | null;
 })[]>([])
 const bares = ref<BareMetalServer[]>([])
 const searchKeyword = ref('')
@@ -210,7 +256,11 @@ const loadData = async () => {
         ...server,
         switchLoading: false,
         clouddiskStatusLoading: true, // 初始状态为加载中
-        clouddiskStatusError: false
+        clouddiskStatusError: false,
+        recoveryModeLoading: true, // 恢复模式初始状态为加载中
+        recoveryModeError: false,
+        recoveryModeSwitching: false, // 恢复模式切换状态
+        recovery_mode: null
       }))
       .sort((a, b) => ipSort(a.ip_address, b.ip_address))
     
@@ -219,8 +269,8 @@ const loadData = async () => {
     // 列表加载完成后，loading 状态结束，用户可以立即看到列表
     loading.value = false
     
-    // 然后异步加载每个服务器的云盘启动状态
-    loadCloudDiskStatus()
+    // 然后异步加载每个服务器的云盘启动状态和恢复模式
+    loadServerDetails()
     
   } catch (error) {
     ElMessage.error('加载MV200列表失败')
@@ -228,27 +278,40 @@ const loadData = async () => {
   }
 }
 
-// 异步加载云盘启动状态
-const loadCloudDiskStatus = async () => {
-  const promises = servers.value.map(async (server) => {
+// 异步加载服务器详情（云盘启动状态和恢复模式）
+const loadServerDetails = async () => {
+  const promises = servers.value.map(async (server, index) => {
     try {
-      // 调用单个服务器详情接口获取云盘启动状态
+      // 调用单个服务器详情接口获取详细信息
       const serverDetail = await mv200Api.getById(server.id)
-      // 更新该服务器的云盘启动状态
-      server.clouddisk_enable = serverDetail.clouddisk_enable || false
-      server.clouddiskStatusLoading = false
-      server.clouddiskStatusError = false
+      
+      // 更新该服务器的云盘启动状态和恢复模式
+      servers.value[index] = {
+        ...servers.value[index],
+        clouddisk_enable: serverDetail.clouddisk_enable || false,
+        clouddiskStatusLoading: false,
+        clouddiskStatusError: false,
+        recovery_mode: serverDetail.recovery_mode || 'manual', // 默认为手动模式
+        recoveryModeLoading: false,
+        recoveryModeError: false
+      }
     } catch (error) {
-      console.error(`获取服务器 ${server.name} 的云盘启动状态失败:`, error)
-      server.clouddiskStatusLoading = false
-      server.clouddiskStatusError = true
-      server.clouddisk_enable = false
+      console.error(`获取服务器 ${server.name} 的详情失败:`, error)
+      // 更新状态为错误
+      servers.value[index] = {
+        ...servers.value[index],
+        clouddiskStatusLoading: false,
+        clouddiskStatusError: true,
+        clouddisk_enable: false,
+        recoveryModeLoading: false,
+        recoveryModeError: true
+      }
     }
   })
   
   // 并行加载所有服务器的状态，不阻塞界面
   Promise.allSettled(promises).then(() => {
-    console.log('所有服务器的云盘启动状态加载完成')
+    console.log('所有服务器的详情加载完成')
   })
 }
 
@@ -313,7 +376,12 @@ const handleSwitchChange = async (value: boolean, server: MVServer & {
   server.switchLoading = true
   try {
     await mv200Api.update(server.id, {
-      clouddisk_enable: value
+      name: server.name,
+      ip_address: server.ip_address,
+      description: server.description,
+      bare_id: server.bare_id,
+      clouddisk_enable: value,
+      recovery_mode: server.recovery_mode || 'manual'
     })
     server.clouddisk_enable = value
     ElMessage.success(`已${value ? '启用' : '禁用'}云盘启动支持`)
@@ -323,6 +391,43 @@ const handleSwitchChange = async (value: boolean, server: MVServer & {
     ElMessage.error('状态更新失败，设备可能离线')
   } finally {
     server.switchLoading = false
+  }
+}
+
+// 处理恢复模式切换
+const handleRecoveryModeChange = async (value: string, server: MVServer & { 
+  recoveryModeSwitching?: boolean;
+  recoveryModeError?: boolean;
+}) => {
+  if (server.recoveryModeSwitching) return
+  
+  // 检查设备状态
+  if (server.recoveryModeError) {
+    ElMessage.warning('设备离线，无法切换恢复模式')
+    // 恢复原来的值
+    server.recovery_mode = server.recovery_mode === 'auto' ? 'manual' : 'auto'
+    return
+  }
+  
+  server.recoveryModeSwitching = true
+  
+  try {
+    await mv200Api.update(server.id, {
+      name: server.name,
+      ip_address: server.ip_address,
+      description: server.description,
+      bare_id: server.bare_id,
+      clouddisk_enable: server.clouddisk_enable,
+      recovery_mode: value
+    })
+    
+    ElMessage.success(`恢复模式已切换为 ${value === 'auto' ? '自动' : '手动'}`)
+  } catch (error) {
+    // 更新失败，恢复原来的值
+    server.recovery_mode = server.recovery_mode === 'auto' ? 'manual' : 'auto'
+    ElMessage.error('切换恢复模式失败，设备可能离线')
+  } finally {
+    server.recoveryModeSwitching = false
   }
 }
 
@@ -408,6 +513,13 @@ onMounted(() => {
   gap: 8px;
 }
 
+/* 恢复模式样式 */
+.recovery-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .loading-icon {
   color: #409eff;
   animation: spin 1s linear infinite;
@@ -457,5 +569,14 @@ onMounted(() => {
 
 :deep(.el-dropdown-menu__item.is-disabled:hover) {
   background-color: transparent;
+}
+
+/* 恢复模式开关样式 */
+:deep(.el-switch__label) {
+  color: #909399;
+}
+
+:deep(.el-switch__label.is-active) {
+  color: #409eff;
 }
 </style>
