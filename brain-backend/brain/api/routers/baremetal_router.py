@@ -295,12 +295,27 @@ async def get_boot_entries(
             boot_num = boot_num.strip().replace("Boot", "")
             name = rest.strip().split("\t")[0]
             if not name.startswith("UEFI: PXE") and "EFI Shell" not in name:
-                m = re.search(r"GPT,([0-9a-fA-F-]+)", line)
-                disk = ""
-                if m:
-                    uuid = m.group(1).lower()
-                    disk = uuid_to_disk.get(uuid, "")
-                entries[boot_num] = f"{name} ({disk})" if disk else name
+                # Extract PARTUUID from the boot entry
+                partuuid = ""
+                gpt_match = re.search(r"GPT,([0-9a-fA-F-]+)", line)
+                mbr_match = re.search(r"MBR,([0-9a-fA-F]+)", line)
+                
+                if gpt_match:
+                    partuuid = gpt_match.group(1).lower()
+                elif mbr_match:
+                    partuuid = mbr_match.group(1).lower()
+                
+                # Get disk name from PARTUUID mapping
+                disk = uuid_to_disk.get(partuuid, "")
+                
+                # Create entry with name, disk, and partuuid
+                entry_text = name
+                if disk:
+                    entry_text = f"{entry_text} ({disk})"
+                if partuuid:
+                    entry_text = f"{entry_text} [{partuuid}]"
+                
+                entries[boot_num] = entry_text
 
     LOG.info(f"Found {len(entries)} boot entries for server {server_id}")
     return {

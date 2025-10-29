@@ -223,17 +223,16 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         LOG.error(f"Failed to save checkpoint after creating block {disk_id}: {e}")
         raise
 
-    # Insert new system disk to database
-    LOG.info(f"Inserting disk {disk_id} into database")
-    db.insert(SYSTEM_DISK_COLLECTION, disk_dict)
-    LOG.info(f"Successfully created system disk {disk_id}")
-
     efi_status = 0
     if baremetal.get("os_user") and baremetal.get("os_password"):
         try:
-            create_efi_boot_entry(host_ip, baremetal.get("os_user"),
-                                  baremetal.get("os_password"), 40, disk_id, image["name"])
-            LOG.info(f"EFI create succeeded for server {baremetal['id']}")
+            efi_uuid = create_efi_boot_entry(host_ip, baremetal.get("os_user"),
+                                          baremetal.get("os_password"), 40, disk_id, image["name"])
+            if not efi_uuid:
+                efi_status = 1
+            else:
+                disk_dict["efi_uuid"] = efi_uuid
+                LOG.info(f"EFI create succeeded for server {baremetal['id']}, entry: {efi_uuid}")
         except Exception as e:
             LOG.warning(
                 f"EFI create failed for server {baremetal['id']}: {e}. "
@@ -245,6 +244,11 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
             f"Skipping EFI creating for server {baremetal['id']} due to missing credentials"
         )
         efi_status = 1
+
+    # Insert new system disk to database
+    LOG.info(f"Inserting disk {disk_id} into database")
+    db.insert(SYSTEM_DISK_COLLECTION, disk_dict)
+    LOG.info(f"Successfully created system disk {disk_id}")
 
     return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
 
@@ -714,9 +718,9 @@ async def rebuild_block_to_dest_image(disk_id: str, image_id: str,
 
 
 def create_efi_boot_entry(host_ip: str, username: str, password: str, 
-                          expected_size_gb: int, disk_id: str, image_name: str) -> bool:
+                          expected_size_gb: int, disk_id: str, image_name: str) -> str | None:
     """
-    Create an EFI boot entry for a cloud system disk. Returns only success status.
+    Create an EFI boot entry for a cloud system disk. Returns PARTUUID if successful.
 
     Args:
         host_ip: IP address of the physical host
@@ -726,7 +730,7 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
         disk_id: Disk ID used to generate the boot entry name
 
     Returns:
-        bool: True if EFI boot entry is created or exists, False otherwise
+        str or None: PARTUUID if EFI boot entry is created or exists, None otherwise
     """
     LOG.info(f"Creating EFI boot entry for disk {disk_id} on host {host_ip}")
 
@@ -762,7 +766,7 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
 
         if not disks:
             LOG.warning(f"No disks found matching expected size {expected_size_gb}GB")
-            return False
+            return None
 
         # Select the most recently added disk
         target_device = sorted(disks, key=lambda x: x['add_time'])[-1]['name']
@@ -775,7 +779,7 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
         )
         if not partitions_output:
             LOG.warning(f"No partitions found on /dev/{target_device}")
-            return False
+            return None
         target_partition = partitions_output.splitlines()[0].strip()
 
         # Get PARTUUID of the partition
@@ -784,7 +788,7 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
         )
         if not partuuid_output or not partuuid_output.strip():
             LOG.warning(f"No PARTUUID found for /dev/{target_partition}")
-            return False
+            return None
         partuuid = partuuid_output.strip()
 
         # Check if a boot entry already exists
@@ -792,7 +796,7 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
         for line in existing_entries.splitlines():
             if partuuid in line:
                 LOG.info(f"Boot entry already exists for PARTUUID {partuuid}")
-                return True
+                return partuuid
 
         partition_number = target_partition[len(target_device):]  
 
@@ -830,7 +834,7 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
                         LOG.info("Using grubx64.efi (Secure Boot may be disabled)")
                     else:
                         LOG.error(f"No suitable EFI files found on /dev/{target_partition}")
-                        return False
+                        return None
 
                 # Convert absolute path to relative path within the EFI partition
                 relative_efi_path = selected_efi.replace(mount_point, "").replace("/", "\\")
@@ -863,21 +867,19 @@ def create_efi_boot_entry(host_ip: str, username: str, password: str,
 
             finally:
                 # Cleanup: unmount partition and remove temporary directory
-                umount_cmd = f"umount {mount_point}"
-                ssh_execute(host_ip, umount_cmd, username, password)
-                rmdir_cmd = f"rmdir {mount_point}"
-                ssh_execute(host_ip, rmdir_cmd, username, password)
+                ssh_execute(host_ip, f"umount {mount_point}", username, password)
+                ssh_execute(host_ip, f"rmdir {mount_point}", username, password)
 
         except Exception as e:
             LOG.error(f"An exception occurred while creating EFI boot entry: {e}")
-            return False
+            return None
 
         LOG.info("Created EFI boot entry successfully")
-        return True
+        return partuuid
 
     except Exception as e:
         LOG.error(f"Failed to create EFI boot entry for disk {disk_id}: {e}")
-        return False
+        return None
 
 
 def cleanup_orphaned_efi_entries(host_ip: str, username: str, password: str) -> list:

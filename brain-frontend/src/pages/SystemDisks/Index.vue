@@ -275,6 +275,52 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 启动项认证对话框 -->
+    <el-dialog
+      v-model="bootAuthDialogVisible"
+      title="操作系统身份认证"
+      width="400px"
+    >
+      <div class="dialog-tip">
+        <el-alert
+          title="需要操作系统管理员权限来检查启动项状态"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+      </div>
+      <el-form :model="bootAuthForm" label-width="80px">
+        <el-form-item label="用户名" required>
+          <el-input
+            v-model="bootAuthForm.user"
+            placeholder="请输入操作系统用户名"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="密码" required>
+          <el-input
+            v-model="bootAuthForm.pwd"
+            type="password"
+            placeholder="请输入操作系统密码"
+            clearable
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="handleBootAuthCancel">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="handleBootAuthConfirm" 
+          :loading="bootAuthLoading"
+          :disabled="!bootAuthForm.user || !bootAuthForm.pwd"
+        >
+          确认
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -286,7 +332,7 @@ import { systemDisksApi } from '@/api/system-disks'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
 import { bareApi } from '@/api/bare'
-import type { SystemDisk, Image, MVServer, BareMetalServer } from '@/types/api'
+import type { SystemDisk, Image, MVServer, BareMetalServer, BootEntriesResponse } from '@/types/api'
 
 const loading = ref(false)
 const disks = ref<SystemDisk[]>([])
@@ -295,7 +341,6 @@ const mv200Servers = ref<MVServer[]>([])
 const bares = ref<BareMetalServer[]>([])
 const searchKeyword = ref('')
 
-// 上传为镜像相关
 const uploadDialogVisible = ref(false)
 const uploadLoading = ref(false)
 const currentDisk = ref<SystemDisk | null>(null)
@@ -305,23 +350,27 @@ const uploadForm = reactive({
   description: ''
 })
 
-// 重置镜像相关
 const rebuildDialogVisible = ref(false)
 const rebuildLoading = ref(false)
 const rebuildForm = reactive({
   image_id: ''
 })
 
-// Flatten相关
 const flattenDialogVisible = ref(false)
 const flattenLoading = ref(false)
 
-// IP地址排序函数 - 正确的数值比较
+const bootAuthDialogVisible = ref(false)
+const bootAuthLoading = ref(false)
+const currentBareServer = ref<BareMetalServer | null>(null)
+const bootAuthForm = reactive({
+  user: '',
+  pwd: ''
+})
+let bootAuthResolve: ((value: any) => void) | null = null
+
 const ipSortMethod = (a: SystemDisk, b: SystemDisk) => {
   const ipToNumber = (ip: string) => {
     const parts = ip.split('.').map(part => parseInt(part, 10));
-    // 将IP地址转换为一个可比较的数字
-    // 每段数字占8位，从高位到低位依次是第1段、第2段、第3段、第4段
     return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
   };
   
@@ -333,7 +382,6 @@ const ipSortMethod = (a: SystemDisk, b: SystemDisk) => {
   return 0;
 };
 
-// 裸金属服务器IP排序函数
 const hostIpSortMethod = (a: SystemDisk, b: SystemDisk) => {
   const ipToNumber = (ip: string) => {
     const parts = ip.split('.').map(part => parseInt(part, 10));
@@ -355,7 +403,6 @@ const hostIpSortMethod = (a: SystemDisk, b: SystemDisk) => {
   return 0;
 };
 
-// 辅助函数：用于数据加载时的排序
 const ipSort = (ipA: string, ipB: string) => {
   const ipToNumber = (ip: string) => {
     const parts = ip.split('.').map(part => parseInt(part, 10));
@@ -365,7 +412,6 @@ const ipSort = (ipA: string, ipB: string) => {
   return ipToNumber(ipA) - ipToNumber(ipB);
 };
 
-// 计算属性：创建ID到名称的映射
 const imageMap = computed(() => {
   const map = new Map<string, string>()
   images.value.forEach(image => {
@@ -390,54 +436,43 @@ const bareMap = computed(() => {
   return map
 })
 
-// 计算属性：过滤磁盘列表
 const filteredDisks = computed(() => {
   let filtered = disks.value
   
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
     filtered = disks.value.filter(disk => {
-      // 搜索ID
       if (disk.id.toLowerCase().includes(keyword)) return true
       
-      // 搜索镜像名
       const imageName = getImageName(disk.image_id).toLowerCase()
       if (imageName.includes(keyword)) return true
       
-      // 搜索SOC IP
       if (disk.mv200_ip.toLowerCase().includes(keyword)) return true
       
-      // 搜索裸金属服务器信息
       const hostName = getHostName(disk.mv200_id).toLowerCase()
       const hostIP = getHostIP(disk.mv200_id).toLowerCase()
       if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
       
-      // 搜索创建人
       if (disk.creator && disk.creator.toLowerCase().includes(keyword)) return true
       
-      // 搜索描述
       if (disk.description && disk.description.toLowerCase().includes(keyword)) return true
       
       return false
     })
   }
   
-  // 返回过滤后的数据，el-table会处理排序
   return filtered
 })
 
-// 根据ID获取镜像名称
 const getImageName = (imageId: string) => {
   return imageMap.value.get(imageId) || "镜像已删除"
 }
 
-// 根据ID获取SOC IP名称
 const getMV200Name = (serverId: string) => {
   const server = mv200Map.value.get(serverId)
   return server?.name || serverId
 }
 
-// 根据ID获取裸金属服务器名称
 const getHostName = (mv200_id: string) => {
   const server = mv200Map.value.get(mv200_id)
   if (!server || !server.bare_id) return '-'
@@ -446,7 +481,6 @@ const getHostName = (mv200_id: string) => {
   return bare_info ? bare_info.name : '-'
 }
 
-// 根据ID获取裸金属服务器IP
 const getHostIP = (mv200_id: string) => {
   const server = mv200Map.value.get(mv200_id)
   if (!server || !server.bare_id) return '-'
@@ -455,13 +489,11 @@ const getHostIP = (mv200_id: string) => {
   return bare_info ? bare_info.host_ip : '-'
 }
 
-// 加载数据
 const loadData = async () => {
   loading.value = true
   try {
     const disksResponse = await systemDisksApi.getAll()
     
-    // 如果没有系统盘数据，直接返回
     if (!disksResponse || disksResponse.length === 0) {
       disks.value = []
       images.value = []
@@ -470,14 +502,12 @@ const loadData = async () => {
       return
     }
     
-    // 只有当有系统盘数据时才加载其他数据
     const [imagesResponse, serversResponse, baresResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
       bareApi.getAll(),
     ])
     
-    // 按SOC IP排序
     disks.value = disksResponse.sort((a, b) => ipSort(a.mv200_ip, b.mv200_ip))
     images.value = imagesResponse
     mv200Servers.value = serversResponse
@@ -491,12 +521,9 @@ const loadData = async () => {
   }
 }
 
-// 处理搜索
 const handleSearch = () => {
-  // 搜索逻辑已经在 computed 属性中处理，这里可以留空或添加其他逻辑
 }
 
-// 下拉菜单命令处理
 const handleCommand = (command: string, disk: SystemDisk) => {
   switch (command) {
     case 'edit':
@@ -517,12 +544,10 @@ const handleCommand = (command: string, disk: SystemDisk) => {
   }
 }
 
-// 编辑
 const handleEdit = (disk: SystemDisk) => {
   window.location.href = `/system-disks/edit/${disk.id}`
 }
 
-// 删除
 const handleDelete = async (disk: SystemDisk) => {
   try {
     await ElMessageBox.confirm(
@@ -531,15 +556,64 @@ const handleDelete = async (disk: SystemDisk) => {
       { type: 'warning' }
     )
     
-    // 显示表格加载状态
     loading.value = true
     
-    // 执行删除操作
+    try {
+      const mvServer = mv200Map.value.get(disk.mv200_id)
+      if (mvServer && mvServer.bare_id) {
+        const bareServer = bareMap.value.get(mvServer.bare_id)
+        if (bareServer) {
+          let bootEntriesResponse: BootEntriesResponse | null = null
+          
+          try {
+            if (bareServer.os_user && bareServer.os_password) {
+              bootEntriesResponse = await bareApi.getBootEntries(bareServer.id, true)
+            } else {
+              const authResult = await showBootAuthDialog(bareServer)
+              if (!authResult) {
+                loading.value = false
+                return
+              }
+              bootEntriesResponse = authResult
+            }
+            
+            const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
+            const diskEfiUuid = disk.efi_uuid
+            
+            if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
+              ElMessage.error('当前云系统盘正在使用中，请切换操作系统后重试')
+              loading.value = false
+              return
+            }
+            
+          } catch (error) {
+            console.warn('获取启动项失败:', error)
+            const authResult = await showBootAuthDialog(bareServer)
+            if (!authResult) {
+              loading.value = false
+              return
+            }
+            bootEntriesResponse = authResult
+            
+            const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
+            const diskEfiUuid = disk.efi_uuid
+            
+            if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
+              ElMessage.error('当前云系统盘正在使用中，请切换操作系统后重试')
+              loading.value = false
+              return
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('检查启动项时出错:', error)
+    }
+    
     const response = await systemDisksApi.delete(disk.id)
     
     ElMessage.success('删除成功')
     
-    // 检查清理状态并提示
     if (response.efi_status === 1 || response.cloudinit_status === 1) {
       let warningMessage = '删除成功，但存在以下相关残留问题：\n'
       
@@ -553,16 +627,14 @@ const handleDelete = async (disk: SystemDisk) => {
       
       ElMessage.warning({
         message: warningMessage,
-        duration: 8000, // 延长显示时间
+        duration: 8000,
         showClose: true
       })
     }
     
-    // 重新加载数据
     await loadData()
     
   } catch (error) {
-    // 用户取消删除
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
     }
@@ -571,21 +643,59 @@ const handleDelete = async (disk: SystemDisk) => {
   }
 }
 
-// 保存为镜像
+const showBootAuthDialog = (server: BareMetalServer): Promise<any> => {
+  return new Promise((resolve) => {
+    currentBareServer.value = server
+    bootAuthForm.user = ''
+    bootAuthForm.pwd = ''
+    bootAuthResolve = resolve
+    bootAuthDialogVisible.value = true
+  })
+}
+
+const handleBootAuthConfirm = async () => {
+  if (!currentBareServer.value) return
+  
+  try {
+    bootAuthLoading.value = true
+    const response = await bareApi.getBootEntries(
+      currentBareServer.value.id, 
+      false,
+      bootAuthForm.user, 
+      bootAuthForm.pwd
+    )
+    
+    bootAuthDialogVisible.value = false
+    if (bootAuthResolve) {
+      bootAuthResolve(response)
+    }
+  } catch (error) {
+    ElMessage.error('认证失败，请检查用户名和密码')
+    console.error('认证失败:', error)
+  } finally {
+    bootAuthLoading.value = false
+  }
+}
+
+const handleBootAuthCancel = () => {
+  bootAuthDialogVisible.value = false
+  if (bootAuthResolve) {
+    bootAuthResolve(null)
+  }
+}
+
 const handleUploadToImage = (disk: SystemDisk) => {
   currentDisk.value = disk
   uploadForm.dest_name = ''
   uploadDialogVisible.value = true
 }
 
-// 确认保存为镜像
 const confirmUpload = async () => {
   if (!currentDisk.value) return
   
   try {
     uploadLoading.value = true
     
-    // 调用保存为镜像的API
     await systemDisksApi.uploadToImage(currentDisk.value.id, {
       dest_name: uploadForm.dest_name || undefined,
       dest_pool: uploadForm.dest_pool || undefined,
@@ -603,14 +713,12 @@ const confirmUpload = async () => {
   }
 }
 
-// 重置镜像
 const handleRebuildFromImage = (disk: SystemDisk) => {
   currentDisk.value = disk
   rebuildForm.image_id = ''
   rebuildDialogVisible.value = true
 }
 
-// 确认重置镜像
 const confirmRebuild = async () => {
   if (!currentDisk.value) return
   
@@ -622,11 +730,9 @@ const confirmRebuild = async () => {
   try {
     rebuildLoading.value = true
 
-    // 调用重置镜像的API - 通过查询参数传递 image_id
     const response = await systemDisksApi.rebuildFromImage(currentDisk.value.id, rebuildForm.image_id)
     
     ElMessage.success('重置镜像操作已提交，系统盘将使用新镜像重建')
-    // 检查清理状态并提示
     if (response.efi_status === 1 || response.cloudinit_status === 1) {
       let warningMessage = '刷新成功，但存在以下相关残留问题：\n'
       
@@ -640,13 +746,12 @@ const confirmRebuild = async () => {
       
       ElMessage.warning({
         message: warningMessage,
-        duration: 8000, // 延长显示时间
+        duration: 8000,
         showClose: true
       })
     }
     rebuildDialogVisible.value = false
     
-    // 重新加载数据以更新状态
     await loadData()
     
   } catch (error) {
@@ -657,26 +762,22 @@ const confirmRebuild = async () => {
   }
 }
 
-// Flatten操作
 const handleFlatten = (disk: SystemDisk) => {
   currentDisk.value = disk
   flattenDialogVisible.value = true
 }
 
-// 确认Flatten操作
 const confirmFlatten = async () => {
   if (!currentDisk.value) return
   
   try {
     flattenLoading.value = true
     
-    // 调用Flatten API
     await systemDisksApi.flatten(currentDisk.value.id)
     
     ElMessage.success('Flatten操作已提交')
     flattenDialogVisible.value = false
     
-    // 重新加载数据以更新状态
     await loadData()
     
   } catch (error) {
@@ -728,33 +829,32 @@ onMounted(() => {
   color: #67c23a;
 }
 
-/* 名称高亮样式 - 只改变字体颜色 */
+.dialog-tip {
+  margin-bottom: 20px;
+}
+
 .highlight-name {
   color: #67c23a;
   font-weight: 600;
 }
 
-/* IP地址高亮样式 - 只改变字体颜色 */
 .highlight-ip {
   color: #409eff;
   font-weight: 500;
   font-family: 'Courier New', monospace;
 }
 
-/* 已删除镜像样式 - 置灰显示 */
 .highlight-deleted {
   color: #c0c4cc;
   font-weight: 500;
   font-style: italic;
 }
 
-/* 磁盘大小高亮样式 - 只改变字体颜色 */
 .highlight-size {
   color: #e6a23c;
   font-weight: 600;
 }
 
-/* Flatten状态高亮 - 只改变字体颜色 */
 .highlight-true {
   color: #67c23a;
   font-weight: 600;
@@ -794,7 +894,6 @@ onMounted(() => {
   background-color: transparent;
 }
 
-/* 下拉菜单项样式 */
 .dropdown-item-content {
   display: flex;
   align-items: center;

@@ -41,6 +41,7 @@ class SystemDisk(BaseModel):
     blk_id: int = Field(..., description="Target blk uuid in soc")
     description: Optional[str] = Field(None, description="Disk description")
     creator: Optional[str] = Field(None, description="Creator")
+    efi_uuid: Optional[str] = Field(None, description="UEFI Boot PartUUID")
 
 
 class UploadToImage(BaseModel):

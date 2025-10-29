@@ -69,6 +69,7 @@ export interface SystemDisk {
   blk_id: number
   description?: string
   creator?: string
+  efi_uuid?: string
 }
 
 export interface SystemDiskCreate {
