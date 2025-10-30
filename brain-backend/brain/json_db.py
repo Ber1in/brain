@@ -217,7 +217,8 @@ class SQLiteDocumentDB:
             "flatten": 0,
             "description": "",
             "creator": "",
-            "blk_id": 0
+            "blk_id": 0,
+            "efi_uuid": ""
         },
         "bare_metals": {
             "id": None,
@@ -290,9 +291,14 @@ class SQLiteDocumentDB:
                     col_type = "INTEGER" if isinstance(default, int) else "TEXT"
                     default_val = self._serialize_field(default)
                     self._conn.execute(
-                        f"ALTER TABLE {collection} ADD COLUMN {col} {col_type} DEFAULT ?",
-                        (default_val,)
+                        f"ALTER TABLE {collection} ADD COLUMN {col} {col_type}"
                     )
+
+                    if default_val is not None:
+                        self._conn.execute(
+                            f"UPDATE {collection} SET {col} = ? WHERE {col} IS NULL",
+                            (default_val,)
+                        )
 
             self._tables_initialized.add(collection)
 
