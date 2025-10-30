@@ -8,14 +8,14 @@ from typing import List
 import logging
 import uuid
 
-from brain.json_db import JSONDocumentDB
+from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
 from brain.api.schemas import bare_metal_schemas
 from brain.utils.ssh_client import ssh_execute
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
-db = JSONDocumentDB()
+db = SQLiteDocumentDB()
 
 # Collection name
 BARE_METAL_SERVER_COLLECTION = "bare_metals"

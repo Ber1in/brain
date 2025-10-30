@@ -11,7 +11,7 @@ from urllib.parse import quote
 from brain.api.schemas import block_schemas
 from brain.auth import authenticate_user
 from brain import exceptions
-from brain.json_db import JSONDocumentDB
+from brain.json_db import SQLiteDocumentDB
 from brain.utils import get_cephclient, get_dpuagentclient, ssh_execute
 from brain.clients.ceph import api as ceph_api
 from brain.clients.dpuagent import api as dpuagent_api
@@ -19,7 +19,7 @@ from brain.clients.ceph.exceptions import ApiException
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
-db = JSONDocumentDB()
+db = SQLiteDocumentDB()
 
 # Collection names
 SYSTEM_DISK_COLLECTION = "system_disks"
@@ -226,8 +226,9 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
     efi_status = 0
     if baremetal.get("os_user") and baremetal.get("os_password"):
         try:
-            efi_uuid = create_efi_boot_entry(host_ip, baremetal.get("os_user"),
-                                          baremetal.get("os_password"), 40, disk_id, image["name"])
+            efi_uuid = create_efi_boot_entry(
+                host_ip, baremetal.get("os_user"),
+                baremetal.get("os_password"), 40, disk_id, image["name"])
             if not efi_uuid:
                 efi_status = 1
             else:

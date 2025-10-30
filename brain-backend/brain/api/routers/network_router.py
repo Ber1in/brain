@@ -8,7 +8,7 @@ import uuid
 import random
 
 from brain.auth import authenticate_user
-from brain.json_db import JSONDocumentDB
+from brain.json_db import SQLiteDocumentDB
 from brain.api.schemas import network_schemas
 from brain.clients.dpuagent import api
 from brain.utils.get_client import get_dpuagentclient
@@ -16,7 +16,7 @@ from brain import exceptions
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
-db = JSONDocumentDB()
+db = SQLiteDocumentDB()
 
 NETWORK_COLLECTION = "networks"
 MV_SERVER_COLLECTION = "mv_servers"

@@ -10,13 +10,13 @@ from urllib.parse import quote
 from brain.api.schemas import image_schemas
 from brain.auth import authenticate_user
 from brain.utils import get_cephclient
-from brain.json_db import JSONDocumentDB
+from brain.json_db import SQLiteDocumentDB
 from brain.clients.ceph import api
 from brain.clients.ceph.exceptions import ApiException
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
-db = JSONDocumentDB()
+db = SQLiteDocumentDB()
 
 # Collection name
 IMAGE_COLLECTION = "images"

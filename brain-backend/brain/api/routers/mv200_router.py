@@ -7,17 +7,16 @@ import logging
 import uuid
 import urllib3
 
-from brain.json_db import JSONDocumentDB
+from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
 from brain.api.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
-from brain.clients.dpuagent import exceptions as dpuagentExp
 from brain.utils.get_client import get_dpuagentclient
 from brain.utils.ssh_client import ssh_execute
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
-db = JSONDocumentDB()
+db = SQLiteDocumentDB()
 
 # Collection name
 MV_SERVER_COLLECTION = "mv_servers"

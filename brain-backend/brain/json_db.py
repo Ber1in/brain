@@ -1,12 +1,46 @@
 import json
 import threading
+import sqlite3
 import os
 
 from typing import Dict, List, Any
 from filelock import FileLock
+from abc import ABC, abstractmethod
 
 
-class JSONDocumentDB:
+class BaseDocumentDB(ABC):
+    @abstractmethod
+    def insert(self, collection: str, document: Dict[str, Any]) -> None:
+        pass
+
+    @abstractmethod
+    def find(self, collection: str, filter_dict=None) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    def find_one(self, collection: str, filter_dict=None) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def update(self, collection: str,
+               filter_dict: Dict[str, Any], update_dict: Dict[str, Any]) -> int:
+        pass
+
+    @abstractmethod
+    def update_one(self, collection: str, filter_dict: Dict[str, Any], 
+                   update_dict: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def delete(self, collection: str, filter_dict: Dict[str, Any]) -> int:
+        pass
+
+    @abstractmethod
+    def delete_one(self, collection: str, filter_dict: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+
+
+class JSONDocumentDB(BaseDocumentDB):
     """A lightweight JSON document database with thread-safe operations."""
     _instance = None
     _instance_lock = threading.Lock()
@@ -146,3 +180,202 @@ class JSONDocumentDB:
     def clear_cache(self) -> None:
         with self.lock:
             self._cache = None
+
+
+class SQLiteDocumentDB:
+    _instance = None
+    _instance_lock = threading.Lock()
+
+    # 固定列结构，新增字段填默认值
+    COLLECTION_SCHEMAS = {
+        "images": {
+            "id": None,
+            "name": "",
+            "ceph_location": "",
+            "min_size": 0,
+            "mon_host": "",
+            "description": "",
+            "brain": 0
+        },
+        "mv_servers": {
+            "id": None,
+            "name": "",
+            "ip_address": "",
+            "description": "",
+            "bare_id": "",
+            "clouddisk_enable": 0,
+            "recovery_mode": ""
+        },
+        "system_disks": {
+            "id": None,
+            "rbd_path": "",
+            "image_id": "",
+            "mv200_id": "",
+            "mv200_ip": "",
+            "mon_host": "",
+            "size_gb": 0,
+            "flatten": 0,
+            "description": "",
+            "creator": "",
+            "blk_id": 0
+        },
+        "bare_metals": {
+            "id": None,
+            "name": "",
+            "host_ip": "",
+            "mac": "",
+            "gateway": "",
+            "description": "",
+            "os_user": "",
+            "os_password": ""
+        },
+        "networks": {
+            "id": None,
+            "mv200_id": "",
+            "ip": "",
+            "vlan_tag": 0,
+            "gateway": "",
+            "mtu": 1500,
+            "mac": "",
+            "dns": "[]",
+            "description": "",
+            "xsc_id": 0,
+            "ifname": ""
+        }
+    }
+
+    def __new__(cls, db_path="/opt/brain/db.sqlite3"):
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, db_path="/opt/brain/db.sqlite3"):
+        if getattr(self, "_initialized", False):
+            return
+        self.db_path = db_path
+        self.lock = threading.Lock()
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._conn.execute("PRAGMA foreign_keys = ON")
+        self._initialized = True
+
+    def _ensure_table(self, collection: str):
+        schema = self.COLLECTION_SCHEMAS.get(collection)
+        if not schema:
+            raise ValueError(f"Unknown collection {collection}")
+        columns_def = []
+        for k, v in schema.items():
+            col_type = "INTEGER" if isinstance(v, int) else "TEXT"
+            if k == "id":
+                columns_def.append(f"{k} {col_type} PRIMARY KEY")
+            else:
+                columns_def.append(f"{k} {col_type}")
+        with self._conn:
+            self._conn.execute(
+                f"CREATE TABLE IF NOT EXISTS {collection} ({', '.join(columns_def)})")
+
+    def insert(self, collection: str, document: Dict[str, Any]) -> None:
+        if "id" not in document:
+            raise ValueError("Document must have 'id' key before insert.")
+        self._ensure_table(collection)
+        schema = self.COLLECTION_SCHEMAS[collection]
+        # 用 schema 默认值填充缺失字段
+        row = {k: document.get(k, v) for k, v in schema.items()}
+        cols = list(row.keys())
+        vals = [self._serialize_field(row[c]) for c in cols]
+        placeholders = ",".join("?" for _ in cols)
+        sql = f"INSERT INTO {collection} ({','.join(cols)}) VALUES ({placeholders})"
+        with self.lock, self._conn:
+            self._conn.execute(sql, vals)
+
+    def find(self, collection: str, filter_dict=None) -> List[Dict[str, Any]]:
+        self._ensure_table(collection)
+        sql = f"SELECT * FROM {collection}"
+        params = []
+        if filter_dict:
+            conds = []
+            for k, v in filter_dict.items():
+                conds.append(f"{k}=?")
+                params.append(self._serialize_field(v))
+            sql += " WHERE " + " AND ".join(conds)
+        with self.lock:
+            cur = self._conn.execute(sql, params)
+            rows = [
+                dict(zip([c[0] for c in cur.description],
+                         [self._deserialize_field(v) for v in row]))
+                for row in cur.fetchall()
+            ]
+        return rows
+
+    def find_one(self, collection: str, filter_dict=None) -> Dict[str, Any]:
+        results = self.find(collection, filter_dict)
+        if not results:
+            raise ValueError(f"No entry found matching {filter_dict}")
+        if len(results) > 1:
+            raise ValueError(
+                f"Expected 1 document, but found {len(results)} matching {filter_dict}")
+        return results[0]
+
+    def update(self, collection: str, filter_dict: Dict[str, Any],
+               update_dict: Dict[str, Any]) -> int:
+        if not update_dict:
+            return 0
+        self._ensure_table(collection)
+        set_clause = ", ".join(f"{k}=?" for k in update_dict)
+        set_vals = [self._serialize_field(v) for v in update_dict.values()]
+        params = set_vals
+        sql = f"UPDATE {collection} SET {set_clause}"
+        if filter_dict:
+            conds = []
+            for k, v in filter_dict.items():
+                conds.append(f"{k}=?")
+                params.append(self._serialize_field(v))
+            sql += " WHERE " + " AND ".join(conds)
+        with self.lock, self._conn:
+            cur = self._conn.execute(sql, params)
+            return cur.rowcount
+
+    def update_one(self, collection: str, filter_dict: Dict[str, Any], 
+                   update_dict: Dict[str, Any]) -> Dict[str, Any]:
+        row = self.find_one(collection, filter_dict)
+        self.update(collection, {"id": row["id"]}, update_dict)
+        return row
+
+    def delete(self, collection: str, filter_dict: Dict[str, Any]) -> int:
+        self._ensure_table(collection)
+        sql = f"DELETE FROM {collection}"
+        params = []
+        if filter_dict:
+            conds = []
+            for k, v in filter_dict.items():
+                conds.append(f"{k}=?")
+                params.append(self._serialize_field(v))
+            sql += " WHERE " + " AND ".join(conds)
+        with self.lock, self._conn:
+            cur = self._conn.execute(sql, params)
+            return cur.rowcount
+
+    def delete_one(self, collection: str, filter_dict: Dict[str, Any]) -> Dict[str, Any]:
+        row = self.find_one(collection, filter_dict)
+        self.delete(collection, {"id": row["id"]})
+        return row
+
+    @staticmethod
+    def _serialize_field(value):
+        if isinstance(value, list) or isinstance(value, dict):
+            return json.dumps(value)
+        if isinstance(value, bool):
+            return int(value)
+        return value
+
+    @staticmethod
+    def _deserialize_field(value):
+        if value is None:
+            return None
+        if isinstance(value, bytes):
+            value = value.decode()
+        try:
+            return json.loads(value)
+        except Exception:
+            return value
