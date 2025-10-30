@@ -258,29 +258,49 @@ class SQLiteDocumentDB:
         self.lock = threading.Lock()
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.execute("PRAGMA foreign_keys = ON")
+        self._tables_initialized = set()
         self._initialized = True
 
     def _ensure_table(self, collection: str):
+        """Ensure table exists and all schema columns are present."""
+        if collection in self._tables_initialized:
+            return
+
         schema = self.COLLECTION_SCHEMAS.get(collection)
         if not schema:
             raise ValueError(f"Unknown collection {collection}")
-        columns_def = []
-        for k, v in schema.items():
-            col_type = "INTEGER" if isinstance(v, int) else "TEXT"
-            if k == "id":
-                columns_def.append(f"{k} {col_type} PRIMARY KEY")
-            else:
-                columns_def.append(f"{k} {col_type}")
-        with self._conn:
+
+        with self.lock:
+            columns_def = []
+            for k, v in schema.items():
+                col_type = "INTEGER" if isinstance(v, int) else "TEXT"
+                if k == "id":
+                    columns_def.append(f"{k} {col_type} PRIMARY KEY")
+                else:
+                    columns_def.append(f"{k} {col_type}")
             self._conn.execute(
-                f"CREATE TABLE IF NOT EXISTS {collection} ({', '.join(columns_def)})")
+                f"CREATE TABLE IF NOT EXISTS {collection} ({', '.join(columns_def)})"
+            )
+
+            cur = self._conn.execute(f"PRAGMA table_info({collection})")
+            existing_columns = {row[1] for row in cur.fetchall()}
+
+            for col, default in schema.items():
+                if col not in existing_columns:
+                    col_type = "INTEGER" if isinstance(default, int) else "TEXT"
+                    default_val = self._serialize_field(default)
+                    self._conn.execute(
+                        f"ALTER TABLE {collection} ADD COLUMN {col} {col_type} DEFAULT ?",
+                        (default_val,)
+                    )
+
+            self._tables_initialized.add(collection)
 
     def insert(self, collection: str, document: Dict[str, Any]) -> None:
         if "id" not in document:
             raise ValueError("Document must have 'id' key before insert.")
         self._ensure_table(collection)
         schema = self.COLLECTION_SCHEMAS[collection]
-        # 用 schema 默认值填充缺失字段
         row = {k: document.get(k, v) for k, v in schema.items()}
         cols = list(row.keys())
         vals = [self._serialize_field(row[c]) for c in cols]
