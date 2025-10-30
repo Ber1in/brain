@@ -547,16 +547,84 @@ const handleCommand = (command: string, disk: SystemDisk) => {
 const handleEdit = (disk: SystemDisk) => {
   window.location.href = `/system-disks/edit/${disk.id}`
 }
-
 const handleDelete = async (disk: SystemDisk) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除系统磁盘 ${disk.id}（关联SOC：${disk.mv200_ip}）吗？`,
-      '确认删除',
-      { type: 'warning' }
-    )
-    
     loading.value = true
+    
+    // 创建带复选框的确认对话框
+    const isForceDelete = await new Promise<boolean>((resolve) => {
+      ElMessageBox.confirm(
+        `
+          <div>
+            <div style="margin-bottom: 16px;">确定要删除系统磁盘 ${disk.id}（关联SOC：${disk.mv200_ip}）吗？</div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: #fffbf0; border-radius: 4px;">
+              <input type="checkbox" id="forceDeleteCheckbox" style="margin-right: 8px;">
+              <label for="forceDeleteCheckbox" style="color: #b88230; font-weight: 500;">
+                强制删除
+              </label>
+            </div>
+            <div style="color: #e6a23c; font-size: 12px; line-height: 1.4;">
+              注意：勾选强制删除将忽略系统盘使用状态，可能会影响正在运行的系统
+            </div>
+          </div>
+        `,
+        '确认删除',
+        {
+          type: 'warning',
+          dangerouslyUseHTMLString: true,
+          showCancelButton: true,
+          confirmButtonText: '删除',
+          cancelButtonText: '取消',
+          beforeClose: (action, instance, done) => {
+            if (action === 'confirm') {
+              const checkbox = document.getElementById('forceDeleteCheckbox') as HTMLInputElement
+              const forceDelete = checkbox?.checked || false
+              instance.confirmButtonLoading = true
+              setTimeout(() => {
+                done()
+                instance.confirmButtonLoading = false
+                resolve(forceDelete) // 在这里解析Promise
+              }, 300)
+            } else {
+              done()
+              resolve(false) // 取消时返回false
+            }
+          }
+        }
+      ).catch(() => {
+        resolve(false) // 捕获取消操作
+      })
+    })
+    
+    // 如果是强制删除，直接执行删除操作，不检查使用状态
+    if (isForceDelete) {
+      const response = await systemDisksApi.delete(disk.id, isForceDelete)
+      ElMessage.success('强制删除成功')
+      
+      if (response.efi_status === 1 || response.cloudinit_status === 1) {
+        let warningMessage = '强制删除成功，但存在以下相关残留问题：\n'
+        
+        if (response.efi_status === 1) {
+          warningMessage += '• 自动清理EFI启动项失败，需要重启系统完成自动清理\n'
+        }
+        
+        if (response.cloudinit_status === 1) {
+          warningMessage += '• cloud-init数据源清理失败\n'
+        }
+        
+        ElMessage.warning({
+          message: warningMessage,
+          duration: 8000,
+          showClose: true
+        })
+      }
+      
+      await loadData()
+      return
+    }
+    
+    // 如果不是强制删除，检查系统盘是否在使用
+    let isInUse = false
     
     try {
       const mvServer = mv200Map.value.get(disk.mv200_id)
@@ -579,11 +647,9 @@ const handleDelete = async (disk: SystemDisk) => {
             
             const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
             const diskEfiUuid = disk.efi_uuid
-            
+
             if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
-              ElMessage.error('当前云系统盘正在使用中，请切换操作系统后重试')
-              loading.value = false
-              return
+              isInUse = true
             }
             
           } catch (error) {
@@ -599,9 +665,7 @@ const handleDelete = async (disk: SystemDisk) => {
             const diskEfiUuid = disk.efi_uuid
             
             if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
-              ElMessage.error('当前云系统盘正在使用中，请切换操作系统后重试')
-              loading.value = false
-              return
+              isInUse = true
             }
           }
         }
@@ -610,7 +674,15 @@ const handleDelete = async (disk: SystemDisk) => {
       console.warn('检查启动项时出错:', error)
     }
     
-    const response = await systemDisksApi.delete(disk.id)
+    // 如果系统盘正在使用且不是强制删除，提示并返回
+    if (isInUse) {
+      ElMessage.error('当前云系统盘正在使用中，请切换操作系统后重试，或使用强制删除')
+      loading.value = false
+      return
+    }
+    
+    // 执行删除操作（非强制删除）
+    const response = await systemDisksApi.delete(disk.id, isForceDelete)
     
     ElMessage.success('删除成功')
     
@@ -664,6 +736,26 @@ const handleBootAuthConfirm = async () => {
       bootAuthForm.user, 
       bootAuthForm.pwd
     )
+    
+    // 保存成功的凭据到服务器
+    try {
+      await bareApi.updateServerCredentials(currentBareServer.value.id, {
+        user: bootAuthForm.user,
+        pwd: bootAuthForm.pwd
+      })
+      console.log('账号密码已保存')
+      
+      // 更新本地缓存
+      if (bareMap.value.has(currentBareServer.value.id)) {
+        const updatedServer = { ...currentBareServer.value }
+        updatedServer.os_user = bootAuthForm.user
+        updatedServer.os_password = bootAuthForm.pwd
+        bareMap.value.set(currentBareServer.value.id, updatedServer)
+      }
+    } catch (saveError) {
+      console.warn('保存账号密码失败:', saveError)
+      // 不阻止主流程，只是记录警告
+    }
     
     bootAuthDialogVisible.value = false
     if (bootAuthResolve) {
