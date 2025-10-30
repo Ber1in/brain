@@ -547,12 +547,13 @@ const handleCommand = (command: string, disk: SystemDisk) => {
 const handleEdit = (disk: SystemDisk) => {
   window.location.href = `/system-disks/edit/${disk.id}`
 }
+
 const handleDelete = async (disk: SystemDisk) => {
   try {
     loading.value = true
     
     // 创建带复选框的确认对话框
-    const isForceDelete = await new Promise<boolean>((resolve) => {
+    const isForceDelete = await new Promise<boolean>((resolve, reject) => {
       ElMessageBox.confirm(
         `
           <div>
@@ -583,18 +584,20 @@ const handleDelete = async (disk: SystemDisk) => {
               setTimeout(() => {
                 done()
                 instance.confirmButtonLoading = false
-                resolve(forceDelete) // 在这里解析Promise
+                resolve(forceDelete) // 确认时解析为勾选状态
               }, 300)
             } else {
               done()
-              resolve(false) // 取消时返回false
+              reject('cancel') // 取消时拒绝Promise
             }
           }
         }
       ).catch(() => {
-        resolve(false) // 捕获取消操作
+        reject('cancel') // 捕获取消操作
       })
     })
+    
+    console.info("isForceDelete:", isForceDelete)
     
     // 如果是强制删除，直接执行删除操作，不检查使用状态
     if (isForceDelete) {
