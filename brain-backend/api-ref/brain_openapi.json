@@ -45,6 +45,616 @@
                 }
             }
         },
+        "/bare-metals": {
+            "get": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Get All Bare Metals",
+                "description": "Get all bare metals list",
+                "operationId": "get_all_bare_metals_bare_metals_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/BareMetalServer"
+                                    },
+                                    "type": "array",
+                                    "title": "Response Get All Bare Metals Bare Metals Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Create Bare Metal Server",
+                "description": "Create a new bare metal",
+                "operationId": "create_bare_metal_server_bare_metals_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BareMetalServerCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BareMetalServer"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}": {
+            "get": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Get Bare Metal Server",
+                "description": "Get specific bare metal by ID",
+                "operationId": "get_bare_metal_server_bare_metals__server_id__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BareMetalServer"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Update Bare Metal Server",
+                "description": "Update bare metal information by ID",
+                "operationId": "update_bare_metal_server_bare_metals__server_id__put",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BareMetalServerUpdate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BareMetalServer"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Delete Bare Metal Server",
+                "description": "Delete bare metal by ID",
+                "operationId": "delete_bare_metal_server_bare_metals__server_id__delete",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}/boot-entries": {
+            "get": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Get Boot Entries",
+                "description": "Get all boot entries (name + parent disk), current boot, next boot, and default boot",
+                "operationId": "get_boot_entries_bare_metals__server_id__boot_entries_get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "title": "Use Saved",
+                            "default": false
+                        },
+                        "name": "use_saved",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "User"
+                        },
+                        "name": "user",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "Pwd"
+                        },
+                        "name": "pwd",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BootEntriesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}/set-boot": {
+            "post": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Set Boot Entry",
+                "description": "Set boot entry for bare metal server",
+                "operationId": "set_boot_entry_bare_metals__server_id__set_boot_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Boot Id"
+                        },
+                        "name": "boot_id",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "title": "Use Saved",
+                            "default": false
+                        },
+                        "name": "use_saved",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "title": "Set Default",
+                            "default": false
+                        },
+                        "name": "set_default",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "User"
+                        },
+                        "name": "user",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "Pwd"
+                        },
+                        "name": "pwd",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}/power-cycle": {
+            "post": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Power Cycle Server",
+                "description": "Power cycle bare metal server via BMC",
+                "operationId": "power_cycle_server_bare_metals__server_id__power_cycle_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}/power-reset": {
+            "post": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Power Reset Server",
+                "description": "Warm reset bare metal server via BMC",
+                "operationId": "power_reset_server_bare_metals__server_id__power_reset_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}/verify-credentials": {
+            "post": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Verify Credentials",
+                "description": "验证服务器操作系统凭据是否有效",
+                "operationId": "verify_credentials_bare_metals__server_id__verify_credentials_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "title": "Use Saved",
+                            "default": false
+                        },
+                        "name": "use_saved",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "User"
+                        },
+                        "name": "user",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "Pwd"
+                        },
+                        "name": "pwd",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/bare-metals/{server_id}/credentials": {
+            "put": {
+                "tags": [
+                    "baremetal"
+                ],
+                "summary": "Update Server Credentials",
+                "description": "更新服务器操作系统凭据",
+                "operationId": "update_server_credentials_bare_metals__server_id__credentials_put",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ServerCredentials"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
         "/system-disks": {
             "get": {
                 "tags": [
@@ -97,9 +707,7 @@
                         "description": "Successful Response",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/SystemDisk"
-                                }
+                                "schema": {}
                             }
                         }
                     },
@@ -240,6 +848,164 @@
                         },
                         "name": "disk_id",
                         "in": "path"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/system-disks/{disk_id}/flatten": {
+            "post": {
+                "tags": [
+                    "block"
+                ],
+                "summary": "Flatten System Disk",
+                "operationId": "flatten_system_disk_system_disks__disk_id__flatten_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Disk Id"
+                        },
+                        "name": "disk_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SystemDisk"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/system-disks/{disk_id}/upload": {
+            "post": {
+                "tags": [
+                    "block"
+                ],
+                "summary": "Save Block To New Image",
+                "description": "Upload system disk to new image",
+                "operationId": "save_block_to_new_image_system_disks__disk_id__upload_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Disk Id"
+                        },
+                        "name": "disk_id",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadToImage"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/system-disks/{disk_id}/rebuild": {
+            "post": {
+                "tags": [
+                    "block"
+                ],
+                "summary": "Rebuild Block To Dest Image",
+                "description": "Rebuild system disk to destination image",
+                "operationId": "rebuild_block_to_dest_image_system_disks__disk_id__rebuild_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Disk Id"
+                        },
+                        "name": "disk_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Image Id"
+                        },
+                        "name": "image_id",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -706,6 +1472,213 @@
                     }
                 ]
             }
+        },
+        "/networks": {
+            "get": {
+                "tags": [
+                    "network"
+                ],
+                "summary": "List Interfaces",
+                "description": "List all network interfaces",
+                "operationId": "list_interfaces_networks_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/InterfaceInfo"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Interfaces Networks Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "network"
+                ],
+                "summary": "Update Interface Description",
+                "description": "Update description of an existing interface",
+                "operationId": "update_interface_description_networks_put",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InterfaceUpdate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InterfaceInfo"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "network"
+                ],
+                "summary": "Create Interface",
+                "description": "Create a new network interface",
+                "operationId": "create_interface_networks_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InterfaceCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InterfaceInfo"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "network"
+                ],
+                "summary": "Delete Interface",
+                "description": "Delete an existing network interface",
+                "operationId": "delete_interface_networks_delete",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InterfaceDelete"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/networks/{interface_id}": {
+            "get": {
+                "tags": [
+                    "network"
+                ],
+                "summary": "Get Interface",
+                "description": "Get a single network interface by its ID",
+                "operationId": "get_interface_networks__interface_id__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Interface Id"
+                        },
+                        "name": "interface_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InterfaceInfo"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -725,6 +1698,115 @@
                     "system_user"
                 ],
                 "title": "BareMetalCreate"
+            },
+            "BareMetalServer": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id",
+                        "description": "Unique identifier for the BareMetal server"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description"
+                    },
+                    "host_ip": {
+                        "type": "string",
+                        "title": "Host Ip"
+                    },
+                    "mac": {
+                        "type": "string",
+                        "title": "Mac"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "title": "Gateway"
+                    },
+                    "os_user": {
+                        "type": "string",
+                        "title": "Os User"
+                    },
+                    "os_password": {
+                        "type": "string",
+                        "title": "Os Password"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "title": "BareMetalServer"
+            },
+            "BareMetalServerCreate": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "host_ip": {
+                        "type": "string",
+                        "title": "Host Ip"
+                    },
+                    "mac": {
+                        "type": "string",
+                        "title": "Mac"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "title": "Gateway"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "host_ip",
+                    "mac",
+                    "gateway"
+                ],
+                "title": "BareMetalServerCreate"
+            },
+            "BareMetalServerUpdate": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description"
+                    },
+                    "host_ip": {
+                        "type": "string",
+                        "title": "Host Ip"
+                    },
+                    "mac": {
+                        "type": "string",
+                        "title": "Mac"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "title": "Gateway"
+                    },
+                    "os_user": {
+                        "type": "string",
+                        "title": "Os User"
+                    },
+                    "os_password": {
+                        "type": "string",
+                        "title": "Os Password"
+                    }
+                },
+                "type": "object",
+                "title": "BareMetalServerUpdate"
             },
             "Body_login_for_access_token_login_post": {
                 "properties": {
@@ -762,6 +1844,35 @@
                 "type": "object",
                 "title": "Body_login_for_access_token_login_post"
             },
+            "BootEntriesResponse": {
+                "properties": {
+                    "entries": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object",
+                        "title": "Entries"
+                    },
+                    "current": {
+                        "type": "string",
+                        "title": "Current"
+                    },
+                    "next": {
+                        "type": "string",
+                        "title": "Next"
+                    },
+                    "default": {
+                        "type": "string",
+                        "title": "Default"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "entries",
+                    "current"
+                ],
+                "title": "BootEntriesResponse"
+            },
             "HTTPValidationError": {
                 "properties": {
                     "detail": {
@@ -792,6 +1903,11 @@
                         "title": "Ceph Location",
                         "description": "Ceph location in format pool/rbd"
                     },
+                    "min_size": {
+                        "type": "integer",
+                        "title": "Min Size",
+                        "description": "Minimum capacity when creating a system disk"
+                    },
                     "mon_host": {
                         "type": "string",
                         "format": "ipvanyaddress",
@@ -809,6 +1925,7 @@
                     "id",
                     "name",
                     "ceph_location",
+                    "min_size",
                     "mon_host"
                 ],
                 "title": "Image"
@@ -831,6 +1948,11 @@
                         "title": "Mon Host",
                         "description": "Ceph monitor host IP address"
                     },
+                    "min_size": {
+                        "type": "integer",
+                        "title": "Min Size",
+                        "description": "Minimum capacity when creating a system disk"
+                    },
                     "description": {
                         "type": "string",
                         "title": "Description",
@@ -841,7 +1963,8 @@
                 "required": [
                     "name",
                     "ceph_location",
-                    "mon_host"
+                    "mon_host",
+                    "min_size"
                 ],
                 "title": "ImageCreate"
             },
@@ -863,6 +1986,11 @@
                         "title": "Mon Host",
                         "description": "Ceph monitor host IP address"
                     },
+                    "min_size": {
+                        "type": "integer",
+                        "title": "Min Size",
+                        "description": "Minimum capacity when creating a system disk"
+                    },
                     "description": {
                         "type": "string",
                         "title": "Description",
@@ -871,6 +1999,178 @@
                 },
                 "type": "object",
                 "title": "ImageUpdate"
+            },
+            "InterfaceCreate": {
+                "properties": {
+                    "mv200_id": {
+                        "type": "string",
+                        "title": "Mv200 Id",
+                        "description": "Target SoC ID to perform network operation"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "format": "ip-netmask",
+                        "title": "Ip",
+                        "description": "IP/Netmask (support IPv4/IPv6)",
+                        "example": "127.0.0.1/24"
+                    },
+                    "vlan_tag": {
+                        "type": "integer",
+                        "title": "Vlan Tag",
+                        "description": "VLAN tag for the interface"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "title": "Gateway",
+                        "description": "Gateway address for the interface"
+                    },
+                    "mtu": {
+                        "type": "integer",
+                        "title": "Mtu",
+                        "description": "Optional field, MTU size",
+                        "default": 1500,
+                        "example": 1500
+                    },
+                    "mac": {
+                        "type": "string",
+                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                        "title": "Mac",
+                        "description": "MAC address of the interface (optional)"
+                    },
+                    "dns": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Dns",
+                        "description": "List of DNS server addresses (optional)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Description of the network interface"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "mv200_id",
+                    "ip",
+                    "vlan_tag",
+                    "gateway"
+                ],
+                "title": "InterfaceCreate"
+            },
+            "InterfaceDelete": {
+                "properties": {
+                    "mv200_id": {
+                        "type": "string",
+                        "title": "Mv200 Id",
+                        "description": "Target SoC ID to perform network operation"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id",
+                        "description": "Unique ID of the network interface to delete"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "mv200_id",
+                    "id"
+                ],
+                "title": "InterfaceDelete",
+                "description": "Schema for deleting an existing interface"
+            },
+            "InterfaceInfo": {
+                "properties": {
+                    "mv200_id": {
+                        "type": "string",
+                        "title": "Mv200 Id",
+                        "description": "Target SoC ID to perform network operation"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "format": "ip-netmask",
+                        "title": "Ip",
+                        "description": "IP/Netmask (support IPv4/IPv6)",
+                        "example": "127.0.0.1/24"
+                    },
+                    "vlan_tag": {
+                        "type": "integer",
+                        "title": "Vlan Tag",
+                        "description": "VLAN tag for the interface"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "title": "Gateway",
+                        "description": "Gateway address for the interface"
+                    },
+                    "mtu": {
+                        "type": "integer",
+                        "title": "Mtu",
+                        "description": "Optional field, MTU size",
+                        "default": 1500,
+                        "example": 1500
+                    },
+                    "mac": {
+                        "type": "string",
+                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                        "title": "Mac",
+                        "description": "MAC address of the interface (optional)"
+                    },
+                    "dns": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Dns",
+                        "description": "List of DNS server addresses (optional)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Description of the network interface"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id",
+                        "description": "Unique ID of the network interface"
+                    },
+                    "ifname": {
+                        "type": "string",
+                        "title": "Ifname"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "mv200_id",
+                    "ip",
+                    "vlan_tag",
+                    "gateway",
+                    "id"
+                ],
+                "title": "InterfaceInfo",
+                "description": "Schema for returning interface info"
+            },
+            "InterfaceUpdate": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id",
+                        "description": "Unique ID of the interface to update"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "New description for the interface"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id"
+                ],
+                "title": "InterfaceUpdate",
+                "description": "Schema for updating only the description of an interface"
             },
             "MVServer": {
                 "properties": {
@@ -891,16 +2191,27 @@
                         "type": "string",
                         "title": "Description"
                     },
-                    "host_ip": {
+                    "bare_id": {
                         "type": "string",
-                        "title": "Host Ip"
+                        "title": "Bare Id"
+                    },
+                    "clouddisk_enable": {
+                        "type": "boolean",
+                        "title": "Clouddisk Enable",
+                        "description": "The host allows the use of system cloud disk (waiting for dpu ready when the host starts)"
+                    },
+                    "recovery_mode": {
+                        "type": "string",
+                        "title": "Recovery Mode",
+                        "description": "The recovery mode of aidpu, the value is one of auto and manual"
                     }
                 },
                 "type": "object",
                 "required": [
                     "id",
                     "name",
-                    "ip_address"
+                    "ip_address",
+                    "clouddisk_enable"
                 ],
                 "title": "MVServer"
             },
@@ -918,9 +2229,9 @@
                         "type": "string",
                         "title": "Description"
                     },
-                    "host_ip": {
+                    "bare_id": {
                         "type": "string",
-                        "title": "Host Ip"
+                        "title": "Bare Id"
                     }
                 },
                 "type": "object",
@@ -944,13 +2255,42 @@
                         "type": "string",
                         "title": "Description"
                     },
-                    "host_ip": {
+                    "bare_id": {
                         "type": "string",
-                        "title": "Host Ip"
+                        "title": "Bare Id"
+                    },
+                    "clouddisk_enable": {
+                        "type": "boolean",
+                        "title": "Clouddisk Enable"
+                    },
+                    "recovery_mode": {
+                        "type": "string",
+                        "title": "Recovery Mode"
                     }
                 },
                 "type": "object",
+                "required": [
+                    "clouddisk_enable"
+                ],
                 "title": "MVServerUpdate"
+            },
+            "ServerCredentials": {
+                "properties": {
+                    "user": {
+                        "type": "string",
+                        "title": "User"
+                    },
+                    "pwd": {
+                        "type": "string",
+                        "title": "Pwd"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user",
+                    "pwd"
+                ],
+                "title": "ServerCredentials"
             },
             "SystemDisk": {
                 "properties": {
@@ -986,6 +2326,12 @@
                         "title": "Mon Host",
                         "description": "Ceph monitor host IP address"
                     },
+                    "flatten": {
+                        "type": "boolean",
+                        "title": "Flatten",
+                        "description": "Whether to execute flatten on the cloned system disk",
+                        "default": false
+                    },
                     "rbd_path": {
                         "type": "string",
                         "title": "Rbd Path",
@@ -1000,6 +2346,16 @@
                         "type": "string",
                         "title": "Description",
                         "description": "Disk description"
+                    },
+                    "creator": {
+                        "type": "string",
+                        "title": "Creator",
+                        "description": "Creator"
+                    },
+                    "efi_uuid": {
+                        "type": "string",
+                        "title": "Efi Uuid",
+                        "description": "UEFI Boot PartUUID"
                     }
                 },
                 "type": "object",
@@ -1037,6 +2393,12 @@
                         "type": "string",
                         "title": "Description",
                         "description": "Disk description"
+                    },
+                    "flatten": {
+                        "type": "boolean",
+                        "title": "Flatten",
+                        "description": "Whether to execute flatten on the cloned system disk",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -1105,6 +2467,27 @@
                     "refresh_token"
                 ],
                 "title": "TokenResponse"
+            },
+            "UploadToImage": {
+                "properties": {
+                    "dest_name": {
+                        "type": "string",
+                        "title": "Dest Name",
+                        "description": "Dest image name"
+                    },
+                    "dest_pool": {
+                        "type": "string",
+                        "title": "Dest Pool",
+                        "description": "Dest pool name"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Image description"
+                    }
+                },
+                "type": "object",
+                "title": "UploadToImage"
             },
             "ValidationError": {
                 "properties": {
