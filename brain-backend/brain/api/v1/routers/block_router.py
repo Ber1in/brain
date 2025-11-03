@@ -8,7 +8,7 @@ import logging
 import uuid
 from urllib.parse import quote
 
-from brain.api.schemas import block_schemas
+from brain.api.v1.schemas import block_schemas
 from brain.auth import authenticate_user
 from brain import exceptions
 from brain.json_db import SQLiteDocumentDB

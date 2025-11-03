@@ -9,7 +9,7 @@ import random
 
 from brain.auth import authenticate_user
 from brain.json_db import SQLiteDocumentDB
-from brain.api.schemas import network_schemas
+from brain.api.v1.schemas import network_schemas
 from brain.clients.dpuagent import api
 from brain.utils.get_client import get_dpuagentclient
 from brain import exceptions

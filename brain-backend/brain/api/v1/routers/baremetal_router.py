@@ -10,7 +10,7 @@ import uuid
 
 from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
-from brain.api.schemas import bare_metal_schemas
+from brain.api.v1.schemas import bare_metal_schemas
 from brain.utils.ssh_client import ssh_execute
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])

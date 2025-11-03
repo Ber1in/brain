@@ -9,7 +9,7 @@ import urllib3
 
 from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
-from brain.api.schemas import mv200_schemas
+from brain.api.v1.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
 from brain.utils.get_client import get_dpuagentclient
 from brain.utils.ssh_client import ssh_execute

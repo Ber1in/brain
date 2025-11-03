@@ -7,7 +7,7 @@ import logging
 import uuid
 from urllib.parse import quote
 
-from brain.api.schemas import image_schemas
+from brain.api.v1.schemas import image_schemas
 from brain.auth import authenticate_user
 from brain.utils import get_cephclient
 from brain.json_db import SQLiteDocumentDB
