@@ -1679,10 +1679,122 @@
                     }
                 ]
             }
+        },
+        "/api/devices": {
+            "post": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Create Device",
+                "operationId": "create_device_api_devices_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ServerRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServerDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
         }
     },
     "components": {
         "schemas": {
+            "AIDPU_Nic": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "title": "Type"
+                    },
+                    "mac": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Mac"
+                    },
+                    "bdf": {
+                        "type": "string",
+                        "title": "Bdf"
+                    },
+                    "soc_ip": {
+                        "type": "string",
+                        "format": "ipv4",
+                        "title": "Soc Ip"
+                    },
+                    "aidpu_sn": {
+                        "type": "string",
+                        "title": "Aidpu Sn"
+                    },
+                    "firmware_version": {
+                        "type": "string",
+                        "title": "Firmware Version"
+                    },
+                    "nic_sn": {
+                        "type": "string",
+                        "title": "Nic Sn"
+                    },
+                    "management_ip": {
+                        "type": "string",
+                        "title": "Management Ip"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "type",
+                    "mac",
+                    "bdf",
+                    "soc_ip"
+                ],
+                "title": "AIDPU_Nic"
+            },
+            "BMC": {
+                "properties": {
+                    "ip": {
+                        "type": "string",
+                        "format": "ipv4",
+                        "title": "Ip"
+                    },
+                    "hostname": {
+                        "type": "string",
+                        "title": "Hostname"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hostname"
+                ],
+                "title": "BMC"
+            },
             "BareMetalCreate": {
                 "properties": {
                     "system_disk": {
@@ -1872,6 +1984,57 @@
                     "current"
                 ],
                 "title": "BootEntriesResponse"
+            },
+            "DeviceRequest": {
+                "properties": {
+                    "sn": {
+                        "type": "string",
+                        "title": "Sn"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "format": "ipv4",
+                        "title": "Ip"
+                    },
+                    "username": {
+                        "type": "string",
+                        "title": "Username"
+                    },
+                    "password": {
+                        "type": "string",
+                        "title": "Password"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "ip",
+                    "username",
+                    "password"
+                ],
+                "title": "DeviceRequest"
+            },
+            "DeviceResponse": {
+                "properties": {
+                    "sn": {
+                        "type": "string",
+                        "title": "Sn"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "format": "ipv4",
+                        "title": "Ip"
+                    },
+                    "username": {
+                        "type": "string",
+                        "title": "Username"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "ip",
+                    "username"
+                ],
+                "title": "DeviceResponse"
             },
             "HTTPValidationError": {
                 "properties": {
@@ -2274,6 +2437,32 @@
                 ],
                 "title": "MVServerUpdate"
             },
+            "NicBase": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "title": "Type"
+                    },
+                    "mac": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Mac"
+                    },
+                    "bdf": {
+                        "type": "string",
+                        "title": "Bdf"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "type",
+                    "mac",
+                    "bdf"
+                ],
+                "title": "NicBase"
+            },
             "ServerCredentials": {
                 "properties": {
                     "user": {
@@ -2291,6 +2480,122 @@
                     "pwd"
                 ],
                 "title": "ServerCredentials"
+            },
+            "ServerDetailResponse": {
+                "properties": {
+                    "bmc": {
+                        "$ref": "#/components/schemas/BMC"
+                    },
+                    "device": {
+                        "$ref": "#/components/schemas/DeviceResponse"
+                    },
+                    "nics": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/components/schemas/NicBase"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/AIDPU_Nic"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Nics"
+                    },
+                    "os_types": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Os Types"
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Tags"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "title": "Notes"
+                    },
+                    "user": {
+                        "type": "string",
+                        "title": "User"
+                    },
+                    "time": {
+                        "type": "integer",
+                        "title": "Time"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "title": "Created At"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "title": "Updated At"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "bmc",
+                    "device"
+                ],
+                "title": "ServerDetailResponse"
+            },
+            "ServerRequest": {
+                "properties": {
+                    "bmc": {
+                        "$ref": "#/components/schemas/BMC"
+                    },
+                    "device": {
+                        "$ref": "#/components/schemas/DeviceRequest"
+                    },
+                    "nics": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/components/schemas/NicBase"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/AIDPU_Nic"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Nics"
+                    },
+                    "os_types": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Os Types"
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Tags"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "title": "Notes"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "bmc",
+                    "device"
+                ],
+                "title": "ServerRequest"
             },
             "SystemDisk": {
                 "properties": {

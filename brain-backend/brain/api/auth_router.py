@@ -9,7 +9,7 @@ from fastapi import Depends
 from typing import Optional
 from fastapi import Form
 
-from brain.api.v1.schemas import auth_schemas
+from brain.api import auth_schemas
 from brain.auth import ACCESS_TOKEN_EXPIRE_MINUTES
 from brain.auth import create_access_token, create_refresh_token
 from brain.auth import decode_refresh_token, ldap_authenticate

@@ -155,6 +155,26 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: '/devices',
+      name: 'Devices',
+      component: () => import('@/pages/Devices/Index.vue')
+    },
+    {
+      path: '/devices/create',
+      name: 'DeviceCreate',
+      component: () => import('@/pages/Devices/Create.vue')
+    },
+    {
+      path: '/devices/detail/:id',
+      name: 'DeviceDetail',
+      component: () => import('@/pages/Devices/Detail.vue')
+    },
+    {
+      path: '/devices/edit/:id',
+      name: 'DeviceEdit',
+      component: () => import('@/pages/Devices/Edit.vue')
+    },
   ],
 })
 

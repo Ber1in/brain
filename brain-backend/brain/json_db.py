@@ -242,6 +242,35 @@ class SQLiteDocumentDB:
             "description": "",
             "xsc_id": 0,
             "ifname": ""
+        },
+        "servers": {
+            "bmc": {
+                "ip": "10.0.2.206",
+                "hostname": "string"
+            },
+            "device": {
+                "sn": "79V5QJ3",
+                "ip": "10.0.3.206",
+                "username": "root"
+            },
+            "nics": [],
+            "os_types": [
+                "Ubuntu [76d85426-b728-4f58-9361-bda04183fc03]",
+                "CentOS (sda) [efaa3f67-655b-4b73-a493-cf2e8629ad5e]",
+                "ubuntu [0xa38f2887]"
+            ],
+            "tags": [],
+            "notes": "",
+            "user": "",
+            "start": "",
+            "time": 0,
+            "created_at": "2025-11-04 15:24:12",
+            "updated_at": "",
+            "id": "99b62073-21dd-440a-9d2a-5e8f5b538a81"
+        },
+        "tags": {
+            "id": "",
+            "name": ""
         }
     }
 

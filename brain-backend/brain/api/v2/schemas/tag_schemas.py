@@ -1,0 +1,18 @@
+# Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
+# All rights reserved.
+
+from pydantic import BaseModel
+from typing import List
+
+
+class TagsRequest(BaseModel):
+    name: str
+
+
+class TagResponse(TagsRequest):
+    name: str
+    id: str
+
+
+class TagsResponse(BaseModel):
+    tags: List[TagResponse]

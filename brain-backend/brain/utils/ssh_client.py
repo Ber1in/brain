@@ -3,6 +3,7 @@
 
 import paramiko
 import logging
+from paramiko import ssh_exception
 
 from fastapi import HTTPException
 
@@ -24,6 +25,12 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
             LOG.warning(f"Command error on {host}: {err.strip()}")
         LOG.debug(f"SSH command completed on {host}")
         return out.strip()
+    except (ssh_exception.NoValidConnectionsError, TimeoutError) as e:
+        LOG.error(e)
+        raise HTTPException(status_code=503, detail=f"{e}")
+    except ssh_exception.AuthenticationException as e:
+        LOG.error(e)
+        raise HTTPException(status_code=509, detail=f"{e}")
     except Exception as e:
         LOG.error(f"SSH execution failed on {host}: {e}")
         raise HTTPException(status_code=500, detail=f"SSH execution failed on {host}: {e}")

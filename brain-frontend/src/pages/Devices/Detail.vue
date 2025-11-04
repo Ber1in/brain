@@ -1,0 +1,247 @@
+<template>
+  <div class="device-detail">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <h2>服务器详情 - {{ deviceData.bmc?.hostname }}</h2>
+          <div class="header-actions">
+            <el-button type="primary" @click="handleEdit">
+              <el-icon><Edit /></el-icon>
+              编辑服务器
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-descriptions :column="2" border>
+        <!-- 基本信息 -->
+        <el-descriptions-item label="创建时间">{{ formatTime(deviceData.created_at) }}</el-descriptions-item>
+        <el-descriptions-item label="更新时间">{{ formatTime(deviceData.updated_at) }}</el-descriptions-item>
+        <el-descriptions-item label="占用信息" :span="2">
+          <div v-if="isDeviceOccupied">
+            <el-tag type="success" style="margin-right: 8px;">{{ deviceData.user }}</el-tag>
+            <span>占用至 {{ getEndTimeDisplay() }}</span>
+          </div>
+          <el-tag v-else type="info">未占用</el-tag>
+        </el-descriptions-item>
+
+        <!-- BMC信息 -->
+        <el-descriptions-item label="服务器名称">{{ deviceData.bmc?.hostname || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="BMC IP">{{ deviceData.bmc?.ip || '-' }}</el-descriptions-item>
+
+        <!-- 服务器信息 -->
+        <el-descriptions-item label="服务器IP">{{ deviceData.device?.ip || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="服务器序列号">{{ deviceData.device?.sn || '-' }}</el-descriptions-item>
+
+        <!-- 网卡信息 -->
+        <el-descriptions-item label="网卡数量" :span="2">
+          {{ deviceData.nics?.length || 0 }} 个
+        </el-descriptions-item>
+
+        <!-- 操作系统类型 -->
+        <el-descriptions-item label="操作系统类型" :span="2">
+          <div v-if="deviceData.os_types && deviceData.os_types.length > 0">
+            <el-tag 
+              v-for="os in deviceData.os_types" 
+              :key="os" 
+              style="margin-right: 8px; margin-bottom: 4px;"
+            >
+              {{ os }}
+            </el-tag>
+          </div>
+          <span v-else>-</span>
+        </el-descriptions-item>
+
+        <!-- 标签 -->
+        <el-descriptions-item label="标签" :span="2">
+          <div v-if="deviceData.tags && deviceData.tags.length > 0">
+            <el-tag 
+              v-for="tag in deviceData.tags" 
+              :key="tag" 
+              type="info"
+              style="margin-right: 8px; margin-bottom: 4px;"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+          <span v-else>-</span>
+        </el-descriptions-item>
+
+        <!-- 备注 -->
+        <el-descriptions-item label="备注" :span="2">
+          {{ deviceData.notes || '无' }}
+        </el-descriptions-item>
+      </el-descriptions>
+
+      <!-- 网卡详细信息 -->
+      <el-card header="网卡信息" style="margin-top: 20px;" v-if="deviceData.nics && deviceData.nics.length > 0">
+        <el-table :data="deviceData.nics">
+          <el-table-column prop="type" label="类型" width="120" />
+          <el-table-column prop="bdf" label="BDF" width="120" />
+          <el-table-column prop="sn" label="序列号" />
+          <el-table-column label="MAC地址">
+            <template #default="{ row }">
+              <div v-if="row.mac && row.mac.length > 0">
+                <div v-for="mac in row.mac" :key="mac" class="mac-address">
+                  {{ mac }}
+                </div>
+              </div>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="hasAidpuNics" prop="soc_ip" label="SoC IP" />
+          <el-table-column v-if="hasAidpuNics" prop="aidpu_sn" label="AIDPU SN" />
+          <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" />
+          <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" />
+        </el-table>
+      </el-card>
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Edit } from '@element-plus/icons-vue'
+import { deviceApi } from '@/api/device'
+import type { ServerDetailResponse, AIDPU_Nic } from '@/types/api'
+
+const route = useRoute()
+const router = useRouter()
+const deviceId = ref<string>('')
+const deviceData = ref<ServerDetailResponse>({
+  bmc: { hostname: '', ip: '' },
+  device: { ip: '', username: '' },
+  nics: [],
+  os_types: [],
+  tags: [],
+  notes: '',
+  user: '',
+  time: '',
+  created_at: '',
+  updated_at: '',
+  id: ''
+})
+
+// 根据剩余秒数计算截止时间
+const getEndTimeFromSeconds = (seconds: number): Date => {
+  const now = new Date()
+  now.setTime(now.getTime() + seconds * 1000)
+  return now
+}
+
+// 统一的日期时间格式化函数
+const formatDateTime = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  const seconds = date.getSeconds().toString().padStart(2, '0')
+  
+  return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`
+}
+
+// 检查服务器是否被占用
+const isDeviceOccupied = computed(() => {
+  const device = deviceData.value
+  // 检查user和time是否有效
+  const hasValidUser = device.user && device.user.trim() !== ''
+  const hasValidTime = device.time !== undefined && device.time !== null && device.time > 0
+  
+  // 如果有有效的用户和时间，再检查时间是否过期
+  if (hasValidUser && hasValidTime) {
+    return device.time > 0 // 剩余时间大于0表示未过期
+  }
+  
+  return false
+})
+
+// 根据剩余秒数显示截止时间
+const getEndTimeDisplay = () => {
+  const device = deviceData.value
+  if (!device.time || device.time <= 0) return '-'
+  
+  const endTime = getEndTimeFromSeconds(device.time)
+  return formatDateTime(endTime)
+}
+
+// 检查是否有AIDPU网卡
+const hasAidpuNics = computed(() => {
+  return deviceData.value.nics?.some(nic => 
+    'soc_ip' in nic && (nic as AIDPU_Nic).soc_ip
+  )
+})
+
+// 格式化时间显示
+const formatTime = (timeStr: string) => {
+  if (!timeStr) return '-'
+  try {
+    return new Date(timeStr).toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).replace(/\//g, '/')
+  } catch (error) {
+    return timeStr // 如果解析失败，返回原始字符串
+  }
+}
+
+// 加载服务器详情
+const loadDeviceDetail = async () => {
+  try {
+    const data = await deviceApi.getById(deviceId.value)
+    deviceData.value = data
+  } catch (error) {
+    ElMessage.error('加载服务器详情失败')
+    router.push('/devices')
+  }
+}
+
+// 编辑服务器
+const handleEdit = () => {
+  router.push(`/devices/edit/${deviceId.value}`)
+}
+
+onMounted(() => {
+  deviceId.value = route.params.id as string
+  if (!deviceId.value) {
+    ElMessage.error('服务器ID不能为空')
+    router.push('/devices')
+    return
+  }
+  loadDeviceDetail()
+})
+</script>
+
+<style scoped>
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.mac-address {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+:deep(.el-descriptions) {
+  margin-top: 20px;
+}
+
+:deep(.el-descriptions__label) {
+  font-weight: 600;
+}
+</style>

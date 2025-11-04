@@ -1,0 +1,251 @@
+openapi: 3.0.3
+info:
+  title: Device Management & Occupation API
+  version: "1.0.0"
+servers:
+  - url: https://api.example.com
+
+components:
+  securitySchemes:
+    OAuth2PasswordBearer:
+      type: oauth2
+      flows:
+        password:
+          scopes: {}
+          tokenUrl: login
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }
+          required: [code, message]
+
+    BMC:
+      type: object
+      properties:
+        ip: { type: string }
+        hostname: { type: string }
+        username: { type: string }
+        password: { type: string, writeOnly: true }
+      required: [ip, username, password]
+
+    Device:
+      type: object
+      properties:
+        sn: { type: string }
+        ip: { type: string }
+        username: { type: string }
+        password: { type: string, writeOnly: true }
+      required: [sn]
+
+    Cputype:
+      type: object
+      properties:
+        cputype:
+          type: string
+          description: x86/arm
+        cpuname:
+          type: string
+          description: Cpu information (AMD/Intel)
+
+    Gputype:
+      type: object
+      properties:
+        gpu_name:
+          type: string
+          description: GPU型号 (A100/P100/H100)
+        vram:
+          type: string
+          description: 显存容量
+
+    NicBase:
+      type: object
+      properties:
+        type: { type: string }
+        mac:
+          type: array
+          items:
+            type: string
+        bdf: { type: string }
+      required: [type, mac]
+
+    AIDPU_Nic:
+      allOf:
+        - $ref: '#/components/schemas/NicBase'
+        - type: object
+          properties:
+            aidpu_sn: { type: string }
+            firmware_version: { type: string }
+            soc_ip: { type: string }
+            nic_sn: { type: string }
+            management_ip: { type: string }
+            bdf: { type: string }
+
+    LocalDisk:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: ["SATA SSD", "NVMe SSD", "SAS HDD"]
+        capacity:
+          type: string
+        raid_info:
+          type: string
+
+    RemoteStorage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: ["NAS", "iSCSI", "OBJECT"]
+        mount_point:
+          type: string
+        bandwidth:
+          type: string
+
+    DeviceRequest:
+      type: object
+      properties:
+        bmc: { $ref: '#/components/schemas/BMC' }
+        device: { $ref: '#/components/schemas/Device' }
+        nics:
+          type: array
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/NicBase'
+              - $ref: '#/components/schemas/AIDPU_Nic'
+        os_types:
+          type: array
+          items: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        notes: { type: string }
+        user: { type: string }
+        time: { type: string }
+      required: [bmc, device, nics, os_types]
+
+    DeviceUpdateRequest:
+      type: object
+      properties:
+        bmc: { $ref: '#/components/schemas/BMC' }
+        device:
+          type: object
+          properties:
+            ip: { type: string }
+            username: { type: string }
+            password: { type: string, writeOnly: true }
+        nics:
+          type: array
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/NicBase'
+              - $ref: '#/components/schemas/AIDPU_Nic'
+        os_types:
+          type: array
+          items: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        notes: { type: string }
+
+    DeviceDetailResponse:
+      type: object
+      properties:
+        id: { type: string }
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        bmc: { $ref: '#/components/schemas/BMC' }
+        device: { $ref: '#/components/schemas/Device' }
+        nics:
+          type: array
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/NicBase'
+              - $ref: '#/components/schemas/AIDPU_Nic'
+        os_types:
+          type: array
+          items: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        notes: { type: string }
+        user: { type: string }
+        time: { type: string }
+
+
+paths:
+  /api/devices:
+    get:
+      tags: [Device]
+      summary: Get all devices
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceDetailResponse'
+    post:
+      tags: [Device]
+      summary: Create a device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceDetailResponse' }
+
+  /api/devices/{device_id}:
+    parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema: { type: string }
+
+    get:
+      tags: [Device]
+      summary: Get device details
+      responses:
+        '200':
+          description: Device details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceDetailResponse' }
+
+    patch:
+      tags: [Device]
+      summary: Update device (partial update)
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceUpdateRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceDetailResponse' }
+
+    delete:
+      tags: [Device]
+      summary: Delete device
+      responses:
+        '204': { description: Deleted }

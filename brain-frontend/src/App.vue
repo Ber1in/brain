@@ -36,6 +36,10 @@
               <el-icon><Cpu /></el-icon>
               <span>MV200管理</span>
             </el-menu-item>
+            <el-menu-item index="/devices">
+              <el-icon><Monitor /></el-icon>
+              <span>服务器管理</span>
+            </el-menu-item>
           </el-sub-menu>
 
           <el-menu-item index="/system-disks">

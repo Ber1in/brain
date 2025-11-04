@@ -1,7 +1,6 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-import re
 import subprocess
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
@@ -11,6 +10,7 @@ import uuid
 from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
 from brain.api.v1.schemas import bare_metal_schemas
+from brain.utils import tools
 from brain.utils.ssh_client import ssh_execute
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -264,58 +264,8 @@ async def get_boot_entries(
         credentials_pwd = pwd
 
     LOG.info(f"Retrieving boot entries from server {server_id} ({host_ip})")
-    efiboot_output = ssh_execute(host_ip, "efibootmgr -v",
-                                 credentials_user, credentials_pwd).splitlines()
-    lsblk_output = ssh_execute(host_ip, "lsblk -no PARTUUID,PKNAME",
-                               credentials_user, credentials_pwd).splitlines()
-
-    uuid_to_disk = {}
-    for line in lsblk_output:
-        parts = line.strip().split()
-        if len(parts) == 2:
-            uuid, disk = parts
-            uuid_to_disk[uuid.lower()] = disk
-
-    entries = {}
-    current_boot = None
-    next_boot = None
-    default_boot = None
-
-    for line in efiboot_output:
-        line = line.strip()
-        if line.startswith("BootCurrent"):
-            current_boot = line.split(":")[1].strip()
-        elif line.startswith("BootNext"):
-            next_boot = line.split(":")[1].strip()
-        elif line.startswith("BootOrder"):
-            boot_order_parts = line.split(":")[1].strip().split(",")
-            default_boot = boot_order_parts[0] if boot_order_parts else None
-        elif line.startswith("Boot") and "*" in line:
-            boot_num, rest = line.split("*", 1)
-            boot_num = boot_num.strip().replace("Boot", "")
-            name = rest.strip().split("\t")[0]
-            if not name.startswith("UEFI: PXE") and "EFI Shell" not in name:
-                # Extract PARTUUID from the boot entry
-                partuuid = ""
-                gpt_match = re.search(r"GPT,([0-9a-fA-F-]+)", line)
-                mbr_match = re.search(r"MBR,([0-9a-fA-F]+)", line)
-                
-                if gpt_match:
-                    partuuid = gpt_match.group(1).lower()
-                elif mbr_match:
-                    partuuid = mbr_match.group(1).lower()
-                
-                # Get disk name from PARTUUID mapping
-                disk = uuid_to_disk.get(partuuid, "")
-                
-                # Create entry with name, disk, and partuuid
-                entry_text = name
-                if disk:
-                    entry_text = f"{entry_text} ({disk})"
-                if partuuid:
-                    entry_text = f"{entry_text} [{partuuid}]"
-                
-                entries[boot_num] = entry_text
+    entries, current_boot, next_boot, default_boot = tools.get_boot_entries(
+        host_ip, credentials_user, credentials_pwd)
 
     LOG.info(f"Found {len(entries)} boot entries for server {server_id}")
     return {

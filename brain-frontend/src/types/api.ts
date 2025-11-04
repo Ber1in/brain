@@ -193,3 +193,94 @@ export interface InterfaceDelete {
   mv200_id: string
   id: string
 }
+
+// 在现有类型定义的基础上添加以下内容
+
+export interface BMC {
+  ip?: string | null  // 可以为空，后端会自动生成
+  hostname: string
+}
+
+export interface DeviceRequest {
+  sn?: string
+  ip: string  // 或者使用 IPv4Address 如果已定义
+  username: string
+  password: string
+}
+
+export interface DeviceResponse {
+  sn?: string
+  ip: string  // 或者使用 IPv4Address 如果已定义
+  username: string
+}
+
+export interface NicBase {
+  type: string
+  mac: string[]
+  bdf: string
+  sn: string
+}
+
+export interface AIDPU_Nic {
+  type: string
+  mac: string[]
+  bdf: string
+  sn: string
+  soc_ip: string  // 或者使用 IPv4Address 如果已定义
+  aidpu_sn?: string
+  firmware_version?: string
+  nic_sn?: string
+  management_ip?: string
+}
+
+export interface ServerDetailResponse {
+  bmc: BMC
+  device: DeviceResponse
+  nics?: Array<NicBase | AIDPU_Nic>
+  os_types?: string[]
+  tags?: string[]
+  notes?: string
+  user?: string
+  time?: string
+  created_at?: string
+  updated_at?: string
+  id?: string
+}
+
+export interface ServerRequest {
+  bmc: BMC
+  device: DeviceRequest
+  nics?: Array<NicBase | AIDPU_Nic>
+  os_types?: string[]
+  tags?: string[]
+  notes?: string
+}
+
+export interface ServerUpdateRequest {
+  auto?: boolean
+  device: DeviceRequest
+  bmc: BMC
+  nics?: Array<NicBase | AIDPU_Nic>
+  os_types?: string[]
+  tags?: string[]
+  notes?: string
+  time?: string
+}
+
+export interface ServerCredentials {
+  user: string
+  pwd: string
+}
+
+export interface TagsRequest {
+  name: string
+}
+
+export interface TagResponse {
+  id: string
+  name: string
+}
+
+export interface TagsResponse {
+  tags: TagResponse[]
+}
