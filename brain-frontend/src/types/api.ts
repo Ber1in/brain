@@ -237,7 +237,6 @@ export interface ServerDetailResponse {
   bmc: BMC
   device: DeviceResponse
   nics?: Array<NicBase | AIDPU_Nic>
-  os_types?: string[]
   tags?: string[]
   notes?: string
   user?: string
@@ -251,7 +250,6 @@ export interface ServerRequest {
   bmc: BMC
   device: DeviceRequest
   nics?: Array<NicBase | AIDPU_Nic>
-  os_types?: string[]
   tags?: string[]
   notes?: string
 }
@@ -261,7 +259,6 @@ export interface ServerUpdateRequest {
   device: DeviceRequest
   bmc: BMC
   nics?: Array<NicBase | AIDPU_Nic>
-  os_types?: string[]
   tags?: string[]
   notes?: string
   time?: string

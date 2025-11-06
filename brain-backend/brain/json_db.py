@@ -254,11 +254,6 @@ class SQLiteDocumentDB:
                 "username": "root"
             },
             "nics": [],
-            "os_types": [
-                "Ubuntu [76d85426-b728-4f58-9361-bda04183fc03]",
-                "CentOS (sda) [efaa3f67-655b-4b73-a493-cf2e8629ad5e]",
-                "ubuntu [0xa38f2887]"
-            ],
             "tags": [],
             "notes": "",
             "user": "",
@@ -352,14 +347,21 @@ class SQLiteDocumentDB:
         if filter_dict:
             conds = []
             for k, v in filter_dict.items():
-                conds.append(f"{k}=?")
+                if k.startswith("json_extract("):
+                    conds.append(f"{k} = ?")
+                else:
+                    conds.append(f"{k} = ?")
                 params.append(self._serialize_field(v))
             sql += " WHERE " + " AND ".join(conds)
         with self.lock:
             cur = self._conn.execute(sql, params)
             rows = [
-                dict(zip([c[0] for c in cur.description],
-                         [self._deserialize_field(v) for v in row]))
+                dict(
+                    zip(
+                        [c[0] for c in cur.description],
+                        [self._deserialize_field(v) for v in row],
+                    )
+                )
                 for row in cur.fetchall()
             ]
         return rows

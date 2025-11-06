@@ -256,11 +256,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Edit, Delete, Setting, RefreshLeft, RefreshRight, Search, QuestionFilled } from '@element-plus/icons-vue'
 import { bareApi } from '@/api/bare'
 import type { BareMetalServer } from '@/types/api'
 
+const router = useRouter()
 const loading = ref(false)
 const servers = ref<BareMetalServer[]>([])
 const searchKeyword = ref('')
@@ -277,7 +279,7 @@ const currentBootId = ref('')
 const defaultBootId = ref<string | null>('') 
 const nextBootId = ref<string | null>('')
 const selectedBootId = ref('')
-const setDefaultBoot = ref(false) // 新增：是否设置为默认启动项
+const setDefaultBoot = ref(false)
 const bootAuthForm = reactive({
   user: '',
   pwd: ''
@@ -289,12 +291,10 @@ const resetLoading = ref(false)
 const resetType = ref<'cold' | 'warm'>('cold')
 const resetDialogTitle = ref('')
 
-// IP地址排序函数 - 正确的数值比较
+// IP地址排序函数
 const ipSortMethod = (a: BareMetalServer, b: BareMetalServer) => {
   const ipToNumber = (ip: string) => {
     const parts = ip.split('.').map(part => parseInt(part, 10));
-    // 将IP地址转换为一个可比较的数字
-    // 每段数字占8位，从高位到低位依次是第1段、第2段、第3段、第4段
     return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
   };
   
@@ -320,30 +320,18 @@ const ipSort = (ipA: string, ipB: string) => {
 const filteredServers = computed(() => {
   let filtered = servers.value
   
-  // 搜索过滤
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
     filtered = servers.value.filter(server => {
-      // 搜索ID
       if (server.id.toLowerCase().includes(keyword)) return true
-      
-      // 搜索名称
       if (server.name.toLowerCase().includes(keyword)) return true
-      
-      // 搜索管理IP
       if (server.host_ip.toLowerCase().includes(keyword)) return true
-      
-      // 搜索MAC地址
       if (server.mac.toLowerCase().includes(keyword)) return true
-      
-      // 搜索描述
       if (server.description && server.description.toLowerCase().includes(keyword)) return true
-      
       return false
     })
   }
   
-  // 返回过滤后的数据，el-table会处理排序
   return filtered
 })
 
@@ -391,7 +379,6 @@ const loadData = async () => {
   loading.value = true
   try {
     const data = await bareApi.getAll()
-    // 加载数据后按管理IP排序
     servers.value = data.sort((a, b) => ipSort(a.host_ip, b.host_ip))
   } catch (error) {
     ElMessage.error('加载裸金属服务器列表失败')
@@ -402,7 +389,7 @@ const loadData = async () => {
 
 // 处理搜索
 const handleSearch = () => {
-  // 搜索逻辑已经在 computed 属性中处理，这里可以留空或添加其他逻辑
+  // 搜索逻辑已经在 computed 属性中处理
 }
 
 // 下拉菜单命令处理
@@ -428,7 +415,7 @@ const handleCommand = (command: string, server: BareMetalServer) => {
 
 // 编辑
 const handleEdit = (server: BareMetalServer) => {
-  window.location.href = `/bare/edit/${server.id}`
+  router.push(`/bare/edit/${server.id}`)
 }
 
 // 删除
@@ -454,7 +441,8 @@ const handleBootConfig = async (server: BareMetalServer) => {
   defaultBootId.value = ''
   nextBootId.value = ''
   selectedBootId.value = ''
-  setDefaultBoot.value = false // 重置勾选状态
+  setDefaultBoot.value = false
+  
   // 首先尝试使用保存的凭据
   if (server.os_user && server.os_password) {
     try {
@@ -549,7 +537,6 @@ const handleBootAuth = async () => {
       ElMessage.success('操作系统凭据已保存')
     } catch (saveError) {
       console.warn('保存凭据失败:', saveError)
-      // 这里不显示错误消息，因为主要功能（获取启动项）已经成功
     }
     
     // 关闭认证对话框，打开设置对话框
@@ -565,7 +552,7 @@ const handleBootAuth = async () => {
   }
 }
 
-// 修改设置启动项逻辑，优先使用保存的凭据
+// 设置启动项
 const handleSetBoot = async () => {
   if (!currentServer.value || !selectedBootId.value) return
   
@@ -580,16 +567,16 @@ const handleSetBoot = async () => {
       await bareApi.setBootEntry(
         currentServer.value.id,
         selectedBootId.value,
-        true, // use_saved = true
-        setDefaultBoot.value // 新增参数
+        true,
+        setDefaultBoot.value
       )
     } else {
       // 使用当前输入的凭据
       await bareApi.setBootEntry(
         currentServer.value.id,
         selectedBootId.value,
-        false, // use_saved = false
-        setDefaultBoot.value, // 新增参数
+        false,
+        setDefaultBoot.value,
         bootAuthForm.user,
         bootAuthForm.pwd
       )
@@ -688,34 +675,24 @@ onMounted(() => {
   color: #67c23a;
 }
 
-/* 名称高亮样式 - 只改变字体颜色 */
+/* 名称高亮样式 */
 .highlight-name {
   color: #67c23a;
   font-weight: 600;
 }
 
-/* IP地址高亮样式 - 只改变字体颜色 */
+/* IP地址高亮样式 */
 .highlight-ip {
   color: #409eff;
   font-weight: 500;
   font-family: 'Courier New', monospace;
 }
 
-/* MAC地址高亮样式 - 只改变字体颜色 */
+/* MAC地址高亮样式 */
 .highlight-mac {
   color: #e6a23c;
   font-weight: 500;
   font-family: 'Courier New', monospace;
-}
-
-/* 新增样式 */
-.option-tip {
-  margin-top: 8px;
-  color: #909399;
-}
-
-.option-tip small {
-  font-size: 12px;
 }
 
 .boot-info {

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, TagsRequest, TagsResponse } from '@/types/api'
+import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse } from '@/types/api'
 
 export const deviceApi = {
   // 获取所有设备
@@ -27,4 +27,30 @@ export const deviceApi = {
     return apiClient.delete(`/api/devices/${id}`)
   },
 
+  // 获取启动项（支持使用保存的凭据）
+  getBootEntries(serverId: string): Promise<BootEntriesResponse> {
+    return apiClient.get(`/api/devices/${serverId}/boot-entries`)
+  },
+
+  
+  // 设置启动项（支持使用保存的凭据）
+  setBootEntry(
+    serverId: string, 
+    bootId: string, 
+    setDefault: boolean = false,
+  ): Promise<void> {
+    const params: any = { 
+      boot_id: bootId,
+      set_default: setDefault
+    }
+    return apiClient.post(`/api/devices/${serverId}/set-boot`, null, { params })
+  },
+
+  powerCycle(serverId: string): Promise<void> {
+    return apiClient.post(`/api/devices/${serverId}/power-cycle`)
+  },
+
+  powerReset(serverId: string): Promise<void> {
+    return apiClient.post(`/api/devices/${serverId}/power-reset`)
+  }
 }

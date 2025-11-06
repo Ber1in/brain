@@ -17,7 +17,43 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-button type="primary" @click="$router.push('/devices/create')">
+            
+            <!-- 批量操作按钮 -->
+            <el-dropdown @command="handleBatchCommand" :disabled="selectedDevices.length === 0">
+              <el-button type="primary">
+                批量操作<el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item 
+                    command="batchRelease" 
+                    class="batch-release-item"
+                    :disabled="!canBatchRelease"
+                  >
+                    <el-icon><Unlock /></el-icon>
+                    <span>释放占用</span>
+                    <el-tooltip 
+                      v-if="!canBatchRelease && selectedDevices.length > 0"
+                      effect="dark" 
+                      :content="getBatchReleaseTooltip()"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="batchPowerCycle" divided class="batch-power-item">
+                    <el-icon><Refresh /></el-icon>
+                    <span>冷重启</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="batchPowerReset" class="batch-power-item">
+                    <el-icon><RefreshRight /></el-icon>
+                    <span>热重启</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            
+            <el-button type="primary" @click="$router.push('/devices/create')" style="margin-left: 12px;">
               录入服务器
             </el-button>
           </div>
@@ -28,7 +64,11 @@
         :data="filteredDevices" 
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
+        @selection-change="handleSelectionChange"
       >
+        <!-- 多选列 -->
+        <el-table-column type="selection" width="35" />
+
         <el-table-column 
           prop="bmc.hostname" 
           label="服务器名称"
@@ -59,7 +99,7 @@
         </el-table-column>
         <el-table-column 
           label="网卡信息"
-          min-width="150"
+          min-width="100"
         >
           <template #default="{ row }">
             <div v-if="getNicSummary(row).length > 0" class="nic-summary">
@@ -165,6 +205,32 @@
                     <span>编辑</span>
                   </el-dropdown-item>
                   
+                  <!-- 新增：修改启动项 -->
+                  <el-dropdown-item 
+                    command="bootEntry" 
+                    class="dropdown-item boot-entry-item"
+                    @click="handleBootEntryDialog(row)"
+                  >
+                    <el-icon><Setting /></el-icon>
+                    <span>修改启动项</span>
+                  </el-dropdown-item>
+
+                  <!-- 新增：电源操作 -->
+                  <el-dropdown-item 
+                    command="powerCycle" 
+                    class="dropdown-item power-cycle-item"
+                  >
+                    <el-icon><Refresh /></el-icon>
+                    <span>冷重启</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item 
+                    command="powerReset" 
+                    class="dropdown-item power-reset-item"
+                  >
+                    <el-icon><RefreshRight /></el-icon>
+                    <span>热重启</span>
+                  </el-dropdown-item>
+                  
                   <!-- 占用服务器按钮 -->
                   <el-dropdown-item 
                     command="occupy" 
@@ -185,14 +251,14 @@
                     </el-tooltip>
                   </el-dropdown-item>
                   
-                  <!-- 结束占用按钮 -->
+                  <!-- 释放占用按钮 -->
                   <el-dropdown-item 
                     command="release" 
                     :disabled="!isDeviceOccupied(row) || !isCurrentUserOccupier(row)"
                     class="occupy-item end-occupy-item dropdown-item"
                   >
                     <el-icon><Unlock /></el-icon>
-                    <span>结束占用</span>
+                    <span>释放占用</span>
                     <el-tooltip 
                       v-if="!isDeviceOccupied(row)"
                       effect="dark" 
@@ -375,6 +441,210 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 新增：修改启动项对话框 -->
+    <el-dialog
+      v-model="bootEntryDialogVisible"
+      title="修改启动项"
+      width="600px"
+      class="boot-entry-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="boot-entries-content" v-loading="bootEntriesLoading">
+        <div class="dialog-header">
+          <div class="device-info">
+            <el-icon class="server-icon"><Monitor /></el-icon>
+            <div class="info-content">
+              <div class="hostname">{{ currentDevice?.bmc.hostname }}</div>
+              <div class="ip-address">{{ currentDevice?.device.ip }}</div>
+            </div>
+          </div>
+          <div class="user-info">
+            <el-avatar :size="32" style="background-color: #409eff;">
+              {{ currentUser?.charAt(0).toUpperCase() }}
+            </el-avatar>
+            <span class="username">{{ currentUser }}</span>
+          </div>
+        </div>
+        <!-- 启动项选择 -->
+        <div class="boot-selection">
+          <div class="section-title">
+            <el-icon><Setting /></el-icon>
+            <span>选择下次启动项</span>
+          </div>
+
+          <div v-if="bootEntriesList.length > 0" class="boot-entries-list">
+            <div
+              v-for="entry in bootEntriesList"
+              :key="entry.key"
+              class="boot-entry-item"
+              :class="{
+                'current-entry': entry.isCurrent,
+                'selected-entry': selectedBootEntry === entry.key
+              }"
+              @click="selectedBootEntry = entry.key"
+            >
+              <div class="boot-entry-content">
+                <div class="boot-entry-main">
+                  <el-radio 
+                    v-model="selectedBootEntry" 
+                    :label="entry.key"
+                    class="boot-radio"
+                  >
+                    <div class="boot-entry-text">{{ entry.value }}</div>
+                  </el-radio>
+                  <div class="boot-entry-tags">
+                    <el-tag v-if="entry.isCurrent" type="success" size="small">当前</el-tag>
+                    <el-tag v-if="entry.isNext" type="warning" size="small">下次</el-tag>
+                    <el-tag v-if="entry.isDefault" type="info" size="small">默认</el-tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="no-boot-entries">
+            <el-empty description="暂无启动项信息" />
+          </div>
+
+          <!-- 启动选项 -->
+          <div class="boot-options">
+            <el-checkbox v-model="setAsDefaultBoot" class="default-boot-checkbox">
+              设置为默认启动项
+            </el-checkbox>
+            <div class="option-tip">
+              勾选后，此启动项将作为服务器的默认启动项
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="bootEntryDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleSetBootEntry" 
+            :loading="bootEntryLoading"
+            :disabled="!selectedBootEntry"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            确认修改
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 新增：批量操作对话框 -->
+    <el-dialog
+      v-model="batchDialogVisible"
+      :title="batchDialogTitle"
+      width="500px"
+      class="batch-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="batch-dialog-content">
+        <!-- 批量操作确认信息 -->
+        <div class="batch-confirm-info">
+          <el-alert
+            :title="getBatchConfirmMessage()"
+            :type="getBatchAlertType()"
+            :closable="false"
+            show-icon
+          />
+          <div v-if="batchOperation === 'batchRelease'" class="warning-tip">
+            <el-icon><Warning /></el-icon>
+            <span>注意：只能释放当前用户占用的服务器，已自动过滤非当前用户占用的服务器</span>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="batchDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            :type="getBatchConfirmButtonType()"
+            @click="handleBatchConfirm" 
+            :loading="batchLoading"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            {{ getBatchConfirmButtonText() }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 新增：电源重启确认对话框 -->
+    <el-dialog
+      v-model="powerDialogVisible"
+      :title="powerDialogTitle"
+      width="400px"
+      class="power-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="power-dialog-content">
+        <div class="dialog-tip">
+          <el-alert
+            :title="powerType === 'cycle' ? '冷重启将完全断电后重新启动服务器' : '热重启将保持通电状态重新启动服务器'"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
+        </div>
+        <div class="confirm-message">
+          <p v-if="isBatchPowerOperation">
+            确定要对 <strong>{{ selectedDevices.length }} 台服务器</strong> 执行{{ powerType === 'cycle' ? '冷重启' : '热重启' }}吗？
+          </p>
+          <p v-else>
+            确定要对服务器 <strong>"{{ currentDevice?.bmc.hostname }}"</strong> 执行{{ powerType === 'cycle' ? '冷重启' : '热重启' }}吗？
+          </p>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="powerDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handlePowerConfirm" 
+            :loading="powerLoading"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            确认重启
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -396,11 +666,16 @@ import {
   Clock,
   Calendar,
   Watch,
-  Loading
+  Loading,
+  Setting,
+  Refresh,
+  RefreshRight,
+  ArrowDown,
+  Warning
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { tagApi } from '@/api/tag'
-import type { ServerDetailResponse, ServerUpdateRequest, TagResponse } from '@/types/api'
+import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -408,6 +683,7 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const devices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
+const selectedDevices = ref<ServerDetailResponse[]>([])
 
 // 当前用户信息
 const currentUser = computed(() => authStore.username)
@@ -427,6 +703,366 @@ const availableTags = ref<TagResponse[]>([])
 const tagsLoading = ref(false)
 const addingTags = ref(false)
 const editingDevice = ref<ServerDetailResponse | null>(null)
+
+// 启动项管理相关
+const bootEntryDialogVisible = ref(false)
+const bootEntryLoading = ref(false)
+const bootEntriesLoading = ref(false)
+const bootEntriesData = ref<BootEntriesResponse | null>(null)
+const selectedBootEntry = ref<string>('')
+const setAsDefaultBoot = ref(false)
+
+// 批量操作相关
+const batchDialogVisible = ref(false)
+const batchLoading = ref(false)
+const batchOperation = ref<string>('')
+
+// 电源操作相关
+const powerDialogVisible = ref(false)
+const powerLoading = ref(false)
+const powerType = ref<'cycle' | 'reset'>('cycle')
+const isBatchPowerOperation = ref(false)
+
+// 计算电源操作对话框标题
+const powerDialogTitle = computed(() => {
+  const typeText = powerType.value === 'cycle' ? '冷重启' : '热重启'
+  if (isBatchPowerOperation.value) {
+    return `批量${typeText}`
+  }
+  return `${typeText}服务器`
+})
+
+// 计算批量操作对话框标题
+const batchDialogTitle = computed(() => {
+  const titles: Record<string, string> = {
+    'batchRelease': '批量释放服务器',
+    'batchPowerCycle': '批量冷重启',
+    'batchPowerReset': '批量热重启'
+  }
+  return titles[batchOperation.value] || '批量操作'
+})
+
+// 获取批量操作确认信息
+const getBatchConfirmMessage = () => {
+  const messages: Record<string, string> = {
+    'batchRelease': `确认要释放 ${selectedDevices.value.length} 台服务器吗？`,
+    'batchPowerCycle': `确认要对 ${selectedDevices.value.length} 台服务器执行冷重启吗？`,
+    'batchPowerReset': `确认要对 ${selectedDevices.value.length} 台服务器执行热重启吗？`
+  }
+  return messages[batchOperation.value] || ''
+}
+
+// 获取批量操作警告类型
+const getBatchAlertType = () => {
+  const types: Record<string, any> = {
+    'batchRelease': 'warning',
+    'batchPowerCycle': 'warning',
+    'batchPowerReset': 'warning'
+  }
+  return types[batchOperation.value] || 'info'
+}
+
+// 获取批量操作确认按钮类型
+const getBatchConfirmButtonType = () => {
+  const types: Record<string, any> = {
+    'batchRelease': 'warning',
+    'batchPowerCycle': 'warning',
+    'batchPowerReset': 'warning'
+  }
+  return types[batchOperation.value] || 'primary'
+}
+
+// 获取批量操作确认按钮文本
+const getBatchConfirmButtonText = () => {
+  const texts: Record<string, string> = {
+    'batchRelease': '确认释放',
+    'batchPowerCycle': '确认重启',
+    'batchPowerReset': '确认重启'
+  }
+  return texts[batchOperation.value] || '确认'
+}
+
+// 处理选择变化
+const handleSelectionChange = (selection: ServerDetailResponse[]) => {
+  selectedDevices.value = selection
+}
+
+// 清空选择
+const clearSelection = () => {
+  selectedDevices.value = []
+}
+
+// 处理批量操作命令
+const handleBatchCommand = (command: string) => {
+  if (command === 'batchRelease' && !canBatchRelease.value) {
+    // 如果不满足批量释放条件，显示提示但不执行操作
+    const invalidCount = selectedDevices.value.filter(device => 
+      !isDeviceOccupied(device) || !isCurrentUserOccupier(device)
+    ).length
+    ElMessage.warning(`无法执行批量释放：勾选了 ${invalidCount} 台非当前用户所占用的服务器`)
+    return
+  }
+  
+  if (command === 'batchPowerCycle' || command === 'batchPowerReset') {
+    // 电源操作使用单独的对话框
+    const operation = command === 'batchPowerCycle' ? 'cycle' : 'reset'
+    handleBatchPowerOperation(operation)
+  } else {
+    // 其他批量操作使用原来的对话框
+    batchOperation.value = command
+    batchDialogVisible.value = true
+  }
+}
+
+// 处理批量操作确认
+const handleBatchConfirm = async () => {
+  if (selectedDevices.value.length === 0) return
+
+  try {
+    batchLoading.value = true
+
+    // 执行批量操作（电源操作已单独处理）
+    switch (batchOperation.value) {
+      case 'batchRelease':
+        await handleBatchRelease()
+        break
+    }
+
+    batchDialogVisible.value = false
+    clearSelection()
+    
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '批量操作失败')
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+// 批量释放
+const handleBatchRelease = async () => {
+  // 过滤出当前用户占用的设备
+  const releasableDevices = selectedDevices.value.filter(device => 
+    isDeviceOccupied(device) && isCurrentUserOccupier(device)
+  )
+  
+  if (releasableDevices.length === 0) {
+    ElMessage.warning('没有可释放的服务器')
+    return
+  }
+  
+  const promises = releasableDevices.map(device => 
+    deviceApi.update(device.id!, {
+      auto: false,
+      time: 0,
+      device: {
+        ip: device.device.ip,
+        username: device.device.username,
+        password: ''
+      },
+      bmc: {
+        hostname: device.bmc.hostname,
+        ip: device.bmc.ip
+      },
+      tags: device.tags || [],
+      notes: device.notes || ''
+    })
+  )
+
+  await Promise.all(promises)
+  
+  // 显示实际释放的数量
+  const totalSelected = selectedDevices.value.length
+  const actualReleased = releasableDevices.length
+  const skipped = totalSelected - actualReleased
+  
+  let message = `成功释放 ${actualReleased} 台服务器`
+  if (skipped > 0) {
+    message += `（自动跳过 ${skipped} 台非当前用户占用的服务器）`
+  }
+  
+  ElMessage.success(message)
+  loadData()
+}
+
+// 处理批量电源操作
+const handleBatchPowerOperation = (operation: 'cycle' | 'reset') => {
+  powerType.value = operation
+  isBatchPowerOperation.value = true
+  powerDialogVisible.value = true
+}
+
+// 确认电源操作
+const handlePowerConfirm = async () => {
+  try {
+    powerLoading.value = true
+
+    if (isBatchPowerOperation.value) {
+      // 批量电源操作
+      const promises = selectedDevices.value.map(device => 
+        powerType.value === 'cycle' 
+          ? deviceApi.powerCycle(device.id!)
+          : deviceApi.powerReset(device.id!)
+      )
+
+      await Promise.all(promises)
+      const operationText = powerType.value === 'cycle' ? '冷重启' : '热重启'
+      ElMessage.success(`成功对 ${selectedDevices.value.length} 台服务器执行${operationText}`)
+    } else {
+      // 单个电源操作
+      if (currentDevice.value) {
+        if (powerType.value === 'cycle') {
+          await deviceApi.powerCycle(currentDevice.value.id!)
+        } else {
+          await deviceApi.powerReset(currentDevice.value.id!)
+        }
+        const operationText = powerType.value === 'cycle' ? '冷重启' : '热重启'
+        ElMessage.success(`${operationText}命令已发送`)
+      }
+    }
+
+    powerDialogVisible.value = false
+    if (isBatchPowerOperation.value) {
+      clearSelection()
+    }
+    
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '重启操作失败')
+  } finally {
+    powerLoading.value = false
+  }
+}
+
+// 处理单个设备的电源操作
+const handlePowerOperation = async (device: ServerDetailResponse, operation: 'cycle' | 'reset') => {
+  currentDevice.value = device
+  powerType.value = operation
+  isBatchPowerOperation.value = false
+  powerDialogVisible.value = true
+}
+
+const canBatchRelease = computed(() => {
+  if (selectedDevices.value.length === 0) return false
+  
+  // 检查所有选中的设备是否都是当前用户占用的
+  return selectedDevices.value.every(device => 
+    isDeviceOccupied(device) && isCurrentUserOccupier(device)
+  )
+})
+
+// 获取批量释放操作的提示信息
+const getBatchReleaseTooltip = () => {
+  const invalidDevices = selectedDevices.value.filter(device => 
+    !isDeviceOccupied(device) || !isCurrentUserOccupier(device)
+  )
+  
+  if (invalidDevices.length > 0) {
+    return `勾选了 ${invalidDevices.length} 台非当前用户所占用的服务器`
+  }
+  
+  return '只能释放当前用户占用的服务器'
+}
+
+// 计算启动项列表
+const bootEntriesList = computed(() => {
+  const bootEntries = bootEntriesData.value
+  if (!bootEntries || !bootEntries.entries) return []
+
+  const { entries, current, next, default: defaultOs } = bootEntries
+  const result = []
+
+  for (const [key, value] of Object.entries(entries)) {
+    result.push({
+      key,
+      value,
+      isCurrent: key === current,
+      isNext: key === next,
+      isDefault: key === defaultOs
+    })
+  }
+
+  return result
+})
+
+// 获取当前启动项显示文本
+const getCurrentBootEntry = () => {
+  const current = bootEntriesData.value?.current
+  if (!current) return '-'
+  
+  const entry = bootEntriesList.value.find(item => item.key === current)
+  return entry ? entry.value : '-'
+}
+
+// 加载启动项信息
+const loadBootEntries = async (deviceId: string) => {
+  try {
+    bootEntriesLoading.value = true
+    const data = await deviceApi.getBootEntries(deviceId)
+    bootEntriesData.value = data
+    
+    // 默认选中当前启动项
+    if (data.current) {
+      selectedBootEntry.value = data.current
+    }
+  } catch (error) {
+    console.error('加载启动项信息失败:', error)
+    ElMessage.error('加载启动项信息失败')
+  } finally {
+    bootEntriesLoading.value = false
+  }
+}
+
+// 处理启动项对话框
+const handleBootEntryDialog = async (device: ServerDetailResponse) => {
+  currentDevice.value = device
+  selectedBootEntry.value = ''
+  setAsDefaultBoot.value = false
+  bootEntryDialogVisible.value = true
+  
+  // 加载启动项信息
+  await loadBootEntries(device.id!)
+}
+
+// 设置启动项
+const handleSetBootEntry = async () => {
+  if (!currentDevice.value || !selectedBootEntry.value) return
+
+  try {
+    bootEntryLoading.value = true
+    
+    const bootEntryName = bootEntriesData.value?.entries[selectedBootEntry.value]
+    
+    await ElMessageBox.confirm(
+      `确定要设置下次启动项为 "${bootEntryName}" 吗？${
+        setAsDefaultBoot.value ? '同时会设置为默认启动项。' : ''
+      }`,
+      '确认设置启动项',
+      {
+        type: 'warning',
+        confirmButtonText: '确定设置',
+        cancelButtonText: '取消'
+      }
+    )
+
+    // 调用设置启动项接口
+    await deviceApi.setBootEntry(currentDevice.value.id!, selectedBootEntry.value, setAsDefaultBoot.value)
+    
+    ElMessage.success('启动项设置成功')
+    bootEntryDialogVisible.value = false
+    
+    // 重置状态
+    selectedBootEntry.value = ''
+    setAsDefaultBoot.value = false
+    
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消操作
+      return
+    }
+    ElMessage.error(error.response?.data?.detail || '设置启动项失败')
+  } finally {
+    bootEntryLoading.value = false
+  }
+}
 
 // 获取标签样式
 const getTagStyle = (tagName: string) => {
@@ -953,6 +1589,15 @@ const handleCommand = (command: string, device: ServerDetailResponse) => {
     case 'edit':
       handleEdit(device)
       break
+    case 'bootEntry':
+      // 这个命令现在通过 @click 直接处理，不在这里处理
+      break
+    case 'powerCycle':
+      handlePowerOperation(device, 'cycle')
+      break
+    case 'powerReset':
+      handlePowerOperation(device, 'reset')
+      break
     case 'occupy':
       handleOccupyDialog(device)
       break
@@ -1031,7 +1676,7 @@ const handleOccupy = async () => {
   }
 }
 
-// 结束占用
+// 释放占用
 const handleRelease = async (device: ServerDetailResponse) => {
   if (!isDeviceOccupied(device)) {
     ElMessage.warning('服务器未被占用，无法释放')
@@ -1045,7 +1690,7 @@ const handleRelease = async (device: ServerDetailResponse) => {
   
   try {
     await ElMessageBox.confirm(
-      `确定要结束占用 "${device.bmc.hostname}" 吗？`, 
+      `确定要释放占用 "${device.bmc.hostname}" 吗？`, 
       '确认结束', 
       {
         type: 'warning',
@@ -1054,7 +1699,7 @@ const handleRelease = async (device: ServerDetailResponse) => {
 
     const updateData: ServerUpdateRequest = {
       auto: false,
-      time: 0, // 设置为0表示结束占用
+      time: 0, // 设置为0表示释放占用
       // user字段后端会自动处理
       device: {
         ip: device.device.ip,
@@ -1104,6 +1749,99 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 电源重启对话框样式 */
+.power-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dialog-tip {
+  margin-bottom: 8px;
+}
+
+.confirm-message {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.confirm-message p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirm-message strong {
+  color: #409eff;
+}
+
+/* 批量操作按钮样式 */
+:deep(.batch-release-item.is-disabled) {
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-release-item.is-disabled .el-icon) {
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-release-item.is-disabled:hover) {
+  background-color: transparent !important;
+  color: #c0c4cc !important;
+}
+
+/* 批量释放按钮正常状态颜色 - 与单个释放按钮保持一致 */
+:deep(.batch-release-item:not(.is-disabled)) {
+  color: #67c23a !important;
+}
+
+:deep(.batch-release-item:not(.is-disabled):hover) {
+  color: #5daf34 !important;
+  background-color: #f0f9eb !important;
+}
+
+:deep(.batch-power-item) {
+  color: #e6a23c !important;
+}
+
+
+/* 批量对话框样式 */
+.batch-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.warning-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #fdf6ec;
+  border-radius: 4px;
+  color: #e6a23c;
+  font-size: 14px;
+}
+
+/* 电源操作按钮样式 */
+:deep(.power-cycle-item:not(.is-disabled)) {
+  color: #e6a23c !important;
+}
+
+:deep(.power-cycle-item:not(.is-disabled):hover) {
+  color: #cf9236 !important;
+  background-color: #fdf6ec !important;
+}
+
+:deep(.power-reset-item:not(.is-disabled)) {
+  color: #f56c6c !important;
+}
+
+:deep(.power-reset-item:not(.is-disabled):hover) {
+  color: #dd6161 !important;
+  background-color: #fef0f0 !important;
+}
+
 /* 服务器名称链接样式 - 添加下划线 */
 .underlined-link {
   text-decoration: underline !important;
@@ -1117,7 +1855,7 @@ onMounted(() => {
 
 /* 操作下拉菜单样式优化 */
 :deep(.action-dropdown-menu) {
-  min-width: 140px;
+  min-width: 160px;
 }
 
 :deep(.dropdown-item) {
@@ -1142,6 +1880,16 @@ onMounted(() => {
 :deep(.dropdown-item span) {
   flex: 1 !important;
   text-align: left !important;
+}
+
+/* 启动项按钮样式 */
+:deep(.boot-entry-item:not(.is-disabled)) {
+  color: #7239ea !important;
+}
+
+:deep(.boot-entry-item:not(.is-disabled):hover) {
+  color: #5f2bc3 !important;
+  background-color: #f8f5ff !important;
 }
 
 /* 占用相关按钮样式优化 */
@@ -1248,6 +1996,170 @@ onMounted(() => {
   }
 }
 
+/* 启动项对话框样式 */
+.boot-entry-dialog {
+  :deep(.el-dialog__header) {
+    padding: 20px 20px 0;
+    margin-right: 0;
+  }
+  
+  :deep(.el-dialog__body) {
+    padding: 16px 20px;
+  }
+  
+  :deep(.el-dialog__footer) {
+    padding: 0 20px 20px;
+  }
+}
+
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: #909399;
+}
+
+.boot-entries-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.current-boot-info {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f0f7ff;
+  border: 1px solid #d4e8ff;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.info-label {
+  font-weight: 600;
+  margin-right: 8px;
+  color: #1890ff;
+  min-width: 80px;
+}
+
+.current-entry {
+  font-family: 'Courier New', monospace;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.boot-selection {
+  background: white;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.section-title .el-icon {
+  color: #409eff;
+}
+
+.boot-entries-list {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.boot-entry-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.boot-entry-item:last-child {
+  border-bottom: none;
+}
+
+.boot-entry-item:hover {
+  background-color: #f5f7fa;
+}
+
+.boot-entry-item.current-entry {
+  background-color: #e6f7ff;
+  border-left: 3px solid #1890ff;
+}
+
+.boot-entry-item.default-entry {
+  background-color: #f6ffed;
+}
+
+.boot-entry-item.selected-entry {
+  background-color: #f0f7ff;
+  border-left: 3px solid #409eff;
+}
+
+.boot-entry-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.boot-entry-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.boot-radio {
+  flex: 1;
+  
+  :deep(.el-radio__label) {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}
+
+.boot-entry-text {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.boot-entry-tags {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.boot-options {
+  padding: 12px 0;
+}
+
+.default-boot-checkbox {
+  margin-bottom: 4px;
+}
+
+.option-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 24px;
+}
+
+.no-boot-entries {
+  padding: 40px 0;
+}
+
 /* 对话框头部 */
 .dialog-header {
   display: flex;
@@ -1322,22 +2234,6 @@ onMounted(() => {
   background: white;
   border-radius: 8px;
   padding: 0;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #f3f4f6;
-}
-
-.section-title .el-icon {
-  color: #409eff;
 }
 
 /* 紧凑表单项 */
@@ -1440,6 +2336,16 @@ onMounted(() => {
   
   .user-info {
     align-self: flex-end;
+  }
+  
+  .boot-entry-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .boot-entry-tags {
+    align-self: flex-start;
   }
 }
 

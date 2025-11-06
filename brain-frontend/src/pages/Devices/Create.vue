@@ -110,7 +110,7 @@ const form = reactive<ServerRequest>({
     password: ''
   },
   nics: [],
-  os_types: [],
+  os_types: null,
   tags: [],
   notes: ''
 })

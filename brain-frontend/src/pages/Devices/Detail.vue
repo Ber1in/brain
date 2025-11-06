@@ -41,22 +41,34 @@
         <!-- 服务器信息 -->
         <el-descriptions-item label="服务器IP">{{ deviceData.device?.ip || '-' }}</el-descriptions-item>
         <el-descriptions-item label="服务器序列号">{{ deviceData.device?.sn || '-' }}</el-descriptions-item>
+        
+        <!-- 新增的管理口信息 -->
+        <el-descriptions-item label="管理口MAC地址">{{ deviceData.device?.mac || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="管理网网关">{{ deviceData.device?.gateway || '-' }}</el-descriptions-item>
 
         <!-- 网卡信息 -->
         <el-descriptions-item label="网卡数量" :span="2">
           {{ deviceData.nics?.length || 0 }} 个
         </el-descriptions-item>
 
-        <!-- 操作系统类型 -->
+        <!-- 操作系统类型 - 修改后的展示方式 -->
         <el-descriptions-item label="操作系统类型" :span="2">
-          <div v-if="deviceData.os_types && deviceData.os_types.length > 0">
-            <el-tag 
-              v-for="os in deviceData.os_types" 
-              :key="os" 
-              style="margin-right: 8px; margin-bottom: 4px;"
+          <div v-if="bootEntriesLoading" class="loading-text">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            加载启动项信息中...
+          </div>
+          <div v-else-if="bootEntriesList && bootEntriesList.length > 0">
+            <div 
+              v-for="os in bootEntriesList" 
+              :key="os.key" 
+              class="os-item"
+              :class="{ 
+                'current-os': os.isCurrent,
+                'default-os': os.isDefault
+              }"
             >
-              {{ os }}
-            </el-tag>
+              {{ os.displayText }}
+            </div>
           </div>
           <span v-else>-</span>
         </el-descriptions-item>
@@ -112,19 +124,21 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Refresh } from '@element-plus/icons-vue'
+import { Edit, Refresh, Loading } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import type { ServerDetailResponse, AIDPU_Nic } from '@/types/api'
+import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const deviceId = ref<string>('')
 const refreshing = ref(false)
+const bootEntriesLoading = ref(false)
+const bootEntriesData = ref<BootEntriesResponse | null>(null)
+
 const deviceData = ref<ServerDetailResponse>({
   bmc: { hostname: '', ip: '' },
   device: { ip: '', username: '' },
   nics: [],
-  os_types: [],
   tags: [],
   notes: '',
   user: '',
@@ -132,6 +146,38 @@ const deviceData = ref<ServerDetailResponse>({
   created_at: '',
   updated_at: '',
   id: ''
+})
+
+// 计算操作系统类型列表
+const bootEntriesList = computed(() => {
+  const bootEntries = bootEntriesData.value
+  if (!bootEntries || !bootEntries.entries) return []
+
+  const { entries, current, next, default: defaultOs } = bootEntries
+  const result = []
+
+  for (const [key, value] of Object.entries(entries)) {
+    const statusFlags = []
+    if (key === current) statusFlags.push('当前')
+    if (key === next) statusFlags.push('下次')
+    if (key === defaultOs) statusFlags.push('默认')
+    
+    let displayText = value
+    if (statusFlags.length > 0) {
+      displayText += ` (${statusFlags.join(')(')})`
+    }
+
+    result.push({
+      key,
+      value,
+      displayText,
+      isCurrent: key === current,
+      isNext: key === next,
+      isDefault: key === defaultOs
+    })
+  }
+
+  return result
 })
 
 // 根据剩余秒数计算截止时间
@@ -202,11 +248,28 @@ const formatTime = (timeStr: string) => {
   }
 }
 
+// 加载启动项信息
+const loadBootEntries = async () => {
+  try {
+    bootEntriesLoading.value = true
+    const data = await deviceApi.getBootEntries(deviceId.value)
+    bootEntriesData.value = data
+  } catch (error) {
+    console.error('加载启动项信息失败:', error)
+    // 不显示错误信息，因为启动项信息不是必须的
+  } finally {
+    bootEntriesLoading.value = false
+  }
+}
+
 // 加载服务器详情
 const loadDeviceDetail = async () => {
   try {
     const data = await deviceApi.getById(deviceId.value)
     deviceData.value = data
+    
+    // 同时加载启动项信息
+    await loadBootEntries()
   } catch (error) {
     ElMessage.error('加载服务器详情失败')
     router.push('/devices')
@@ -233,7 +296,7 @@ const handleRefresh = async () => {
     
     ElMessage.success('服务器信息更新成功')
     
-    // 重新加载详情数据
+    // 重新加载详情数据和启动项信息
     await loadDeviceDetail()
     
   } catch (error: any) {
@@ -279,6 +342,33 @@ onMounted(() => {
   font-family: 'Courier New', monospace;
   font-size: 12px;
   margin-bottom: 2px;
+}
+
+.os-item {
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.current-os {
+  background-color: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #1890ff;
+}
+
+.default-os {
+  background-color: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #52c41a;
+}
+
+.loading-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #909399;
 }
 
 :deep(.el-descriptions) {

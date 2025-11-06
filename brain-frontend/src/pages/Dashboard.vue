@@ -28,14 +28,14 @@
         </el-card>
       </el-col>
       <el-col :span="4">
-        <el-card class="stat-card" @click="goToPage('baremetal')" style="cursor: pointer;">
+        <el-card class="stat-card" @click="goToPage('devices')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #67c23a">
               <el-icon><Monitor /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ bareCount }}</div>
-              <div class="stat-label">裸金属数量</div>
+              <div class="stat-value">{{ deviceCount }}</div>
+              <div class="stat-label">服务器数量</div>
             </div>
           </div>
         </el-card>
@@ -110,23 +110,23 @@
 import { ref, onMounted, computed } from 'vue'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
+import { deviceApi } from '@/api/device'
 import { useRouter } from 'vue-router'
 import { systemDisksApi } from '@/api/system-disks'
 import { networkApi } from '@/api/network'
-import type { Image, MVServer, SystemDisk, InterfaceInfo } from '@/types/api'
+import type { Image, MVServer, SystemDisk, InterfaceInfo, ServerDetailResponse } from '@/types/api'
 
 const router = useRouter()
 const loading = ref(false)
 const images = ref<Image[]>([])
 const mv200Servers = ref<MVServer[]>([])
-const bareServers = ref<BareMetalServer[]>([])
+const devices = ref<ServerDetailResponse[]>([])
 const disks = ref<SystemDisk[]>([])
 const xscInterfaces = ref<InterfaceInfo[]>([])
 
 const imageCount = computed(() => images.value.length)
 const mv200Count = computed(() => mv200Servers.value.length)
-const bareCount = computed(() => bareServers.value.length)
+const deviceCount = computed(() => devices.value.length)
 const diskCount = computed(() => disks.value.length)
 const xscInterfaceCount = computed(() => xscInterfaces.value.length)
 const recentDisks = computed(() => disks.value.slice(0, 5))
@@ -149,8 +149,8 @@ const goToPage = (pageType: string) => {
     case 'mv200':
       router.push('/mv200')
       break
-    case 'baremetal':
-      router.push('/bare')
+    case 'devices':
+      router.push('/devices')
       break
     case 'blocks':
       router.push('/system-disks')
@@ -166,18 +166,18 @@ const goToPage = (pageType: string) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const [imagesResponse, serversResponse, disksResponse, bareResponse, interfacesResponse] = await Promise.all([
+    const [imagesResponse, serversResponse, disksResponse, devicesResponse, interfacesResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
       systemDisksApi.getAll(),
-      bareApi.getAll(),
+      deviceApi.getAll(),
       networkApi.getAll(),
     ])
 
     images.value = imagesResponse
     mv200Servers.value = serversResponse
     disks.value = disksResponse
-    bareServers.value = bareResponse
+    devices.value = devicesResponse
     xscInterfaces.value = interfacesResponse
   } catch (error) {
     console.error('加载数据失败:', error)

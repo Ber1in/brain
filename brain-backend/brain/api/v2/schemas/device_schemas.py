@@ -3,7 +3,7 @@
 
 from pydantic import BaseModel, Field
 from ipaddress import IPv4Address
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 
 class BMC(BaseModel):
@@ -22,6 +22,8 @@ class DeviceResponse(BaseModel):
     sn: str = None
     ip: IPv4Address
     username: str
+    mac: str = None
+    gateway: IPv4Address = None
 
 
 class NicBase(BaseModel):
@@ -38,11 +40,17 @@ class AIDPU_Nic(NicBase):
     management_ip: str = None
 
 
+class BootEntriesResponse(BaseModel):
+    entries: Dict[str, str]
+    current: str
+    next: str = Field(None)
+    default: str = Field(None)
+
+
 class ServerRequest(BaseModel):
     bmc: BMC = Field(...)
     device: DeviceRequest = Field(...)
     nics: List[Union[NicBase, AIDPU_Nic]] = None
-    os_types: List[str] = []
     tags: List[str] = []
     notes: str = None
 
@@ -51,7 +59,6 @@ class ServerResponse(BaseModel):
     bmc: BMC = Field(...)
     device: DeviceResponse = Field(...)
     nics: List[Union[NicBase, AIDPU_Nic]] = None
-    os_types: List[str] = []
     tags: List[str] = []
     notes: str = None
 
@@ -69,7 +76,6 @@ class ServerUpdateRequest(BaseModel):
     device: Optional[DeviceRequest] = None
     bmc: Optional[BMC] = None
     nics: List[Union[NicBase, AIDPU_Nic]] = None
-    os_types: List[str] = []
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
     time: Optional[str] = None

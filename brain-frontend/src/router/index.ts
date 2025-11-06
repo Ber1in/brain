@@ -157,22 +157,22 @@ const router = createRouter({
     },
     {
       path: '/devices',
-      name: 'Devices',
+      name: '服务器管理',
       component: () => import('@/pages/Devices/Index.vue')
     },
     {
       path: '/devices/create',
-      name: 'DeviceCreate',
+      name: '录入服务器',
       component: () => import('@/pages/Devices/Create.vue')
     },
     {
       path: '/devices/detail/:id',
-      name: 'DeviceDetail',
+      name: '服务器详情',
       component: () => import('@/pages/Devices/Detail.vue')
     },
     {
       path: '/devices/edit/:id',
-      name: 'DeviceEdit',
+      name: '修改服务器信息',
       component: () => import('@/pages/Devices/Edit.vue')
     },
   ],

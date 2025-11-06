@@ -1,7 +1,6 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-import subprocess
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 import logging
@@ -19,8 +18,6 @@ db = SQLiteDocumentDB()
 
 # Collection name
 BARE_METAL_SERVER_COLLECTION = "bare_metals"
-BMC_USER = "ipmiadmin"
-BMC_PASS = "ymxl@2022"
 
 
 def get_bmc_ip(host_ip: str) -> str:
@@ -32,30 +29,6 @@ def get_bmc_ip(host_ip: str) -> str:
     bmc_ip = ".".join(parts)
     LOG.debug(f"Converted host_ip {host_ip} to BMC IP {bmc_ip}")
     return bmc_ip
-
-
-def ipmi_power_action(bmcip: str, action: str):
-    """Execute IPMI power action via ipmitool command"""
-    LOG.info(f"Executing IPMI {action} on BMC {bmcip}")
-
-    if action not in ("cycle", "reset"):
-        raise HTTPException(status_code=400, detail=f"Unsupported IPMI action: {action}")
-
-    cmd = ["ipmitool", "-I", "lanplus", "-H", bmcip, "-U", BMC_USER, "-P", BMC_PASS,
-           "chassis", "power", action]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            LOG.error(f"IPMI {action} failed on BMC {bmcip}: {result.stderr.strip()}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"IPMI {action} failed: {result.stderr.strip()}"
-            )
-        LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}: {result.stdout.strip()}")
-    except Exception as e:
-        LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
-        raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
 
 
 @router.post("/bare-metals", response_model=bare_metal_schemas.BareMetalServer,
@@ -353,7 +326,7 @@ async def power_cycle_server(server_id: str):
 
     bmcip = get_bmc_ip(host_ip)
     LOG.info(f"Power cycling server {server_id} via BMC {bmcip}")
-    ipmi_power_action(bmcip, "cycle")
+    tools.ipmi_power_action(bmcip, "cycle")
 
     LOG.info(f"Successfully completed power cycle for server {server_id}")
     return {"message": f"Server {server_id} power cycled via BMC {bmcip}"}
@@ -377,7 +350,7 @@ async def power_reset_server(server_id: str):
 
     bmcip = get_bmc_ip(host_ip)
     LOG.info(f"Power resetting server {server_id} via BMC {bmcip}")
-    ipmi_power_action(bmcip, "reset")
+    tools.ipmi_power_action(bmcip, "reset")
 
     LOG.info(f"Successfully completed power reset for server {server_id}")
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}

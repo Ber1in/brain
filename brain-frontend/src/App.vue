@@ -28,17 +28,13 @@
               <el-icon><Picture /></el-icon>
               <span>镜像管理</span>
             </el-menu-item>
-            <el-menu-item index="/bare">
+            <el-menu-item index="/devices">
               <el-icon><Monitor /></el-icon>
-              <span>裸金属服务器管理</span>
+              <span>服务器管理</span>
             </el-menu-item>
             <el-menu-item index="/mv200">
               <el-icon><Cpu /></el-icon>
               <span>MV200管理</span>
-            </el-menu-item>
-            <el-menu-item index="/devices">
-              <el-icon><Monitor /></el-icon>
-              <span>服务器管理</span>
             </el-menu-item>
           </el-sub-menu>
 
