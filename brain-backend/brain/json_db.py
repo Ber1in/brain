@@ -270,7 +270,8 @@ class SQLiteDocumentDB:
         },
         "tags": {
             "id": "",
-            "name": ""
+            "name": "",
+            "color": ""
         }
     }
 

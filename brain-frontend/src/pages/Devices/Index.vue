@@ -33,7 +33,7 @@
           prop="bmc.hostname" 
           label="服务器名称"
           sortable
-          width="180"
+          width="150"
         >
           <template #default="{ row }">
             <el-link 
@@ -58,19 +58,26 @@
           </template>
         </el-table-column>
         <el-table-column 
-          prop="bmc.ip" 
-          label="BMC IP"
-          sortable
-          :sort-method="ipSortMethod"
-          width="150"
+          label="网卡信息"
+          min-width="150"
         >
           <template #default="{ row }">
-            <span class="highlight-ip">{{ row.bmc.ip }}</span>
+            <div v-if="getNicSummary(row).length > 0" class="nic-summary">
+              <div 
+                v-for="summary in getNicSummary(row)" 
+                :key="summary.type"
+                class="nic-item"
+              >
+                <span class="nic-count">{{ summary.count }}</span>
+                <span class="nic-type">{{ summary.displayType }}</span>
+              </div>
+            </div>
+            <span v-else class="empty-text">-</span>
           </template>
         </el-table-column>
         <el-table-column 
           label="标签"
-          min-width="200"
+          min-width="250"
         >
           <template #default="{ row }">
             <div v-if="row.tags && row.tags.length > 0" class="tags-container">
@@ -81,6 +88,7 @@
                 closable
                 @close="(e) => handleRemoveTag(e, tag, row)"
                 class="tag-item"
+                :style="getTagStyle(tag)"
               >
                 {{ tag }}
               </el-tag>
@@ -103,7 +111,6 @@
                 @click="showAddTagDialog(row)"
               >
                 <el-icon><Plus /></el-icon>
-                添加标签
               </el-button>
             </div>
           </template>
@@ -112,7 +119,7 @@
           prop="notes" 
           label="备注"
           show-overflow-tooltip
-          min-width="250"
+          min-width="300"
         >
           <template #default="{ row }">
             <span v-if="row.notes">{{ row.notes }}</span>
@@ -324,7 +331,6 @@
     >
       <div class="tag-dialog-content">
         <div class="tag-selection">
-          <div class="dialog-tip">选择已有标签或输入新标签</div>
           <el-select
             v-model="selectedTags"
             multiple
@@ -334,7 +340,8 @@
             placeholder="选择或输入标签"
             style="width: 100%"
             :loading="tagsLoading"
-            @blur="handleTagBlur"
+            @blur="handleTagDialogBlur"
+            @change="handleTagDialogChange"
           >
             <el-option
               v-for="tag in availableTags"
@@ -351,8 +358,8 @@
             <el-tag
               v-for="tag in availableTags"
               :key="tag.id"
-              :type="isTagSelected(tag.name) ? 'primary' : 'info'"
               class="tag-item"
+              :style="getTagStyle(tag.name)"
               @click="toggleTag(tag.name)"
             >
               {{ tag.name }}
@@ -420,6 +427,107 @@ const availableTags = ref<TagResponse[]>([])
 const tagsLoading = ref(false)
 const addingTags = ref(false)
 const editingDevice = ref<ServerDetailResponse | null>(null)
+
+// 获取标签样式
+const getTagStyle = (tagName: string) => {
+  const tag = availableTags.value.find(t => t.name === tagName)
+  if (!tag || !tag.color) return {}
+  
+  const hexColor = tag.color.toUpperCase()
+  
+  // 计算文字颜色（根据背景色亮度决定用黑色还是白色文字）
+  const rgb = parseInt(tag.color.replace('#', ''), 16)
+  const r = (rgb >> 16) & 0xff
+  const g = (rgb >> 8) & 0xff
+  const b = (rgb >> 0) & 0xff
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000
+  const textColor = brightness > 128 ? '#000000' : '#ffffff'
+  
+  return {
+    backgroundColor: hexColor,
+    borderColor: hexColor,
+    color: textColor
+  }
+}
+
+// 获取网卡信息统计
+const getNicSummary = (device: ServerDetailResponse) => {
+  if (!device.nics || device.nics.length === 0) return []
+  
+  const typeCount: Record<string, number> = {}
+  
+  device.nics.forEach(nic => {
+    if (nic.type) {
+      // 通过第一个-切割，取左边的部分
+      let displayType = nic.type.split('-')[0].trim()
+      
+      typeCount[displayType] = (typeCount[displayType] || 0) + 1
+    }
+  })
+  
+  return Object.entries(typeCount).map(([type, count]) => ({
+    type,
+    displayType: type,
+    count
+  })).sort((a, b) => b.count - a.count) // 按数量降序排列
+}
+
+const getTagNames = (): string[] => {
+  return availableTags.value.map(tag => tag.name)
+}
+
+// 创建新标签
+const createTag = async (tagName: string) => {
+  try {
+    await tagApi.createTag({ name: tagName })
+    // 创建成功后重新加载标签列表
+    await loadTags()
+    ElMessage.success(`标签 "${tagName}" 创建成功`)
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || `创建标签 "${tagName}" 失败`)
+    throw error // 重新抛出错误，让调用者处理
+  }
+}
+
+// 处理标签对话框变化
+const handleTagDialogChange = async (selectedTags: string[]) => {
+  // 检查是否有新创建的标签（不在 availableTags 中）
+  const tagNames = getTagNames()
+  const newTags = selectedTags.filter(tag => !tagNames.includes(tag))
+  
+  for (const newTag of newTags) {
+    if (newTag.trim()) {
+      try {
+        await createTag(newTag.trim())
+      } catch (error) {
+        // 如果创建失败，从当前选中中移除该标签
+        const index = selectedTags.indexOf(newTag)
+        if (index > -1) {
+          selectedTags.splice(index, 1)
+        }
+      }
+    }
+  }
+}
+
+// 处理标签对话框输入框失去焦点
+const handleTagDialogBlur = (event: FocusEvent) => {
+  const input = event.target as HTMLInputElement
+  const value = input.value?.trim()
+  
+  if (value && !selectedTags.value.includes(value) && !getTagNames().includes(value)) {
+    // 如果有输入值且不是已有标签，创建新标签
+    createTag(value).then(() => {
+      // 创建成功后添加到当前选中
+      if (!selectedTags.value.includes(value)) {
+        selectedTags.value.push(value)
+      }
+      input.value = '' // 清空输入框
+    }).catch(() => {
+      // 创建失败，不清空输入框，让用户重新输入
+    })
+  }
+}
 
 // 时间快捷选项
 const timeShortcuts = [
@@ -651,33 +759,12 @@ const toggleTag = (tagName: string) => {
   }
 }
 
-// 处理标签输入框失去焦点
-const handleTagBlur = async (event: FocusEvent) => {
-  const input = event.target as HTMLInputElement
-  const value = input.value?.trim()
-  
-  if (value && !selectedTags.value.includes(value) && !availableTags.value.some(tag => tag.name === value)) {
-    // 如果有输入值且不是已有标签，创建新标签
-    try {
-      await tagApi.createTag({ name: value })
-      await loadTags() // 重新加载标签列表
-      if (!selectedTags.value.includes(value)) {
-        selectedTags.value.push(value)
-      }
-      input.value = '' // 清空输入框
-      ElMessage.success(`标签 "${value}" 创建成功`)
-    } catch (error: any) {
-      ElMessage.error(error.response?.data?.detail || `创建标签 "${value}" 失败`)
-    }
-  }
-}
-
 // 移除标签
 const handleRemoveTag = async (event: Event, tagName: string, device: ServerDetailResponse) => {
   event.stopPropagation() // 阻止事件冒泡
   
   try {
-    await ElMessageBox.confirm(`确定要从设备 "${device.bmc.hostname}" 中移除标签 "${tagName}" 吗？`, '提示', {
+    await ElMessageBox.confirm(`确定要从服务器 "${device.bmc.hostname}" 中移除标签 "${tagName}" 吗？`, '提示', {
       type: 'warning'
     })
 
@@ -798,8 +885,12 @@ const filteredDevices = computed(() => {
       // 搜索服务器管理IP
       if (device.device.ip.toLowerCase().includes(keyword)) return true
       
-      // 搜索BMC IP
-      if (device.bmc.ip.toLowerCase().includes(keyword)) return true
+      // 搜索网卡信息
+      const nicSummary = getNicSummary(device)
+      if (nicSummary.some(summary => 
+        summary.displayType.toLowerCase().includes(keyword) ||
+        summary.count.toString().includes(keyword)
+      )) return true
       
       // 搜索标签
       if (device.tags && device.tags.some(tag => tag.toLowerCase().includes(keyword))) return true
@@ -1094,6 +1185,34 @@ onMounted(() => {
   padding: 8px 0;
 }
 
+/* 网卡信息样式 */
+.nic-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nic-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.nic-count {
+  font-weight: 600;
+  color: #409eff;
+  min-width: 16px;
+  text-align: center;
+  background: #f0f7ff;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.nic-type {
+  color: #606266;
+}
+
 /* 标签容器样式优化 */
 .tags-container {
   display: flex;
@@ -1105,6 +1224,7 @@ onMounted(() => {
 .tag-item {
   margin: 0 !important;
   flex-shrink: 0;
+  border: none !important;
 }
 
 .add-tag-btn {
@@ -1366,5 +1486,40 @@ onMounted(() => {
 .occupy-item:disabled {
   color: #c0c4cc;
   cursor: not-allowed;
+}
+
+/* 添加标签对话框样式 */
+.tag-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dialog-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.existing-tags {
+  margin-top: 8px;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tag-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none !important;
+}
+
+.tag-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 </style>

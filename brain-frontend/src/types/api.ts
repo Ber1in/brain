@@ -279,6 +279,7 @@ export interface TagsRequest {
 export interface TagResponse {
   id: string
   name: string
+  color: string
 }
 
 export interface TagsResponse {

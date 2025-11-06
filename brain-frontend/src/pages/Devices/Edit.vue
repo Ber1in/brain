@@ -5,9 +5,14 @@
         <div class="card-header">
           <h2>编辑服务器 - {{ deviceData.bmc?.hostname }}</h2>
           <div class="header-actions">
-            <el-button type="success" @click="handleAutoUpdate" :loading="autoUpdateLoading">
+            <el-button 
+              type="warning" 
+              @click="handleAutoUpdate" 
+              :loading="autoUpdateLoading"
+              :disabled="autoUpdateLoading"
+            >
               <el-icon><Refresh /></el-icon>
-              自动更新
+              {{ autoUpdateLoading ? '更新中...' : '更新信息' }}
             </el-button>
             <el-button type="primary" @click="handleSubmit" :loading="loading">
               <el-icon><Check /></el-icon>
@@ -144,7 +149,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Check } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { tagApi } from '@/api/tag'
@@ -359,6 +364,19 @@ const loadDeviceData = async () => {
 // 自动更新 - 只传 auto: true
 const handleAutoUpdate = async () => {
   try {
+    // 显示确认对话框
+    await ElMessageBox.confirm(
+      '确定要自动更新服务器信息吗？这将重新获取服务器的硬件信息和状态。',
+      '确认自动更新',
+      {
+        type: 'warning',
+        confirmButtonText: '确定更新',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'confirm-update-btn',
+        cancelButtonClass: 'cancel-update-btn'
+      }
+    )
+
     autoUpdateLoading.value = true
     ElMessage.info('正在自动更新服务器信息...')
     
@@ -382,7 +400,11 @@ const handleAutoUpdate = async () => {
     form.notes = result.notes || ''
     
     ElMessage.success('自动更新成功')
-  } catch (error) {
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消操作，不显示错误信息
+      return
+    }
     ElMessage.error('自动更新失败')
   } finally {
     autoUpdateLoading.value = false
@@ -510,5 +532,28 @@ onMounted(() => {
 /* 修复密码输入框与其他输入框的对齐 */
 :deep(.el-descriptions__cell) {
   vertical-align: middle;
+}
+
+/* 自动更新按钮样式 */
+:deep(.el-button--warning) {
+  background-color: #e6a23c;
+  border-color: #e6a23c;
+}
+
+:deep(.el-button--warning:hover) {
+  background-color: #e6a23c;
+  border-color: #e6a23c;
+  opacity: 0.8;
+}
+
+:deep(.el-button--warning:focus) {
+  background-color: #e6a23c;
+  border-color: #e6a23c;
+}
+
+:deep(.el-button--warning.is-disabled) {
+  background-color: #fabf78;
+  border-color: #fabf78;
+  opacity: 0.6;
 }
 </style>

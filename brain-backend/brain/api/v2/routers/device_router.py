@@ -80,18 +80,48 @@ async def create_device(data: device_schemas.ServerRequest):
     db.insert(SERVER_COLLECTION, result)
     LOG.info(f"Device created, ID: {result['id']}")
 
+    try:
+        init_command = '''
+# 先删除已有的警告块
+sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
+
+# 添加新的警告块
+cat >> /etc/profile << 'EOF'
+# WARNING_MESSAGE_START
+echo "-----------------------------------------------------------------------------"
+echo "提示：当前服务器无人使用！"
+echo "请先登录: http://10.0.3.206:8089/devices 在[服务器管理]完成'占用服务器'后继续使用"
+echo "-----------------------------------------------------------------------------"
+# WARNING_MESSAGE_END
+EOF
+'''
+        ssh_execute(str(data.device.ip), init_command, data.device.username, data.device.password)
+    except Exception:
+        LOG.warning("Failed to initialize the server usage warning message.")
+
     return result
 
 
 @router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_device(device_id: str):
     LOG.info(f"Deleting device, ID: {device_id}")
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": device_id})
+    except Exception as e:
+        LOG.warning(f"Device not found, {e}")
+        raise HTTPException(status_code=404, detail=f"Device not found, {e}")
 
     deleted = db.delete(SERVER_COLLECTION, {"id": device_id})
     if not deleted:
         LOG.warning(f"Device not found, ID: {device_id}")
     else:
         LOG.info(f"Device deleted, ID: {device_id}")
+
+    try:
+        clean_command = "sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile"
+        ssh_execute(server["device"]["ip"], clean_command, server["device"]["username"], server["device"]["password"])
+    except Exception:
+        LOG.warning("Failed to initialize the server usage warning message.")
 
 
 @router.get("/devices", response_model=list[device_schemas.ServerDetailResponse])
@@ -141,7 +171,6 @@ async def update_device(
         LOG.warning(f"Device not found, ID: {device_id}")
         raise HTTPException(status_code=404, detail="Device not found")
 
-    # --- 自动更新 ---
     if data.auto:
         LOG.info(f"Automatic updating device: {device_id}")
 
@@ -172,7 +201,55 @@ async def update_device(
         if data.time is not None:
             device["time"] = data.time
             device["start"] = datetime.now().timestamp()
-            device["user"] = user if int(data.time) else ''
+            ip = device["device"]["ip"]
+            ssh_user = device["device"].get("username", "")
+            ssh_pass = device["device"].get("password", "")
+            time = int(data.time)
+            if time:
+                device["user"] = user
+
+                # 计算结束时间戳并转换为指定格式
+                end_timestamp = device["start"] + time
+                end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+
+                # 使用更可靠的方法：先删除再添加
+                command = f'''
+# 先删除已有的警告块
+sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
+
+# 添加新的警告块
+cat >> /etc/profile << 'EOF'
+# WARNING_MESSAGE_START
+echo "--------------------------------------------------------------------"
+echo "警告：当前服务器有人正在使用！请勿执行破坏性操作！"
+echo "使用人: {user}"
+echo "占用截止时间: {end_time}"
+echo "请登录: http://10.0.3.206:8089/devices 在[服务器管理]页面查看其余可用服务器"
+echo "--------------------------------------------------------------------"
+# WARNING_MESSAGE_END
+EOF
+'''
+
+                ssh_execute(ip, command, ssh_user, ssh_pass)
+
+            else:
+                device["user"] = ""
+                # 删除警告
+                clean_command = '''
+# 先删除已有的警告块
+sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
+
+# 添加新的警告块
+cat >> /etc/profile << 'EOF'
+# WARNING_MESSAGE_START
+echo "-----------------------------------------------------------------------------"
+echo "提示：当前服务器无人使用！"
+echo "请先登录: http://10.0.3.206:8089/devices 在[服务器管理]完成'占用服务器'后继续使用"
+echo "-----------------------------------------------------------------------------"
+# WARNING_MESSAGE_END
+EOF
+'''
+                ssh_execute(ip, clean_command, ssh_user, ssh_pass)
 
     device["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

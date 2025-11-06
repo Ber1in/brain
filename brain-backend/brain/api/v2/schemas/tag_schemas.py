@@ -11,6 +11,7 @@ class TagsRequest(BaseModel):
 
 class TagResponse(TagsRequest):
     name: str
+    color: str
     id: str
 
 

@@ -5,6 +5,15 @@
         <div class="card-header">
           <h2>服务器详情 - {{ deviceData.bmc?.hostname }}</h2>
           <div class="header-actions">
+            <el-button 
+              type="warning" 
+              @click="handleRefresh" 
+              :loading="refreshing"
+              :disabled="refreshing"
+            >
+              <el-icon><Refresh /></el-icon>
+              {{ refreshing ? '更新中...' : '更新信息' }}
+            </el-button>
             <el-button type="primary" @click="handleEdit">
               <el-icon><Edit /></el-icon>
               编辑服务器
@@ -102,14 +111,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Edit } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Edit, Refresh } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import type { ServerDetailResponse, AIDPU_Nic } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const deviceId = ref<string>('')
+const refreshing = ref(false)
 const deviceData = ref<ServerDetailResponse>({
   bmc: { hostname: '', ip: '' },
   device: { ip: '', username: '' },
@@ -203,6 +213,40 @@ const loadDeviceDetail = async () => {
   }
 }
 
+// 更新服务器信息
+const handleRefresh = async () => {
+  try {
+    refreshing.value = true
+    
+    await ElMessageBox.confirm(
+      '确定要更新服务器信息吗？这将重新获取服务器的硬件信息和状态。',
+      '确认更新',
+      {
+        type: 'warning',
+        confirmButtonText: '确定更新',
+        cancelButtonText: '取消'
+      }
+    )
+
+    // 调用自动更新接口
+    await deviceApi.update(deviceId.value, { auto: true })
+    
+    ElMessage.success('服务器信息更新成功')
+    
+    // 重新加载详情数据
+    await loadDeviceDetail()
+    
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消操作，不显示错误信息
+      return
+    }
+    ElMessage.error(error.response?.data?.detail || '更新服务器信息失败')
+  } finally {
+    refreshing.value = false
+  }
+}
+
 // 编辑服务器
 const handleEdit = () => {
   router.push(`/devices/edit/${deviceId.value}`)
@@ -243,5 +287,22 @@ onMounted(() => {
 
 :deep(.el-descriptions__label) {
   font-weight: 600;
+}
+
+/* 更新按钮加载状态样式 */
+:deep(.el-button--warning) {
+  background-color: #e6a23c;
+  border-color: #e6a23c;
+}
+
+:deep(.el-button--warning:hover) {
+  background-color: #e6a23c;
+  border-color: #e6a23c;
+  opacity: 0.8;
+}
+
+:deep(.el-button--warning:focus) {
+  background-color: #e6a23c;
+  border-color: #e6a23c;
 }
 </style>

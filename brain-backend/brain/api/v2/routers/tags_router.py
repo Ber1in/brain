@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import random
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException
 import logging
@@ -25,7 +26,8 @@ async def create_tags(data: tag_schemas.TagsRequest):
 
     tag_data = {
         "id": str(uuid4()),
-        "name": data.name
+        "name": data.name,
+        "color": "#{:06x}".format(random.randint(0, 0xFFFFFF)),
     }
     db.insert(TAG_COLLERCTION, tag_data)
     LOG.info(f"Tag created: {data.name}, ID: {tag_data['id']}")
