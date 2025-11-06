@@ -44,12 +44,10 @@ async def get_all_tags():
 
 @router.delete("/tag/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tag(tag_id: str):
-    # 查找 tag 是否存在
     exist = db.find(TAG_COLLERCTION, {"id": tag_id})
     if not exist:
         LOG.warning(f"Tag not found: ID={tag_id}")
         raise HTTPException(status_code=404, detail=f"Tag with ID '{tag_id}' not found")
 
-    # 删除 tag
     db.delete(TAG_COLLERCTION, {"id": tag_id})
     LOG.info(f"Tag deleted: ID={tag_id}")

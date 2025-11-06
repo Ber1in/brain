@@ -28,8 +28,8 @@ class DeviceResponse(BaseModel):
 
 class NicBase(BaseModel):
     type: str
-    mac: List[str]
-    bdf: str
+    mac: List[str] = None
+    bdf: str = None
     sn: str
 
 

@@ -2,6 +2,7 @@
 # All rights reserved.
 
 
+from collections import defaultdict
 import logging
 import re
 import subprocess
@@ -17,47 +18,118 @@ BMC_PASS = "ymxl@2022"
 
 def parse_yuncli_vpd(output: str) -> List[Dict[str, str]]:
     """
-    Parse 'yuncli vpd -r' output and extract BDF, Product Name, and SN.
+    Parse yuncli lspci output and return a list of devices.
+    If multiple devices have the same Product Name + Part number + Serial number,
+    only return sn and type; otherwise, include bdf as well.
+    Skip entries that do not have all three: Product Name, Part number, Serial number.
     """
     devices = []
-    current_device = {}
+    current = {}
 
+    # Parse the raw output
     for line in output.splitlines():
         line = line.strip()
-        if not line:
+
+        # Match BDF
+        m = re.match(r"^([0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.\d)\s+Ethernet controller", line)
+        if m:
+            # Only append if current has all required fields
+            if current and all(k in current for k in (
+                    "Product Name", "Part number", "Serial number")):
+                devices.append(current)
+            current = {"bdf": m.group(1)}
             continue
 
-        # BDF line
-        bdf_match = re.match(r"BDF:(\S+):", line)
-        if bdf_match:
-            if current_device:
-                devices.append(current_device)
-                current_device = {}
-            current_device["bdf"] = bdf_match.group(1)
+        # Match Product Name
+        m = re.match(r"Product Name:\s*(.+)", line)
+        if m:
+            current["Product Name"] = m.group(1)
             continue
 
-        # Product Name
-        prod_match = re.match(r"Product Name:\s+(.*)", line)
-        if prod_match:
-            current_device["type"] = prod_match.group(1).strip()
+        # Match Part number
+        m = re.match(r"\[PN\]\s*Part number:\s*(.+)", line)
+        if m:
+            current["Part number"] = m.group(1)
             continue
 
-        # Serial Number
-        sn_match = re.match(r"Serial Number\[SN\]:\s+(.*)", line)
-        if sn_match:
-            current_device["sn"] = sn_match.group(1).strip()
+        # Match Serial number
+        m = re.match(r"\[SN\]\s*Serial number:\s*(.+)", line)
+        if m:
+            current["Serial number"] = m.group(1)
             continue
 
-    # append the last device
-    if current_device:
-        devices.append(current_device)
+    # Append the last device if it has all required fields
+    if current and all(k in current for k in ("Product Name", "Part number", "Serial number")):
+        devices.append(current)
 
-    return devices
+    # Count occurrences of each unique Product+Part+SN combination
+    counter = defaultdict(list)
+    for d in devices:
+        key = (d.get("Product Name"), d.get("Part number"), d.get("Serial number"))
+        counter[key].append(d)
+
+    # Build final output
+    result = []
+    for key, dev_list in counter.items():
+        prod_name, part_num, sn = key
+        if len(dev_list) > 1:
+            # Duplicate, return only sn and type
+            result.append({"sn": sn, "type": prod_name})
+        else:
+            # Unique, return sn, type, bdf
+            result.append({
+                "sn": sn,
+                "type": prod_name,
+                "bdf": dev_list[0].get("bdf")
+            })
+
+    return result
 
 
-def parse_bdf_mac(output: str):
+# def parse_yuncli_vpd(output: str) -> List[Dict[str, str]]:
+#     """
+#     Parse 'yuncli vpd -r' output and extract BDF, Product Name, and SN.
+#     """
+#     devices = []
+#     current_device = {}
+
+#     for line in output.splitlines():
+#         line = line.strip()
+#         if not line:
+#             continue
+
+#         # BDF line
+#         bdf_match = re.match(r"BDF:(\S+):", line)
+#         if bdf_match:
+#             if current_device:
+#                 devices.append(current_device)
+#                 current_device = {}
+#             current_device["bdf"] = bdf_match.group(1)
+#             continue
+
+#         # Product Name
+#         prod_match = re.match(r"Product Name:\s+(.*)", line)
+#         if prod_match:
+#             current_device["type"] = prod_match.group(1).strip()
+#             continue
+
+#         # Serial Number
+#         sn_match = re.match(r"Serial Number\[SN\]:\s+(.*)", line)
+#         if sn_match:
+#             current_device["sn"] = sn_match.group(1).strip()
+#             continue
+
+#     # append the last device
+#     if current_device:
+#         devices.append(current_device)
+
+#     return devices
+
+
+def parse_bdf_mac(output: str) -> Dict[str, List[str]]:
     """
     Parse output of `yuncli mac -r` into a dict {bdf: [mac1, mac2, ...]}
+    Remove leading '0000:' from BDF.
     """
     result = {}
     current_bdf = None
@@ -65,13 +137,15 @@ def parse_bdf_mac(output: str):
         line = line.strip()
         if not line:
             continue
-        # 匹配 BDF 行
         bdf_match = re.match(r'BDF:([0-9a-fA-F:.]+):', line)
         if bdf_match:
-            current_bdf = bdf_match.group(1)
+            raw_bdf = bdf_match.group(1)
+            # Remove leading '0000:' if present
+            if raw_bdf.startswith('0000:'):
+                raw_bdf = raw_bdf[5:]
+            current_bdf = raw_bdf
             result[current_bdf] = []
         else:
-            # 匹配 mac 行
             if current_bdf:
                 parts = line.split()
                 if len(parts) == 2:
@@ -81,28 +155,22 @@ def parse_bdf_mac(output: str):
 
 
 def get_boot_entries(host_ip, user, pwd):
-    # 获取 efibootmgr 输出
     efiboot_output = ssh_execute(host_ip, "efibootmgr -v", user, pwd).splitlines()
-    # 获取 lsblk 输出，包括 PARTUUID、父磁盘名和分区表类型
     lsblk_output = ssh_execute(
         host_ip, "lsblk -rno NAME,PKNAME,PTTYPE,PARTUUID", user, pwd).splitlines()
 
-    # 构建映射：PARTUUID/MbrSignature -> disk
     uuid_to_disk = {}
     for line in lsblk_output:
         parts = line.strip().split()
         if len(parts) == 4:
             name, parent, pttype, partuuid = parts
             partuuid = partuuid.lower() if partuuid != "-" else ""
-            # 处理 GPT 分区
             if pttype == "gpt" and partuuid:
                 uuid_to_disk[partuuid] = parent or name
-            # 处理 MBR 分区（内核伪造的 ID，如 a38f2887-01）
             elif pttype in ("dos", "mbr") and partuuid:
-                # 去掉 -01 等后缀，保存成磁盘签名形式 a38f2887
                 disk_sig = partuuid.split("-")[0]
                 uuid_to_disk[partuuid] = parent or name
-                uuid_to_disk[disk_sig] = parent or name  # 支持按磁盘签名匹配
+                uuid_to_disk[disk_sig] = parent or name
 
     entries = {}
     current_boot = None
@@ -123,7 +191,6 @@ def get_boot_entries(host_ip, user, pwd):
             boot_num = boot_num.strip().replace("Boot", "")
             name = rest.strip().split("\t")[0]
 
-            # 跳过非硬盘启动项
             skip_keywords = ["UEFI: PXE", "EFI Shell",
                              "EFI DVD/CDROM", "EFI Network", "CD-ROM", "DVD", "PXE"]
             if any(keyword in line for keyword in skip_keywords):
@@ -131,7 +198,6 @@ def get_boot_entries(host_ip, user, pwd):
             if "HD(" not in line and "File(\\EFI" not in line:
                 continue
 
-            # 提取 GPT 或 MBR 标识
             partuuid = ""
             gpt_match = re.search(r"GPT,([0-9a-fA-F-]+)", line)
             mbr_match = re.search(r"MBR,(0x[0-9a-fA-F]+)", line)
@@ -139,18 +205,14 @@ def get_boot_entries(host_ip, user, pwd):
             if gpt_match:
                 partuuid = gpt_match.group(1).lower()
             elif mbr_match:
-                # MBR 磁盘签名（例如 0xa38f2887）
                 mbr_sig = mbr_match.group(1).lower().replace("0x", "")
-                # 在映射中查找匹配项
                 for key in uuid_to_disk.keys():
                     if key.startswith(mbr_sig):
                         partuuid = key
                         break
 
-            # 查找对应磁盘名
             disk = uuid_to_disk.get(partuuid, "")
 
-            # 构造显示文本
             entry_text = name
             if disk:
                 entry_text = f"{entry_text} ({disk})"

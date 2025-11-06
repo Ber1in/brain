@@ -24,14 +24,18 @@ SERVER_COLLECTION = "servers"
 def _update_automatic(ip, user, password):
     device_sn = ssh_execute(ip, "dmidecode -s system-serial-number", user, password)
 
-    vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
+    # vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
+    cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} /Vital Product Data/ "
+           "{print; for(i=0;i<5;i++){getline; print}}'")
+    vpd_res = ssh_execute(ip, cmd, user, password)
     nics = tools.parse_yuncli_vpd(vpd_res)
     mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
     macs = tools.parse_bdf_mac(mac_res)
     for nic in nics:
-        nic["mac"] = macs[nic["bdf"]]
+        bdf = nic.get('bdf')
+        if bdf and bdf in macs:
+            nic['mac'] = macs[bdf]
 
-    # 修改这里：使用更健壮的awk命令
     iface_name = ssh_execute(
         ip,
         ("ip route get 10.0.3.248 | head -1 | awk '{for(i=1;i<=NF;i++)"
@@ -95,10 +99,8 @@ async def create_device(data: device_schemas.ServerRequest):
 
     try:
         init_command = '''
-# 先删除已有的警告块
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
-# 添加新的警告块
 cat >> /etc/profile << 'EOF'
 # WARNING_MESSAGE_START
 echo "-----------------------------------------------------------------------------"
@@ -145,9 +147,9 @@ async def get_all_devices():
     for i in devices:
         if i["time"]:
             now = datetime.now().timestamp()
-            start = i.get("start")  # start 是任务开始的时间戳
-            passed = int(now - start)  # 已经过了多少秒
-            remaining = i["time"] - passed  # 剩余时间 = 原定总秒数 - 已经过秒数
+            start = i.get("start")
+            passed = int(now - start)
+            remaining = i["time"] - passed
             i["time"] = max(remaining, 0)
     LOG.info(f"Total devices fetched: {len(devices)}")
     return devices
@@ -221,16 +223,12 @@ async def update_device(
             if time:
                 server["user"] = user
 
-                # 计算结束时间戳并转换为指定格式
                 end_timestamp = server["start"] + time
                 end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
-                # 使用更可靠的方法：先删除再添加
                 command = f'''
-# 先删除已有的警告块
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
-# 添加新的警告块
 cat >> /etc/profile << 'EOF'
 # WARNING_MESSAGE_START
 echo "--------------------------------------------------------------------"
@@ -247,12 +245,9 @@ EOF
 
             else:
                 server["user"] = ""
-                # 删除警告
                 clean_command = '''
-# 先删除已有的警告块
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
-# 添加新的警告块
 cat >> /etc/profile << 'EOF'
 # WARNING_MESSAGE_START
 echo "-----------------------------------------------------------------------------"
