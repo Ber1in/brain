@@ -49,6 +49,10 @@
                     <el-icon><RefreshRight /></el-icon>
                     <span>热重启</span>
                   </el-dropdown-item>
+                  <el-dropdown-item command="batchDelete" divided class="danger-item">
+                    <el-icon><Delete /></el-icon>
+                    <span>批量删除</span>
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -566,6 +570,10 @@
             <el-icon><Warning /></el-icon>
             <span>注意：只能释放当前用户占用的服务器，已自动过滤非当前用户占用的服务器</span>
           </div>
+          <div v-if="batchOperation === 'batchDelete'" class="warning-tip">
+            <el-icon><Warning /></el-icon>
+            <span>注意：删除后服务器将不受云管控制, 请谨慎操作！</span>
+          </div>
         </div>
       </div>
       
@@ -747,7 +755,8 @@ const getBatchConfirmMessage = () => {
   const messages: Record<string, string> = {
     'batchRelease': `确认要释放 ${selectedDevices.value.length} 台服务器吗？`,
     'batchPowerCycle': `确认要对 ${selectedDevices.value.length} 台服务器执行冷重启吗？`,
-    'batchPowerReset': `确认要对 ${selectedDevices.value.length} 台服务器执行热重启吗？`
+    'batchPowerReset': `确认要对 ${selectedDevices.value.length} 台服务器执行热重启吗？`,
+    'batchDelete': `确认要删除 ${selectedDevices.value.length} 台服务器吗？`
   }
   return messages[batchOperation.value] || ''
 }
@@ -757,7 +766,8 @@ const getBatchAlertType = () => {
   const types: Record<string, any> = {
     'batchRelease': 'warning',
     'batchPowerCycle': 'warning',
-    'batchPowerReset': 'warning'
+    'batchPowerReset': 'warning',
+    'batchDelete': 'error'
   }
   return types[batchOperation.value] || 'info'
 }
@@ -767,7 +777,8 @@ const getBatchConfirmButtonType = () => {
   const types: Record<string, any> = {
     'batchRelease': 'warning',
     'batchPowerCycle': 'warning',
-    'batchPowerReset': 'warning'
+    'batchPowerReset': 'warning',
+    'batchDelete': 'danger'
   }
   return types[batchOperation.value] || 'primary'
 }
@@ -777,7 +788,8 @@ const getBatchConfirmButtonText = () => {
   const texts: Record<string, string> = {
     'batchRelease': '确认释放',
     'batchPowerCycle': '确认重启',
-    'batchPowerReset': '确认重启'
+    'batchPowerReset': '确认重启',
+    'batchDelete': '确认删除'
   }
   return texts[batchOperation.value] || '确认'
 }
@@ -826,6 +838,9 @@ const handleBatchConfirm = async () => {
       case 'batchRelease':
         await handleBatchRelease()
         break
+      case 'batchDelete':
+        await handleBatchDelete()
+        break
     }
 
     batchDialogVisible.value = false
@@ -836,6 +851,16 @@ const handleBatchConfirm = async () => {
   } finally {
     batchLoading.value = false
   }
+}
+
+const handleBatchDelete = async () => {
+  const promises = selectedDevices.value.map(device => 
+    deviceApi.delete(device.id!)
+  )
+
+  await Promise.all(promises)
+  ElMessage.success(`成功删除 ${selectedDevices.value.length} 台服务器`)
+  loadData()
 }
 
 // 批量释放
@@ -2387,6 +2412,16 @@ onMounted(() => {
 .danger-item:hover {
   color: #f56c6c;
   background-color: #fef0f0;
+}
+
+/* 确保批量删除按钮使用危险色 */
+:deep(.danger-item:not(.is-disabled)) {
+  color: #f56c6c !important;
+}
+
+:deep(.danger-item:not(.is-disabled):hover) {
+  color: #dd6161 !important;
+  background-color: #fef0f0 !important;
 }
 
 .occupy-item:disabled {
