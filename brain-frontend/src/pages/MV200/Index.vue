@@ -7,7 +7,7 @@
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索ID、名称、SOC IP、裸金属服务器或描述"
+              placeholder="搜索名称、SOC IP、关联服务器或描述"
               clearable
               style="width: 350px; margin-right: 16px;"
               @input="handleSearch"
@@ -17,6 +17,17 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
+            
+            <!-- 批量删除按钮 -->
+            <el-button 
+              type="danger" 
+              @click="handleBatchDelete" 
+              :disabled="selectedServers.length === 0"
+              style="margin-right: 12px;"
+            >
+              批量删除
+            </el-button>
+            
             <el-button type="primary" @click="$router.push('/mv200/create')">
               纳管MV200
             </el-button>
@@ -28,15 +39,26 @@
         :data="filteredServers" 
         v-loading="loading"
         :default-sort="{ prop: 'ip_address', order: 'ascending' }"
+        @selection-change="handleSelectionChange"
       >
-        <el-table-column prop="id" label="ID" width="200" />
+        <!-- 多选列 -->
+        <el-table-column type="selection" width="35" />
+
         <el-table-column 
           prop="name" 
           label="名称"
           sortable
+          width="150"
         >
           <template #default="{ row }">
-            <span class="highlight-name">{{ row.name }}</span>
+            <el-link 
+              type="primary" 
+              @click="handleDetail(row)"
+              class="hostname-link underlined-link"
+              :underline="false"
+            >
+              {{ row.name }}
+            </el-link>
           </template>
         </el-table-column>
         <el-table-column 
@@ -44,14 +66,44 @@
           label="SOC IP"
           sortable
           :sort-method="ipSortMethod"
+          width="150"
         >
           <template #default="{ row }">
             <span class="highlight-ip">{{ row.ip_address }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="裸金属服务器">
+        <el-table-column label="关联服务器">
           <template #default="{ row }">
-            <span class="highlight-name">{{ getBareName(row.bare_id) }}</span>
+            <div v-if="row.associatedServer" class="server-info">
+              <el-link 
+                type="primary" 
+                @click="handleServerDetail(row.associatedServer)"
+                class="hostname-link underlined-link"
+                :underline="false"
+              >
+                {{ row.associatedServer.ip }}
+              </el-link>
+            </div>
+            <span v-else class="empty-text">服务器尚未纳管</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="MCR版本" width="200">
+          <template #default="{ row }">
+            <div class="mcr-version">
+              <template v-if="row.mcrVersionLoading">
+                <el-icon class="loading-icon"><Loading /></el-icon>
+                <span class="status-text">查询中...</span>
+              </template>
+              <template v-else-if="row.mcrVersionError">
+                <el-tooltip effect="dark" content="无法获取MCR版本，设备可能离线" placement="top">
+                  <el-icon class="error-icon"><Warning /></el-icon>
+                </el-tooltip>
+                <span class="status-text">离线</span>
+              </template>
+              <template v-else>
+                <span class="version-text">{{ row.versions?.driver || '未知' }}</span>
+              </template>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="clouddisk_enable" label="支持云盘启动" width="140">
@@ -187,12 +239,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled, MoreFilled, Edit, Delete, Search, Warning, Loading } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { MVServer, BareMetalServer } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { MVServer, ServerDetailResponse } from '@/types/api'
 
+const router = useRouter()
 const loading = ref(false)
 const servers = ref<(MVServer & { 
   switchLoading?: boolean; 
@@ -202,9 +256,18 @@ const servers = ref<(MVServer & {
   recoveryModeError?: boolean;
   recoveryModeSwitching?: boolean;
   recovery_mode?: string | null;
+  mcrVersionLoading?: boolean;
+  mcrVersionError?: boolean;
+  // 新增字段，用于存储关联的服务器信息
+  associatedServer?: {
+    hostname: string;
+    ip: string;
+    deviceId?: string; // 新增设备ID字段
+  }
 })[]>([])
-const bares = ref<BareMetalServer[]>([])
+const allDevices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
+const selectedServers = ref<MVServer[]>([])
 
 // IP地址排序函数 - 正确的数值比较
 const ipSortMethod = (a: MVServer, b: MVServer) => {
@@ -233,43 +296,115 @@ const ipSort = (ipA: string, ipB: string) => {
   return ipToNumber(ipA) - ipToNumber(ipB);
 };
 
+// 新增：根据nic_sn查找关联的服务器
+const findAssociatedServer = (mv200: MVServer, devices: ServerDetailResponse[]) => {
+  if (!mv200.nic_sn) return undefined
+  
+  for (const device of devices) {
+    if (device.nics && device.nics.length > 0) {
+      const matchingNic = device.nics.find(nic => nic.sn === mv200.nic_sn)
+      if (matchingNic) {
+        return {
+          hostname: device.bmc.hostname,
+          ip: device.device.ip,
+          deviceId: device.id // 保存设备ID用于跳转
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+// 处理选择变化
+const handleSelectionChange = (selection: MVServer[]) => {
+  selectedServers.value = selection
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedServers.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedServers.value.length} 台MV200吗？此操作不可恢复！`,
+      '确认批量删除',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    const promises = selectedServers.value.map(server => 
+      mv200Api.delete(server.id)
+    )
+
+    await Promise.all(promises)
+    ElMessage.success(`成功删除 ${selectedServers.value.length} 台MV200`)
+    selectedServers.value = []
+    loadData()
+  } catch (error) {
+    // 用户取消删除
+  }
+}
+
+// MV200详情页面跳转
+const handleDetail = (server: MVServer) => {
+  router.push(`/mv200/detail/${server.id}`)
+}
+
+// 服务器详情页面跳转
+const handleServerDetail = (server: { deviceId?: string }) => {
+  if (server.deviceId) {
+    router.push(`/devices/detail/${server.deviceId}`)
+  } else {
+    ElMessage.warning('无法找到服务器详情')
+  }
+}
+
 // 加载基础列表数据
 const loadData = async () => {
   loading.value = true
   try {
-    const serversResponse = await mv200Api.getAll()
+    const [serversResponse, devicesResponse] = await Promise.all([
+      mv200Api.getAll(),
+      deviceApi.getAll()
+    ])
     
     // 如果没有MV200服务器数据，直接返回
     if (!serversResponse || serversResponse.length === 0) {
       servers.value = []
-      bares.value = []
+      allDevices.value = []
       return
     }
     
-    // 只有当有MV200服务器数据时才加载裸金属服务器数据
-    const baresResponse = await bareApi.getAll()
+    allDevices.value = devicesResponse
     
-    // 初始化服务器数据，默认禁用编辑按钮直到状态查询完成
-    // 按SOC IP排序（正确的数值排序）
-    servers.value = serversResponse
-      .map(server => ({
+    // 为每个MV200服务器查找关联的服务器
+    const serversWithAssociation = serversResponse.map(server => {
+      // 查找关联的服务器
+      const associatedServer = findAssociatedServer(server, devicesResponse)
+      
+      return {
         ...server,
         switchLoading: false,
-        clouddiskStatusLoading: true, // 初始状态为加载中
+        clouddiskStatusLoading: true,
         clouddiskStatusError: false,
-        recoveryModeLoading: true, // 恢复模式初始状态为加载中
+        recoveryModeLoading: true,
         recoveryModeError: false,
-        recoveryModeSwitching: false, // 恢复模式切换状态
-        recovery_mode: null
-      }))
+        recoveryModeSwitching: false,
+        mcrVersionLoading: true,
+        mcrVersionError: false,
+        recovery_mode: null,
+        associatedServer  // 存储关联的服务器信息
+      }
+    })
+    
+    // 按SOC IP排序
+    servers.value = serversWithAssociation
       .sort((a, b) => ipSort(a.ip_address, b.ip_address))
     
-    bares.value = baresResponse
-    
-    // 列表加载完成后，loading 状态结束，用户可以立即看到列表
     loading.value = false
-    
-    // 然后异步加载每个服务器的云盘启动状态和恢复模式
     loadServerDetails()
     
   } catch (error) {
@@ -293,7 +428,10 @@ const loadServerDetails = async () => {
         clouddiskStatusError: false,
         recovery_mode: serverDetail.recovery_mode || 'manual', // 默认为手动模式
         recoveryModeLoading: false,
-        recoveryModeError: false
+        recoveryModeError: false,
+        mcrVersionLoading: false,
+        mcrVersionError: false,
+        versions: serverDetail.versions // 保存版本信息
       }
     } catch (error) {
       console.error(`获取服务器 ${server.name} 的详情失败:`, error)
@@ -304,7 +442,9 @@ const loadServerDetails = async () => {
         clouddiskStatusError: true,
         clouddisk_enable: false,
         recoveryModeLoading: false,
-        recoveryModeError: true
+        recoveryModeError: true,
+        mcrVersionLoading: false,
+        mcrVersionError: true
       }
     }
   })
@@ -315,15 +455,6 @@ const loadServerDetails = async () => {
   })
 }
 
-// 计算属性：创建ID到名称的映射
-const bareMap = computed(() => {
-  const map = new Map<string, BareMetalServer>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare)
-  })
-  return map
-})
-
 // 计算属性：过滤并排序服务器列表
 const filteredServers = computed(() => {
   let filtered = servers.value
@@ -331,18 +462,17 @@ const filteredServers = computed(() => {
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
     filtered = servers.value.filter(server => {
-      // 搜索ID
-      if (server.id.toLowerCase().includes(keyword)) return true
-      
       // 搜索MV200名称
       if (server.name.toLowerCase().includes(keyword)) return true
       
       // 搜索SOC IP
       if (server.ip_address.toLowerCase().includes(keyword)) return true
       
-      // 搜索裸金属服务器信息
-      const bareInfo = getBareName(server.bare_id).toLowerCase()
-      if (bareInfo.includes(keyword)) return true
+      // 搜索关联服务器信息
+      if (server.associatedServer) {
+        if (server.associatedServer.hostname.toLowerCase().includes(keyword)) return true
+        if (server.associatedServer.ip.toLowerCase().includes(keyword)) return true
+      }
       
       // 搜索描述
       if (server.description && server.description.toLowerCase().includes(keyword)) return true
@@ -354,12 +484,6 @@ const filteredServers = computed(() => {
   // 返回过滤后的数据，el-table会处理排序
   return filtered
 })
-
-// 根据ID获取裸金属服务器信息
-const getBareName = (bareId: string) => {
-  const bare = bareMap.value.get(bareId)
-  return bare ? `${bare.name} (${bare.host_ip})` : bareId
-}
 
 // 处理搜索
 const handleSearch = () => {
@@ -379,7 +503,6 @@ const handleSwitchChange = async (value: boolean, server: MVServer & {
       name: server.name,
       ip_address: server.ip_address,
       description: server.description,
-      bare_id: server.bare_id,
       clouddisk_enable: value,
       recovery_mode: server.recovery_mode || 'manual'
     })
@@ -416,7 +539,6 @@ const handleRecoveryModeChange = async (value: string, server: MVServer & {
       name: server.name,
       ip_address: server.ip_address,
       description: server.description,
-      bare_id: server.bare_id,
       clouddisk_enable: server.clouddisk_enable,
       recovery_mode: value
     })
@@ -459,7 +581,7 @@ const handleEdit = (server: MVServer & {
     ElMessage.warning('设备离线，无法编辑')
     return
   }
-  window.location.href = `/mv200/edit/${server.id}`
+  router.push(`/mv200/edit/${server.id}`)
 }
 
 const handleDelete = async (server: MVServer) => {
@@ -493,17 +615,71 @@ onMounted(() => {
   align-items: center;
 }
 
-/* 名称高亮样式 - 只改变字体颜色 */
-.highlight-name {
-  color: #67c23a;
-  font-weight: 600;
+/* 主机名链接样式 */
+.hostname-link {
+  font-weight: 500;
 }
 
-/* IP地址高亮样式 - 只改变字体颜色 */
-.highlight-ip {
-  color: #409eff;
+/* 下划线链接样式 */
+.underlined-link {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.underlined-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* MCR版本样式 */
+.mcr-version {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-text {
+  font-family: 'Monaco', 'Consolas', monospace;
   font-weight: 500;
+}
+
+/* IP地址高亮样式 */
+.highlight-ip {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-weight: 500;
+}
+
+/* 关联服务器信息样式 */
+.server-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.server-info .hostname {
+  font-weight: 600;
+  color: #303133;
+  line-height: 1.4;
+}
+
+/* 确保el-link与普通文本对齐 */
+.server-info :deep(.el-link) {
+  display: inline-block;
+  line-height: 1.4;
+  padding: 0;
+  margin: 0;
+}
+
+.server-info .ip {
+  font-size: 12px;
+  color: #909399;
   font-family: 'Courier New', monospace;
+  line-height: 1.2;
+}
+
+.empty-text {
+  color: #c0c4cc;
+  font-style: italic;
 }
 
 /* 云盘状态样式 */

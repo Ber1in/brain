@@ -51,14 +51,14 @@
                   </el-dropdown-item>
                   <el-dropdown-item command="batchDelete" divided class="danger-item">
                     <el-icon><Delete /></el-icon>
-                    <span>批量删除</span>
+                    <span>删除</span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
             
             <el-button type="primary" @click="$router.push('/devices/create')" style="margin-left: 12px;">
-              录入服务器
+              纳管服务器
             </el-button>
           </div>
         </div>

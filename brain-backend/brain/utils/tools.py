@@ -246,3 +246,35 @@ def ipmi_power_action(bmcip: str, action: str):
     except Exception as e:
         LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
         raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
+
+
+def update_automatic(ip, user, password):
+    device_sn = ssh_execute(ip, "dmidecode -s system-serial-number", user, password)
+
+    # vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
+    cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} /Vital Product Data/ "
+           "{print; for(i=0;i<5;i++){getline; print}}'")
+    vpd_res = ssh_execute(ip, cmd, user, password)
+    nics = parse_yuncli_vpd(vpd_res)
+    mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
+    macs = parse_bdf_mac(mac_res)
+    for nic in nics:
+        bdf = nic.get('bdf')
+        if bdf and bdf in macs:
+            nic['mac'] = macs[bdf]
+
+    iface_name = ssh_execute(
+        ip,
+        ("ip route get 10.0.3.248 | head -1 | awk '{for(i=1;i<=NF;i++)"
+         " if($i==\"dev\") print $(i+1)}'"), 
+        user, password)
+
+    iface_mac = ssh_execute(ip, f"cat /sys/class/net/{iface_name}/address", user, password).strip()
+    gateway = ssh_execute(ip, "ip route | awk '/default/ {print $3}'", user, password).strip()
+
+    device_info = {
+        "sn": device_sn,
+        "mac": iface_mac,
+        "gateway": gateway
+    }
+    return device_info, nics

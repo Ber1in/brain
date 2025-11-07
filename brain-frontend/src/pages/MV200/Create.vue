@@ -24,28 +24,6 @@
           <div class="form-tip">MV200的SOC IP地址</div>
         </el-form-item>
 
-
-        <el-form-item label="裸金属服务器" prop="bare_id">
-          <el-select
-            v-model="form.bare_id"
-            placeholder="确定MV200插在哪台裸金属服务器"
-            style="width: 100%"
-            filterable
-          >
-            <el-option
-              v-for="server in bareServers"
-              :key="server.id"
-              :label="server.name"
-              :value="server.id"
-            >
-              <span>{{ server.name }}</span>
-              <span style="float: right; color: #8492a6; font-size: 13px">
-                {{ server.host_ip }}
-              </span>
-            </el-option>
-          </el-select>
-        </el-form-item>
-
         <el-form-item label="描述">
           <el-input 
             v-model="form.description" 
@@ -70,19 +48,18 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { MVServerCreate, BareMetalServer } from '@/types/api'
+import type { MVServerCreate } from '@/types/api'
 
-const bareServers = ref<BareMetalServer[]>([])
+const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 
 const form = ref<MVServerCreate>({
   name: '',
   ip_address: '',
-  bare_id: '',
   description: ''
 })
 
@@ -116,26 +93,11 @@ const validateIP = (rule: any, value: string, callback: any) => {
 const rules: FormRules = {
   name: [
     { required: true, message: '请输入服务器名称', trigger: 'blur' },
-    { min: 1, max: 50, message: '服务器名称长度应在2-50个字符之间', trigger: 'blur' }
+    { min: 1, max: 50, message: '服务器名称长度应在1-50个字符之间', trigger: 'blur' }
   ],
   ip_address: [
     { required: true, validator: validateIP, trigger: 'blur' }
-  ],
-  bare_id: [
-    { required: true, message: '请选择裸金属服务器', trigger: 'blur' }
-  ],
-}
-
-const loadResources = async () => {
-  try {
-    const [serversResponse] = await Promise.all([
-      bareApi.getAll(),
-    ])
-
-    bareServers.value = serversResponse
-  } catch (error) {
-    ElMessage.error('加载资源失败')
-  }
+  ]
 }
 
 const handleSubmit = async () => {
@@ -147,28 +109,11 @@ const handleSubmit = async () => {
     if (!valid) return
 
     loading.value = true
-    
-    // 检查IP地址是否相同
-    if (form.value.ip_address === form.value.host_ip) {
-      await ElMessageBox.confirm(
-        'SOCIP和裸金属服务器相同，是否继续创建？',
-        'IP地址提示',
-        {
-          type: 'warning',
-          confirmButtonText: '继续创建',
-          cancelButtonText: '重新输入'
-        }
-      )
-    }
 
     await mv200Api.create(form.value)
     ElMessage.success('创建成功')
-    window.location.href = '/mv200'
+    router.push('/mv200')
   } catch (error: any) {
-    if (error === 'cancel') {
-      // 用户取消创建，不做任何操作
-      return
-    }
     ElMessage.error(error.response?.data?.detail || '创建失败')
   } finally {
     loading.value = false
@@ -176,7 +121,19 @@ const handleSubmit = async () => {
 }
 
 onMounted(() => {
-  loadResources()
+  // 不再需要加载任何资源
 })
 </script>
 
+<style scoped>
+.mv200-create {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+</style>

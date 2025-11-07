@@ -202,7 +202,10 @@ class SQLiteDocumentDB:
             "name": "",
             "ip_address": "",
             "description": "",
-            "bare_id": "",
+            "sn": "",
+            "mac": "",
+            "gateway": None,
+            "nic_sn": "",
             "clouddisk_enable": 0,
             "recovery_mode": ""
         },

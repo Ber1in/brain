@@ -3,22 +3,28 @@
 
 from pydantic import BaseModel, Field
 from typing import Optional
+from ipaddress import IPv4Address
 
 
 class MVServerCreate(BaseModel):
     name: str
     ip_address: str
     description: Optional[str] = None
-    bare_id: str = None
 
 
 class MVServerUpdate(BaseModel):
     name: Optional[str] = None
     ip_address: Optional[str] = None
     description: Optional[str] = None
-    bare_id: Optional[str] = None
+    auto: bool = False
     clouddisk_enable: bool
     recovery_mode: Optional[str] = None
+
+
+class MCRVersionInfo(BaseModel):
+    driver: str
+    firmware: str
+    dpuagent: str
 
 
 class MVServer(BaseModel):
@@ -26,7 +32,11 @@ class MVServer(BaseModel):
     name: str
     ip_address: str
     description: Optional[str] = None
-    bare_id: Optional[str] = None
+    mac: str = None
+    sn: str = None
+    gateway: IPv4Address = None
+    nic_sn: str = None
+    versions: MCRVersionInfo = None
     clouddisk_enable: bool = Field(..., 
                                    description=("The host allows the use of system cloud disk"
                                                 " (waiting for dpu ready when the host starts)"))

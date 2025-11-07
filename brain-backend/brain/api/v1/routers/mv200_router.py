@@ -13,6 +13,7 @@ from brain.api.v1.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
 from brain.utils.get_client import get_dpuagentclient
 from brain.utils.ssh_client import ssh_execute
+from brain.utils import tools
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
@@ -20,6 +21,8 @@ db = SQLiteDocumentDB()
 
 # Collection name
 MV_SERVER_COLLECTION = "mv_servers"
+MV200_OS_USER = "root"
+MV200_OS_PASSWORD = "yunsilicon"
 
 
 @router.post("/mv-servers", response_model=mv200_schemas.MVServer,
@@ -48,12 +51,18 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
             detail="Server with this IP address already exists"
         )
 
+    device, nics = tools.update_automatic(
+        str(server_data.ip_address), MV200_OS_USER, MV200_OS_PASSWORD
+    )
+
     # Generate unique ID and create server document
     server_id = str(uuid.uuid4())
     server_dict = {
         "id": server_id,
-        **server_data.dict()
+        **server_data.dict(),
+        "nic_sn": nics[0]["sn"]
     }
+    server_dict.update(device)
 
     LOG.info(f"Creating MV server {server_id} with IP {server_data.ip_address}")
 
@@ -131,7 +140,8 @@ async def get_mv_server(server_id: str):
         )
 
     try:
-        setting_api = dpuagentApi.SettingsApi(get_dpuagentclient(server["ip_address"]))
+        dpuagentclient = get_dpuagentclient(server["ip_address"])
+        setting_api = dpuagentApi.SettingsApi(dpuagentclient)
         res = setting_api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(
             _request_timeout=2)
         if res.code != 0:
@@ -154,6 +164,17 @@ async def get_mv_server(server_id: str):
         #              f"{res.mode}")
         res = ssh_execute(server['ip_address'], "cat /opt/dpuagent/mode", "root", "yunsilicon")
         server["recovery_mode"] = res.strip()
+        versionapi = dpuagentApi.VersionApi(dpuagentclient)
+        res = versionapi.get_version_dpu_agent_v1_version_get()
+        if res.code != 200:
+            LOG.error("Failed to retrieve version information for each service on mv200.")
+        else:
+            versions = {
+                "driver": res.driver,
+                "firmware": res.firmware,
+                "dpuagent": res.dpuagent
+            }
+            server["versions"] = versions
 
     except (urllib3.exceptions.ConnectTimeoutError, urllib3.exceptions.MaxRetryError):
         raise HTTPException(
@@ -207,6 +228,17 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
     # Update server information (excluding ID field)
     update_dict = {k: v for k, v in update_data.dict(
         exclude_unset=True).items() if v is not None}
+
+    if update_dict.pop("auto"):
+        LOG.info(f"Automatic updating mv200: {server_id}")
+
+        device, nics = tools.update_automatic(
+            update_data.ip_address,
+            MV200_OS_USER,
+            MV200_OS_PASSWORD
+        )
+        update_dict.update(device)
+        update_dict["nic_sn"] = nics[0]["sn"]
 
     if update_dict:
         LOG.info(f"Updating MV server {server_id} with fields: {list(update_dict.keys())}")

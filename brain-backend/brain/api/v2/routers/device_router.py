@@ -21,52 +21,29 @@ db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 
 
-def _update_automatic(ip, user, password):
-    device_sn = ssh_execute(ip, "dmidecode -s system-serial-number", user, password)
-
-    # vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
-    cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} /Vital Product Data/ "
-           "{print; for(i=0;i<5;i++){getline; print}}'")
-    vpd_res = ssh_execute(ip, cmd, user, password)
-    nics = tools.parse_yuncli_vpd(vpd_res)
-    mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
-    macs = tools.parse_bdf_mac(mac_res)
-    for nic in nics:
-        bdf = nic.get('bdf')
-        if bdf and bdf in macs:
-            nic['mac'] = macs[bdf]
-
-    iface_name = ssh_execute(
-        ip,
-        ("ip route get 10.0.3.248 | head -1 | awk '{for(i=1;i<=NF;i++)"
-         " if($i==\"dev\") print $(i+1)}'"), 
-        user, password)
-
-    iface_mac = ssh_execute(ip, f"cat /sys/class/net/{iface_name}/address", user, password).strip()
-    gateway = ssh_execute(ip, "ip route | awk '/default/ {print $3}'", user, password).strip()
-
-    device_info = {
-        "sn": device_sn,
-        "mac": iface_mac,
-        "gateway": gateway
-    }
-    return device_info, nics
-
-
 @router.post("/devices", response_model=device_schemas.ServerDetailResponse)
 async def create_device(data: device_schemas.ServerRequest):
-    LOG.info(f"Creating device, IP: {data.device.ip}, BMC hostname: {data.bmc.hostname}")
+    LOG.info(f"Creating server, IP: {data.device.ip}, hostname: {data.bmc.hostname}")
 
     exist = db.find(SERVER_COLLECTION,
                     {"json_extract(device, '$.ip')": str(data.device.ip)})
     if exist:
-        LOG.warning(f"Device already exists, IP: {data.device.ip}")
+        LOG.warning(f"Server already exists, IP: {data.device.ip}")
         raise HTTPException(
             status_code=400,
-            detail=f"Device with IP {data.device.ip} already exists"
+            detail=f"Server with IP {data.device.ip} already exists"
         )
 
-    device, nics = _update_automatic(
+    exist = db.find(SERVER_COLLECTION,
+                    {"json_extract(bmc, '$.hostname')": data.bmc.hostname})
+    if exist:
+        LOG.warning(f"Server already exists, name: {data.bmc.hostname}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Server with name {data.bmc.hostname} already exists"
+        )
+
+    device, nics = tools.update_automatic(
         str(data.device.ip), data.device.username, data.device.password
     )
     LOG.info(f"Auto discovery completed, SN: {device['sn']}, NICs: {len(nics)}")
@@ -95,7 +72,7 @@ async def create_device(data: device_schemas.ServerRequest):
     }
 
     db.insert(SERVER_COLLECTION, result)
-    LOG.info(f"Device created, ID: {result['id']}")
+    LOG.info(f"Server created, ID: {result['id']}")
 
     try:
         init_command = '''
@@ -119,18 +96,18 @@ EOF
 
 @router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_device(device_id: str):
-    LOG.info(f"Deleting device, ID: {device_id}")
+    LOG.info(f"Deleting Server, ID: {device_id}")
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": device_id})
     except Exception as e:
-        LOG.warning(f"Device not found, {e}")
-        raise HTTPException(status_code=404, detail=f"Device not found, {e}")
+        LOG.warning(f"Server not found, {e}")
+        raise HTTPException(status_code=404, detail=f"Server not found, {e}")
 
     deleted = db.delete(SERVER_COLLECTION, {"id": device_id})
     if not deleted:
-        LOG.warning(f"Device not found, ID: {device_id}")
+        LOG.warning(f"Server not found, ID: {device_id}")
     else:
-        LOG.info(f"Device deleted, ID: {device_id}")
+        LOG.info(f"Server deleted, ID: {device_id}")
 
     try:
         clean_command = "sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile"
@@ -190,7 +167,7 @@ async def update_device(
     if data.auto:
         LOG.info(f"Automatic updating device: {device_id}")
 
-        device, nics = _update_automatic(
+        device, nics = tools.update_automatic(
             server["device"]["ip"],
             server["device"].get("username", ""),
             server["device"].get("password", "")
@@ -206,6 +183,14 @@ async def update_device(
 
         if data.bmc and data.bmc.hostname:
             server["bmc"]["hostname"] = data.bmc.hostname
+            exist = db.find(SERVER_COLLECTION,
+                            {"json_extract(bmc, '$.hostname')": data.bmc.hostname})
+            if exist:
+                LOG.warning(f"Server already exists, name: {data.bmc.hostname}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Server with name {data.bmc.hostname} already exists"
+                )
 
         if data.tags is not None:
             server["tags"] = data.tags

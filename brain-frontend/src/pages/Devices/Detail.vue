@@ -99,7 +99,23 @@
         <el-table :data="deviceData.nics">
           <el-table-column prop="type" label="类型" width="120" />
           <el-table-column prop="bdf" label="BDF" width="120" />
-          <el-table-column prop="sn" label="序列号" />
+          <el-table-column prop="sn" label="序列号" width="300"/>
+          <!-- SOC IP列调整到MAC地址前面 -->
+          <el-table-column label="SOC IP" width="200">
+            <template #default="{ row }">
+              <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
+                <el-link 
+                  type="primary" 
+                  @click="handleMv200Detail(getMv200ForNic(row.sn))"
+                  class="underlined-link"
+                  :underline="false"
+                >
+                  {{ getMv200ForNic(row.sn)?.ip_address }}
+                </el-link>
+              </div>
+              <span v-else class="empty-text">-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="MAC地址">
             <template #default="{ row }">
               <div v-if="row.mac && row.mac.length > 0">
@@ -126,7 +142,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Refresh, Loading } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse } from '@/types/api'
+import { mv200Api } from '@/api/mv200'
+import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse, MVServer } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -134,6 +151,7 @@ const deviceId = ref<string>('')
 const refreshing = ref(false)
 const bootEntriesLoading = ref(false)
 const bootEntriesData = ref<BootEntriesResponse | null>(null)
+const allMv200s = ref<MVServer[]>([])
 
 const deviceData = ref<ServerDetailResponse>({
   bmc: { hostname: '', ip: '' },
@@ -179,6 +197,24 @@ const bootEntriesList = computed(() => {
 
   return result
 })
+
+// 根据网卡序列号获取对应的MV200信息
+const getMv200ForNic = (nicSn: string): MVServer | null => {
+  if (!nicSn || !allMv200s.value.length) return null
+  
+  // 查找nic_sn匹配的MV200
+  const matchedMv200 = allMv200s.value.find(mv200 => mv200.nic_sn === nicSn)
+  return matchedMv200 || null
+}
+
+// MV200详情页面跳转
+const handleMv200Detail = (mv200: MVServer | null) => {
+  if (mv200 && mv200.id) {
+    router.push(`/mv200/detail/${mv200.id}`)
+  } else {
+    ElMessage.warning('无法找到MV200详情')
+  }
+}
 
 // 根据剩余秒数计算截止时间
 const getEndTimeFromSeconds = (seconds: number): Date => {
@@ -248,6 +284,16 @@ const formatTime = (timeStr: string) => {
   }
 }
 
+// 加载所有MV200数据
+const loadAllMv200s = async () => {
+  try {
+    const data = await mv200Api.getAll()
+    allMv200s.value = data
+  } catch (error) {
+    console.error('加载MV200列表失败:', error)
+  }
+}
+
 // 加载启动项信息
 const loadBootEntries = async () => {
   try {
@@ -268,8 +314,11 @@ const loadDeviceDetail = async () => {
     const data = await deviceApi.getById(deviceId.value)
     deviceData.value = data
     
-    // 同时加载启动项信息
-    await loadBootEntries()
+    // 同时加载启动项信息和MV200数据
+    await Promise.all([
+      loadBootEntries(),
+      loadAllMv200s()
+    ])
   } catch (error) {
     ElMessage.error('加载服务器详情失败')
     router.push('/devices')
@@ -342,6 +391,33 @@ onMounted(() => {
   font-family: 'Courier New', monospace;
   font-size: 12px;
   margin-bottom: 2px;
+}
+
+/* SOC IP链接样式 */
+.soc-ip-link {
+  display: flex;
+  align-items: center;
+}
+
+.soc-ip-link :deep(.el-link) {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.4;
+  padding: 0;
+  margin: 0;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-weight: 500;
+}
+
+/* 下划线链接样式 */
+.underlined-link {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.underlined-link:hover {
+  text-decoration-thickness: 2px;
 }
 
 .os-item {

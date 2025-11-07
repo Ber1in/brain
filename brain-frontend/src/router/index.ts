@@ -119,6 +119,15 @@ const router = createRouter({
       },
     },
     {
+      path: '/mv200/detail/:id',
+      name: 'MV200Detail',
+      component: () => import('@/pages/MV200/Detail.vue'),
+      meta: {
+        title: 'MV200详情',
+        requiresAuth: true,
+      },
+    },
+    {
       path: '/system-disks/edit/:id',
       name: 'SystemDiskEdit',
       component: () => import('@/pages/SystemDisks/Edit.vue'),

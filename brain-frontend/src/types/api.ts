@@ -36,26 +36,39 @@ export interface ImageUpdate {
   description?: string
 }
 
+export interface MCRVersionInfo {
+  driver: string;
+  firmware: string;
+  dpuagent: string;
+}
+
 export interface MVServer {
   id: string
   name: string
   ip_address: string
   description?: string
-  host_ip?: string
+  sn?: string
+  mac?: string
+  gateway?: string
+  nic_sn?: string
+  versions?: MCRVersionInfo;
+  clouddisk_enable: boolean;
+  recovery_mode?: string
 }
 
 export interface MVServerCreate {
   name: string
   ip_address: string
   description?: string
-  host_ip?: string
 }
 
 export interface MVServerUpdate {
   name?: string
   ip_address?: string
   description?: string
-  host_ip?: string
+  auto: boolean;
+  clouddisk_enable: boolean;
+  recovery_mode?: string
 }
 
 export interface SystemDisk {

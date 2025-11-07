@@ -14,9 +14,8 @@
           <el-input v-model="originalData.ip_address" disabled />
         </el-form-item>
 
-        <el-form-item label="裸金属服务器">
-          <el-input :value="originalData.bare_id" disabled />
-          <div class="readonly-info">裸金属名称: {{ getBareName(originalData.bare_id) }}</div>
+        <el-form-item label="关联服务器">
+          <el-input :value="associatedServerInfo" disabled />
         </el-form-item>
 
         <el-form-item label="支持云盘启动">
@@ -35,7 +34,7 @@
           <el-input :value="originalData.clouddisk_enable ? '是' : '否'" disabled />
         </el-form-item>
 
-        <!-- 新增恢复模式显示 -->
+        <!-- 恢复模式显示 -->
         <el-form-item label="恢复模式">
           <template #label>
             <span>恢复模式</span>
@@ -79,34 +78,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { MVServer, MVServerUpdate, BareMetalServer } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { MVServer, MVServerUpdate, ServerDetailResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const serverId = ref<string>('')
-const bare = ref<BareMetalServer | null>(null)
+const allDevices = ref<ServerDetailResponse[]>([])
+
 const originalData = reactive({
   name: '',
   ip_address: '',
-  bare_id: '',
   description: '',
   clouddisk_enable: false,
-  recovery_mode: '' as string | null
+  recovery_mode: '' as string | null,
+  nic_sn: ''
 })
 
 const form = ref<MVServerUpdate>({
   name: '',
   description: '',
   clouddisk_enable: false,
-  recovery_mode: null
+  recovery_mode: null,
+  auto: false
 })
 
 const rules: FormRules = {
@@ -116,6 +117,21 @@ const rules: FormRules = {
   ]
 }
 
+// 计算关联服务器信息
+const associatedServerInfo = computed(() => {
+  if (!originalData.nic_sn || !allDevices.value.length) return '-'
+  
+  for (const device of allDevices.value) {
+    if (device.nics && device.nics.length > 0) {
+      const matchingNic = device.nics.find(nic => nic.sn === originalData.nic_sn)
+      if (matchingNic) {
+        return `${device.bmc.hostname} (${device.device.ip})`
+      }
+    }
+  }
+  return '-'
+})
+
 // 获取恢复模式显示文本
 const getRecoveryModeText = (mode: string | null | undefined) => {
   if (!mode || mode === 'None') return '未知';
@@ -124,32 +140,39 @@ const getRecoveryModeText = (mode: string | null | undefined) => {
   return mode;
 };
 
+// 加载设备列表用于查找关联服务器
+const loadAllDevices = async () => {
+  try {
+    const data = await deviceApi.getAll()
+    allDevices.value = data
+  } catch (error) {
+    console.error('加载设备列表失败:', error)
+  }
+}
+
 // 加载服务器数据
 const loadServerData = async () => {
   try {
     const server = await mv200Api.getById(serverId.value)
     originalData.name = server.name
     originalData.ip_address = server.ip_address
-    originalData.bare_id = server.bare_id || ''
     originalData.description = server.description || ''
     originalData.clouddisk_enable = server.clouddisk_enable || false
     originalData.recovery_mode = server.recovery_mode || null
+    originalData.nic_sn = server.nic_sn || ''
     
-    bare.value = await bareApi.getById(server.bare_id)
+    // 加载设备列表用于显示关联服务器
+    await loadAllDevices()
 
     form.value.name = server.name
     form.value.description = server.description || ''
     form.value.clouddisk_enable = server.clouddisk_enable || false
     form.value.recovery_mode = server.recovery_mode || null
+    form.value.auto = false
   } catch (error) {
     ElMessage.error('加载服务器数据失败')
     router.push('/mv200')
   }
-}
-
-// 根据ID获取镜像名称
-const getBareName = (bareId: string) => {
-  return bare.value ? `${bare.value.name} (${bare.value.host_ip})` : bareId
 }
 
 const handleSubmit = async () => {
@@ -164,9 +187,9 @@ const handleSubmit = async () => {
       name: form.value.name,
       ip_address: originalData.ip_address,
       description: form.value.description,
-      bare_id: originalData.bare_id,
       clouddisk_enable: originalData.clouddisk_enable,
-      recovery_mode: originalData.recovery_mode
+      recovery_mode: originalData.recovery_mode,
+      auto: false
     })
     ElMessage.success('更新成功')
     router.push('/mv200')
