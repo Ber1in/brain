@@ -212,6 +212,13 @@ def update_automatic(ip, user, password):
     server_sn = ssh_execute(ip, "cat /sys/class/dmi/id/product_serial", user, password)
     server_vendor = ssh_execute(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
     server_product = ssh_execute(ip, "cat /sys/class/dmi/id/product_name", user, password)
+    cpu_infos = ssh_execute(
+        ip,
+        ('lscpu | awk -F":" \'/Architecture:|Vendor ID:|Model name'
+         ':/ {gsub(/^[ \t]+/, "", $2); print $2}\''),
+        user,
+        password
+    ).strip().split("\n")
 
     # vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
     cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} /Vital Product Data/ "
@@ -239,7 +246,10 @@ def update_automatic(ip, user, password):
         "mac": iface_mac,
         "gateway": gateway,
         "vendor": server_vendor,
-        "product": server_product
+        "product": server_product,
+        "arch": cpu_infos[0],
+        "cpu_vendor": cpu_infos[1],
+        "cpu_mode": cpu_infos[2]
     }
     return device_info, nics
 

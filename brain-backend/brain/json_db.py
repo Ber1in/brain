@@ -257,7 +257,10 @@ class SQLiteDocumentDB:
                 "ip": "10.0.3.206",
                 "username": "root",
                 "vendor": "",
-                "product": ""
+                "product": "",
+                "arch": "",
+                "cpu_vendor": "",
+                "cpu_mode": "",
             },
             "nics": [],
             "tags": [],

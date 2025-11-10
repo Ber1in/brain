@@ -229,6 +229,9 @@ export interface DeviceResponse {
   product?: string
   mac?: string
   gateway?: string
+  arch?: string
+  cpu_vendor?: string
+  cpu_mode?: string
 }
 
 export interface NicBase {

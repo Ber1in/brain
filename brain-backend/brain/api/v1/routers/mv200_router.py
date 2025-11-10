@@ -57,7 +57,7 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
 
     # The mv200 does not currently record the manufacturer, serial number, or product,
     # as these are all currently 'Default string'.
-    [device.pop(k, None) for k in ["sn", "vendor", "product"]]
+    [device.pop(k, None) for k in ["sn", "vendor", "product", "arch", "cpu_vendor", "cpu_mode"]]
 
     # Generate unique ID and create server document
     server_id = str(uuid.uuid4())
@@ -244,7 +244,7 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
 
         # The mv200 does not currently record the manufacturer, serial number, or product,
         # as these are all currently 'Default string'.
-        [device.pop(k, None) for k in ["sn", "vendor", "product"]]
+        [device.pop(k, None) for k in ["sn", "vendor", "product", "arch", "cpu_vendor", "cpu_mode"]]
 
         update_dict.update(device)
         update_dict["nic_sn"] = nics[0]["sn"]

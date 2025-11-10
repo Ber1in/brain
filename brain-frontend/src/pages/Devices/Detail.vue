@@ -88,32 +88,50 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <!-- 厂商信息和网卡信息并排布局 -->
+      <!-- 服务器信息、CPU信息、网卡信息并排布局 1:1:3 -->
       <div class="info-row" style="margin-top: 20px;">
-        <!-- 厂商信息卡片 - 1/3宽度 -->
-        <el-card header="厂商信息" class="vendor-card" v-if="hasVendorInfo">
-          <div class="vendor-info-compact">
-            <div class="vendor-info-item">
-              <div class="vendor-label">厂商</div>
-              <div class="vendor-value">{{ deviceData.device?.vendor || '-' }}</div>
+        <!-- 服务器信息卡片 - 1/5宽度 -->
+        <el-card header="服务器信息" class="server-info-card" v-if="hasServerInfo">
+          <div class="compact-info-list">
+            <div class="info-item">
+              <div class="info-label">厂商</div>
+              <div class="info-value">{{ deviceData.device?.vendor || '-' }}</div>
             </div>
-            <div class="vendor-info-item">
-              <div class="vendor-label">型号</div>
-              <div class="vendor-value">{{ deviceData.device?.product || '-' }}</div>
+            <div class="info-item">
+              <div class="info-label">型号</div>
+              <div class="info-value">{{ deviceData.device?.product || '-' }}</div>
             </div>
-            <div class="vendor-info-item">
-              <div class="vendor-label">序列号</div>
-              <div class="vendor-value">{{ deviceData.device?.sn || '-' }}</div>
+            <div class="info-item">
+              <div class="info-label">序列号</div>
+              <div class="info-value">{{ deviceData.device?.sn || '-' }}</div>
             </div>
           </div>
         </el-card>
 
-        <!-- 网卡详细信息 - 2/3宽度 -->
+        <!-- CPU信息卡片 - 1/5宽度 -->
+        <el-card header="CPU信息" class="cpu-info-card" v-if="hasCpuInfo">
+          <div class="compact-info-list">
+            <div class="info-item">
+              <div class="info-label">厂商</div>
+              <div class="info-value">{{ deviceData.device?.cpu_vendor || '-' }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">型号</div>
+              <div class="info-value">{{ deviceData.device?.cpu_mode || '-' }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">架构</div>
+              <div class="info-value">{{ deviceData.device?.arch || '-' }}</div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 网卡详细信息 - 3/5宽度 -->
         <el-card header="网卡信息" class="nic-card" v-if="deviceData.nics && deviceData.nics.length > 0">
           <el-table :data="deviceData.nics" class="compact-table">
-            <el-table-column prop="type" label="类型" width="150" />
-            <el-table-column prop="bdf" label="BDF" width="120" />
-            <el-table-column prop="sn" label="序列号" width="200"/>
+            <el-table-column prop="type" label="类型" width="110" />
+            <el-table-column prop="bdf" label="BDF" width="70" />
+            <el-table-column prop="sn" label="序列号" width="170"/>
             <!-- SOC IP列调整到MAC地址前面 -->
             <el-table-column label="SOC IP" width="150">
               <template #default="{ row }">
@@ -181,9 +199,14 @@ const deviceData = ref<ServerDetailResponse>({
   id: ''
 })
 
-// 计算是否有厂商信息
-const hasVendorInfo = computed(() => {
+// 计算是否有服务器信息
+const hasServerInfo = computed(() => {
   return deviceData.value.device?.vendor || deviceData.value.device?.product || deviceData.value.device?.sn
+})
+
+// 计算是否有CPU信息
+const hasCpuInfo = computed(() => {
+  return deviceData.value.device?.arch || deviceData.value.device?.cpu_vendor || deviceData.value.device?.cpu_mode
 })
 
 // 计算操作系统类型列表
@@ -440,34 +463,40 @@ onMounted(() => {
   text-decoration-thickness: 2px;
 }
 
-/* 并排布局样式 - 1:2比例 */
+/* 并排布局样式 - 1:1:3比例 */
 .info-row {
   display: flex;
   gap: 16px;
   align-items: flex-start;
 }
 
-.vendor-card {
-  flex: 1;
+.server-info-card {
+  flex: 1.5;
   min-width: 0;
-  max-width: calc(33.333% - 8px); /* 1/3宽度 */
+  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+}
+
+.cpu-info-card {
+  flex: 1.5;
+  min-width: 0;
+  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
 }
 
 .nic-card {
-  flex: 2;
+  flex: 3;
   min-width: 0;
-  max-width: calc(66.667% - 8px); /* 2/3宽度 */
+  max-width: calc(50% - 11px); /* 3/6 = 50% */
 }
 
-/* 紧凑型厂商信息样式 */
-.vendor-info-compact {
+/* 紧凑信息列表样式 */
+.compact-info-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 8px 0;
 }
 
-.vendor-info-item {
+.info-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -478,26 +507,27 @@ onMounted(() => {
   transition: all 0.2s ease;
 }
 
-.vendor-info-item:hover {
+.info-item:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
 }
 
-.vendor-label {
+.info-label {
   font-size: 13px;
   color: #64748b;
   font-weight: 500;
-  min-width: 60px;
+  min-width: 50px;
 }
 
-.vendor-value {
+.info-value {
   font-size: 14px;
   color: #1e293b;
   font-weight: 600;
   font-family: 'Monaco', 'Consolas', monospace;
   text-align: right;
   flex: 1;
-  margin-left: 16px;
+  margin-left: 12px;
+  word-break: break-all;
 }
 
 /* 紧凑表格样式 */
@@ -579,7 +609,8 @@ onMounted(() => {
     flex-direction: column;
   }
   
-  .vendor-card,
+  .server-info-card,
+  .cpu-info-card,
   .nic-card {
     max-width: 100%;
     width: 100%;
@@ -598,14 +629,14 @@ onMounted(() => {
     justify-content: flex-end;
   }
   
-  .vendor-info-item {
+  .info-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
     padding: 12px;
   }
   
-  .vendor-value {
+  .info-value {
     margin-left: 0;
     text-align: left;
     width: 100%;

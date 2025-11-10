@@ -26,6 +26,9 @@ class DeviceResponse(BaseModel):
     gateway: IPv4Address = None
     vendor: str = None
     product: str = None
+    arch: str = None
+    cpu_vendor: str = None
+    cpu_mode: str = None
 
 
 class NicBase(BaseModel):
