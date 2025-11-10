@@ -39,14 +39,14 @@
             filterable
           >
             <el-option
-              v-for="server in mv200Servers"
+              v-for="server in sortedMv200Servers"
               :key="server.id"
               :label="`${server.name} (${server.ip_address})`"
               :value="server.id"
             >
               <span>{{ server.name }} ({{ server.ip_address }})</span>
               <span style="float: right; color: #8492a6; font-size: 13px">
-                {{ getHostIP(server.bare_id) }}
+                {{ getHostIP(server.nic_sn) }}
               </span>
             </el-option>
           </el-select>
@@ -116,15 +116,15 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
+import { deviceApi } from '@/api/device'
 import { systemDisksApi } from '@/api/system-disks'
-import type { Image, MVServer, BareMetalCreate } from '@/types/api'
+import type { Image, MVServer, BareMetalCreate, ServerDetailResponse } from '@/types/api'
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const images = ref<Image[]>([])
 const mv200Servers = ref<MVServer[]>([])
-const bares = ref<BareMetalServer[]>([])
+const devices = ref<ServerDetailResponse[]>([])
 
 // 初始化表单，size_gb 先设为 0，选择镜像后会自动更新
 const form = ref<BareMetalCreate>({
@@ -141,20 +141,55 @@ const form = ref<BareMetalCreate>({
   },
 })
 
-const bareMap = computed(() => {
-  const map = new Map<string, string>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare)
+// 按SOC IP升序排列的MV200服务器列表
+const sortedMv200Servers = computed(() => {
+  return [...mv200Servers.value].sort((a, b) => {
+    const ipA = a.ip_address || ''
+    const ipB = b.ip_address || ''
+    
+    // 将IP地址转换为数字进行比较
+    const numA = ipToNumber(ipA)
+    const numB = ipToNumber(ipB)
+    
+    return numA - numB
+  })
+})
+
+// 将IP地址转换为数字以便排序
+const ipToNumber = (ip: string): number => {
+  if (!ip) return 0
+  
+  const parts = ip.split('.')
+  if (parts.length !== 4) return 0
+  
+  return (parseInt(parts[0]) << 24) + 
+         (parseInt(parts[1]) << 16) + 
+         (parseInt(parts[2]) << 8) + 
+         parseInt(parts[3])
+}
+
+// 创建设备映射，通过网卡序列号查找对应的设备
+const deviceMap = computed(() => {
+  const map = new Map<string, ServerDetailResponse>()
+  devices.value.forEach(device => {
+    // 遍历设备的网卡，建立网卡序列号到设备的映射
+    device.nics?.forEach(nic => {
+      if (nic.sn) {
+        map.set(nic.sn, device)
+      }
+    })
   })
   return map
 })
 
-// 根据ID获取裸金属服务器
-const getHostIP = (bare_id: string) => {
-  const bare = bareMap.value.get(bare_id);
-  if (!bare) return '未配置';
-
-  return `${bare.name} (${bare.host_ip})`;
+// 根据网卡序列号获取服务器IP
+const getHostIP = (nicSn: string) => {
+  const device = deviceMap.value.get(nicSn)
+  if (!device) return '未找到对应服务器'
+  
+  const hostname = device.bmc?.hostname || '未知服务器'
+  const ip = device.device?.ip || '未知IP'
+  return `${hostname} (${ip})`
 }
 
 // 计算选中的镜像
@@ -202,17 +237,29 @@ const handleImageChange = (imageId: string) => {
   }
 }
 
+// 加载所有设备
+const loadAllDevices = async () => {
+  try {
+    const allDevices = await deviceApi.getAll()
+    devices.value = allDevices
+  } catch (error) {
+    console.error('加载设备列表失败:', error)
+    ElMessage.error('加载设备列表失败')
+  }
+}
+
 const loadResources = async () => {
   try {
-    const [imagesResponse, serversResponse, baresResponse] = await Promise.all([
+    const [imagesResponse, serversResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
-      bareApi.getAll(),
     ])
 
     images.value = imagesResponse
     mv200Servers.value = serversResponse
-    bares.value = baresResponse
+    
+    // 单独加载设备列表
+    await loadAllDevices()
   } catch (error) {
     ElMessage.error('加载资源失败')
   }

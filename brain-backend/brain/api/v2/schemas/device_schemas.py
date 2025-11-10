@@ -20,10 +20,10 @@ class DeviceRequest(BaseModel):
 
 class DeviceResponse(BaseModel):
     sn: str = None
-    ip: IPv4Address
+    ip: str
     username: str
     mac: str = None
-    gateway: IPv4Address = None
+    gateway: str = None
     vendor: str = None
     product: str = None
     arch: str = None

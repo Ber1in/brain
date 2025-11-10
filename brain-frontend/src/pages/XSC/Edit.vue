@@ -70,15 +70,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { networkApi } from '@/api/network'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { InterfaceInfo, InterfaceUpdate, MVServer, BareMetalServer } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { InterfaceInfo, InterfaceUpdate, MVServer, ServerDetailResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const interfaceId = ref<string>('')
-const bares = ref<BareMetalServer[]>([])
+const devices = ref<ServerDetailResponse[]>([])
 const mv200Servers = ref<MVServer[]>([])
 const originalData = reactive({
   mv200_id: '',
@@ -101,6 +101,26 @@ const rules: FormRules = {
   ]
 }
 
+// 加载所有设备
+const loadAllDevices = async () => {
+  try {
+    const allDevices = await deviceApi.getAll()
+    devices.value = allDevices
+  } catch (error) {
+    console.error('加载设备列表失败:', error)
+  }
+}
+
+// 加载MV200服务器列表
+const loadMv200Servers = async () => {
+  try {
+    const serversResponse = await mv200Api.getAll()
+    mv200Servers.value = serversResponse
+  } catch (error) {
+    console.error('加载MV200列表失败')
+  }
+}
+
 // 加载网口数据
 const loadInterfaceData = async () => {
   try {
@@ -121,31 +141,25 @@ const loadInterfaceData = async () => {
   }
 }
 
-// 加载MV200服务器列表
-const loadMv200Servers = async () => {
-  try {
-    const [serversResponse, baresResponse] = await Promise.all([
-      mv200Api.getAll(),
-      bareApi.getAll(),
-    ])
-    mv200Servers.value = serversResponse
-    bares.value = baresResponse
-  } catch (error) {
-    console.error('加载MV200列表失败')
-  }
-}
-const bareMap = computed(() => {
-  const map = new Map<string, string>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare.host_ip)
+// 创建设备映射，通过网卡序列号查找对应的设备
+const deviceMap = computed(() => {
+  const map = new Map<string, ServerDetailResponse>()
+  devices.value.forEach(device => {
+    // 遍历设备的网卡，建立网卡序列号到设备的映射
+    device.nics?.forEach(nic => {
+      if (nic.sn) {
+        map.set(nic.sn, device)
+      }
+    })
   })
   return map
 })
 
-const mv200Map = computed(() => {
+// 创建MV200映射，通过MV200 ID获取nic_sn
+const mv200NicMap = computed(() => {
   const map = new Map<string, string>()
   mv200Servers.value.forEach(server => {
-    map.set(server.id, server.bare_id)
+    map.set(server.id, server.nic_sn)
   })
   return map
 })
@@ -156,13 +170,19 @@ const getMv200Name = (mv200Id: string) => {
   return server ? `${server.name} (${server.ip_address})` : mv200Id
 }
 
-const getBareID = (mv200_id: string) => {
-  return mv200Map.value.get(mv200_id)
-}
-
-const getHostIP = (mv200_id: string) => {
-  const bare_id = getBareID(mv200_id)
-  return bareMap.value.get(bare_id)
+// 根据MV200 ID获取服务器IP
+const getHostIP = (mv200Id: string) => {
+  // 先通过MV200 ID获取对应的网卡序列号
+  const nicSn = mv200NicMap.value.get(mv200Id)
+  if (!nicSn) return '未找到对应MV200'
+  
+  // 再通过网卡序列号获取对应的设备
+  const device = deviceMap.value.get(nicSn)
+  if (!device) return '未找到对应服务器'
+  
+  const hostname = device.bmc?.hostname || '未知服务器'
+  const ip = device.device?.ip || '未知IP'
+  return `${hostname} (${ip})`
 }
 
 const handleSubmit = async () => {
@@ -173,7 +193,7 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
-    await networkApi.update(form.value)
+    await networkApi.update(interfaceId.value, form.value)
     ElMessage.success('更新成功')
     router.push('/xsc-interface')
   } catch (error) {
@@ -183,7 +203,7 @@ const handleSubmit = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   interfaceId.value = route.params.id as string
   if (!interfaceId.value) {
     ElMessage.error('网口ID不能为空')
@@ -191,8 +211,11 @@ onMounted(() => {
     return
   }
   
-  loadMv200Servers()
-  loadInterfaceData()
+  await Promise.all([
+    loadMv200Servers(),
+    loadAllDevices()
+  ])
+  await loadInterfaceData()
 })
 </script>
 
@@ -202,5 +225,4 @@ onMounted(() => {
   color: #909399;
   margin-top: 4px;
 }
-
 </style>

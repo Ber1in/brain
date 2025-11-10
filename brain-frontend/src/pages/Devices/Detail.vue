@@ -49,7 +49,7 @@
         <el-descriptions-item label="操作系统类型" :span="2">
           <div v-if="bootEntriesLoading" class="loading-text">
             <el-icon class="is-loading"><Loading /></el-icon>
-            加载启动项信息中...
+            查询启动项信息中...
           </div>
           <div v-else-if="bootEntriesList && bootEntriesList.length > 0">
             <div 

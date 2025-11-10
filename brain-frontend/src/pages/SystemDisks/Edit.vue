@@ -57,8 +57,8 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { systemDisksApi } from '@/api/system-disks'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { SystemDisk, SystemDiskUpdate, Image, MVServer, BareMetalServer } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { SystemDisk, SystemDiskUpdate, Image, MVServer, ServerDetailResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,7 +66,7 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const diskId = ref<string>('')
 const images = ref<Image[]>([])
-const bares = ref<BareMetalServer[]>([])
+const devices = ref<ServerDetailResponse[]>([])
 const mv200Servers = ref<MVServer[]>([])
 
 const originalData = reactive({
@@ -98,18 +98,25 @@ const imageMap = computed(() => {
   return map
 })
 
-const mv200Map = computed(() => {
-  const map = new Map<string, string>()
-  mv200Servers.value.forEach(server => {
-    map.set(server.id, server.bare_id)
+// 创建设备映射，通过网卡序列号查找对应的设备
+const deviceMap = computed(() => {
+  const map = new Map<string, ServerDetailResponse>()
+  devices.value.forEach(device => {
+    // 遍历设备的网卡，建立网卡序列号到设备的映射
+    device.nics?.forEach(nic => {
+      if (nic.sn) {
+        map.set(nic.sn, device)
+      }
+    })
   })
   return map
 })
 
-const bareMap = computed(() => {
+// 创建MV200映射，通过MV200 ID获取nic_sn
+const mv200Map = computed(() => {
   const map = new Map<string, string>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare.host_ip)
+  mv200Servers.value.forEach(server => {
+    map.set(server.id, server.nic_sn)
   })
   return map
 })
@@ -119,26 +126,43 @@ const getImageName = (imageId: string) => {
   return imageMap.value.get(imageId) || imageId
 }
 
-const getBareID = (mv200_id: string) => {
-  return mv200Map.value.get(mv200_id)
+// 根据MV200 ID获取服务器IP
+const getHostIP = (mv200Id: string) => {
+  // 先通过MV200 ID获取对应的网卡序列号
+  const nicSn = mv200Map.value.get(mv200Id)
+  if (!nicSn) return '未找到对应MV200'
+  
+  // 再通过网卡序列号获取对应的设备
+  const device = deviceMap.value.get(nicSn)
+  if (!device) return '未找到对应服务器'
+  
+  const hostname = device.bmc?.hostname || '未知服务器'
+  const ip = device.device?.ip || '未知IP'
+  return `${hostname} (${ip})`
 }
 
-const getHostIP = (mv200_id: string) => {
-  const bare_id = getBareID(mv200_id)
-  return bareMap.value.get(bare_id)
+// 加载所有设备
+const loadAllDevices = async () => {
+  try {
+    const allDevices = await deviceApi.getAll()
+    devices.value = allDevices
+  } catch (error) {
+    console.error('加载设备列表失败:', error)
+  }
 }
 
 // 加载资源数据
 const loadResources = async () => {
   try {
-    const [imagesResponse, serversResponse, baresResponse] = await Promise.all([
+    const [imagesResponse, serversResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
-      bareApi.getAll(),
     ])
     images.value = imagesResponse
     mv200Servers.value = serversResponse
-    bares.value = baresResponse
+    
+    // 单独加载设备列表
+    await loadAllDevices()
   } catch (error) {
     console.error('加载资源数据失败:', error)
   }
@@ -193,3 +217,11 @@ onMounted(async () => {
   await loadDiskData()
 })
 </script>
+
+<style scoped>
+.readonly-info {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #606266;
+}
+</style>

@@ -7,7 +7,7 @@
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索ID、SOC、裸金属服务器、IP地址、MTU、VLAN或描述"
+              placeholder="搜索网口名、SOC、裸金属服务器、IP地址、MTU、VLAN或描述"
               clearable
               style="width: 400px; margin-right: 16px;"
               @input="handleSearch"
@@ -29,7 +29,6 @@
         v-loading="loading"
         :default-sort="{ prop: 'mv200_ip', order: 'ascending' }"
       >
-        <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="网口名" width="120">
           <template #default="{ row }">
             <div class="interface-name-cell">
@@ -152,8 +151,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Edit, Delete, Search, Loading } from '@element-plus/icons-vue'
 import { networkApi } from '@/api/network'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { InterfaceInfo, MVServer, BareMetalServer } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { InterfaceInfo, MVServer, ServerDetailResponse } from '@/types/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -163,8 +162,8 @@ const interfaces = ref<(InterfaceInfo & {
   ifnameLoading?: boolean;
 })[]>([])
 const mv200Servers = ref<MVServer[]>([])
+const devices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
-const bares = ref<BareMetalServer[]>([])
 
 // IP地址排序函数 - 正确的数值比较
 const ipSortMethod = (a: InterfaceInfo, b: InterfaceInfo) => {
@@ -223,6 +222,16 @@ const ipSort = (ipA: string, ipB: string) => {
   return ipToNumber(ipA) - ipToNumber(ipB);
 };
 
+// 加载所有设备
+const loadAllDevices = async () => {
+  try {
+    const allDevices = await deviceApi.getAll()
+    devices.value = allDevices
+  } catch (error) {
+    console.error('加载设备列表失败:', error)
+  }
+}
+
 // 加载数据
 const loadData = async () => {
   loading.value = true
@@ -244,12 +253,13 @@ const loadData = async () => {
       ifnameLoading: true // 初始状态为加载中
     }))
 
-    const [mv200Response, baresResponse] = await Promise.all([
+    const [mv200Response] = await Promise.all([
       mv200Api.getAll(),
-      bareApi.getAll(),
     ])
     mv200Servers.value = mv200Response
-    bares.value = baresResponse
+
+    // 单独加载设备列表
+    await loadAllDevices()
 
     // 按SOC IP排序
     interfaces.value = interfaces.value.sort((a, b) => {
@@ -302,10 +312,25 @@ const mv200Map = computed(() => {
   return map
 })
 
-const bareMap = computed(() => {
-  const map = new Map<string, BareMetalServer>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare)
+// 创建设备映射，通过网卡序列号查找对应的设备
+const deviceMap = computed(() => {
+  const map = new Map<string, ServerDetailResponse>()
+  devices.value.forEach(device => {
+    // 遍历设备的网卡，建立网卡序列号到设备的映射
+    device.nics?.forEach(nic => {
+      if (nic.sn) {
+        map.set(nic.sn, device)
+      }
+    })
+  })
+  return map
+})
+
+// 创建MV200映射，通过MV200 ID获取nic_sn
+const mv200NicMap = computed(() => {
+  const map = new Map<string, string>()
+  mv200Servers.value.forEach(server => {
+    map.set(server.id, server.nic_sn)
   })
   return map
 })
@@ -317,8 +342,8 @@ const filteredInterfaces = computed(() => {
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
     filtered = interfaces.value.filter(intf => {
-      // 搜索ID
-      if (intf.id.toLowerCase().includes(keyword)) return true
+      // 搜索网口名
+      if (intf.ifname && intf.ifname.toLowerCase().includes(keyword)) return true
       
       // 搜索IP地址
       if (intf.ip.toLowerCase().includes(keyword)) return true
@@ -363,21 +388,29 @@ const getMv200Ip = (mv200Id: string) => {
 }
 
 // 根据ID获取裸金属服务器名称
-const getHostName = (mv200_id: string) => {
-  const server = mv200Map.value.get(mv200_id)
-  if (!server || !server.bare_id) return '-'
+const getHostName = (mv200Id: string) => {
+  // 先通过MV200 ID获取对应的网卡序列号
+  const nicSn = mv200NicMap.value.get(mv200Id)
+  if (!nicSn) return '未知服务器'
   
-  const bare_info = bareMap.value.get(server.bare_id)
-  return bare_info ? bare_info.name : '-'
+  // 再通过网卡序列号获取对应的设备
+  const device = deviceMap.value.get(nicSn)
+  if (!device) return '未知服务器'
+  
+  return device.bmc?.hostname || '未知服务器'
 }
 
 // 根据ID获取裸金属服务器IP
-const getHostIP = (mv200_id: string) => {
-  const server = mv200Map.value.get(mv200_id)
-  if (!server || !server.bare_id) return '0.0.0.0'
+const getHostIP = (mv200Id: string) => {
+  // 先通过MV200 ID获取对应的网卡序列号
+  const nicSn = mv200NicMap.value.get(mv200Id)
+  if (!nicSn) return '0.0.0.0'
   
-  const bare_info = bareMap.value.get(server.bare_id)
-  return bare_info ? bare_info.host_ip : '0.0.0.0'
+  // 再通过网卡序列号获取对应的设备
+  const device = deviceMap.value.get(nicSn)
+  if (!device) return '0.0.0.0'
+  
+  return device.device?.ip || '0.0.0.0'
 }
 
 // 获取网口名显示
