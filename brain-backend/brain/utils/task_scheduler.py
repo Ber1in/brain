@@ -153,7 +153,7 @@ task_scheduler = GenericTaskScheduler()
 
 
 async def init_warning(ip, user, pwd):
-    clean_command = '''
+    init_command = '''
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
 cat >> /etc/profile << 'EOF'
@@ -165,7 +165,7 @@ echo "--------------------------------------------------------------------------
 # WARNING_MESSAGE_END
 EOF
 '''
-    ssh_execute(ip, clean_command, user, pwd)
+    ssh_execute(ip, init_command, user, pwd)
 
 
 async def occupy_warning(ip, ssh_user, ssh_pass, occupy_user, end_time):
@@ -186,7 +186,7 @@ EOF
     ssh_execute(ip, command, ssh_user, ssh_pass)
 
 
-async def cleanup_server_warning(device_id: str):
+async def init_server_warning(device_id: str):
     """
     Task function for cleaning up warning messages on a server
     """
@@ -201,7 +201,7 @@ async def cleanup_server_warning(device_id: str):
         ssh_user = server["device"].get("username", "")
         ssh_pass = server["device"].get("password", "")
 
-        init_warning(ip, ssh_user, ssh_pass)
+        await init_warning(ip, ssh_user, ssh_pass)
         # Update database state
         server["time"] = 0
         server["user"] = ""
@@ -217,9 +217,6 @@ async def cleanup_server_warning(device_id: str):
 
 
 async def setup_server_occupancy(device_id: str, user: str, duration: int):
-    """
-    设置服务器占用的任务函数
-    """
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": device_id})
         if not server:
@@ -230,13 +227,11 @@ async def setup_server_occupancy(device_id: str, user: str, duration: int):
         ssh_user = server["device"].get("username", "")
         ssh_pass = server["device"].get("password", "")
 
-        # 计算结束时间
         start_time = datetime.now().timestamp()
         end_timestamp = start_time + duration
         end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
-        # 设置警告信息
-        occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
+        await occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
 
         # 更新数据库
         server["time"] = duration
@@ -245,8 +240,8 @@ async def setup_server_occupancy(device_id: str, user: str, duration: int):
         server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-        LOG.info(
-            f"Successfully set up occupancy for device {device_id} by user {user} for {duration} seconds")
+        LOG.info(f"Successfully set up occupancy for device {device_id} "
+                 f"by user {user} for {duration} seconds")
         return True
 
     except Exception as e:

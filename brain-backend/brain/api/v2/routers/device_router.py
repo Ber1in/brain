@@ -11,7 +11,7 @@ from brain.api.v2.schemas import device_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute
 from brain.utils import tools
-from brain.utils.task_scheduler import cleanup_server_warning, task_scheduler, init_warning
+from brain.utils.task_scheduler import init_server_warning, task_scheduler, init_warning, occupy_warning # noqa
 
 
 LOG = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ async def create_device(data: device_schemas.ServerRequest):
     LOG.info(f"Server created, ID: {result['id']}")
 
     try:
-        init_warning(str(data.device.ip), data.device.username, data.device.password)
+        await init_warning(str(data.device.ip), data.device.username, data.device.password)
     except Exception:
         LOG.warning("Failed to initialize the server usage warning message.")
 
@@ -102,6 +102,14 @@ async def delete_device(device_id: str):
         clean_command = "sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile"
         ssh_execute(server["device"]["ip"], clean_command, server["device"]
                     ["username"], server["device"]["password"])
+        task_id = f"device_cleanup_{device_id}"
+        success = await task_scheduler.cancel_task(task_id)
+
+        if success:
+            LOG.info(f"Successfully cancelled auto cleanup for device {device_id}")
+        else:
+            LOG.info(f"No auto cleanup task found for device {device_id}")
+
     except Exception:
         LOG.warning("Failed to initialize the server usage warning message.")
 
@@ -192,28 +200,13 @@ async def update_device(
                 end_timestamp = server["start"] + time
                 end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
-                command = f'''
-sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
-
-cat >> /etc/profile << 'EOF'
-# WARNING_MESSAGE_START
-echo "--------------------------------------------------------------------"
-echo "警告：当前服务器有人正在使用！请勿执行破坏性操作！"
-echo "使用人: {user}"
-echo "占用截止时间: {end_time}"
-echo "请登录: http://10.0.3.248:8089/devices 在[服务器管理]页面查看其余可用服务器"
-echo "--------------------------------------------------------------------"
-# WARNING_MESSAGE_END
-EOF
-'''
-
-                ssh_execute(ip, command, ssh_user, ssh_pass)
+                await occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
 
                 task_id = f"device_cleanup_{device_id}"
                 success = await task_scheduler.schedule_task(
                     task_id=task_id,
                     delay_seconds=time,
-                    task_func=cleanup_server_warning,
+                    task_func=init_server_warning,
                     device_id=device_id
                 )
 
@@ -226,7 +219,7 @@ EOF
             else:
                 server["user"] = ""
 
-                init_warning(ip, ssh_user, ssh_pass)
+                await init_warning(ip, ssh_user, ssh_pass)
 
                 task_id = f"device_cleanup_{device_id}"
                 success = await task_scheduler.cancel_task(task_id)

@@ -14,7 +14,7 @@ from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
 from brain.middleware import RequestIdLogFilter, RequestIdMiddleware
 from brain.json_db import SQLiteDocumentDB
-from brain.utils.task_scheduler import cleanup_server_warning, task_scheduler
+from brain.utils.task_scheduler import init_server_warning, task_scheduler
 
 LOG_FILE = "/var/log/brain/brain.log"
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -97,7 +97,7 @@ async def startup_event():
                 success = await task_scheduler.schedule_task(
                     task_id=task_id,
                     delay_seconds=int(remaining_time),
-                    task_func=cleanup_server_warning,
+                    task_func=init_server_warning,
                     device_id=server["id"]
                 )
 
@@ -111,7 +111,7 @@ async def startup_event():
             else:
                 # If the time has already expired, clean up immediately
                 logger.info(f"Device {server['id']} occupancy expired, cleaning up...")
-                await cleanup_server_warning(server["id"])
+                await init_server_warning(server["id"])
 
     except Exception as e:
         logger.error(f"Error while restoring device timers: {str(e)}")
