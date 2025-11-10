@@ -1145,11 +1145,11 @@ const getNicSummary = (device: ServerDetailResponse) => {
 
 const nicTypeColors = [
   '#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399',
-  '#7239ea', '#ff85c0', '#36cfc9', '#597ef7', '#9254de',
-  '#13c2c2', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1',
+  '#7239ea', '#ff85c0', '#36cfc9', '#597ef7', '#52c41a',
+  '#13c2c2', '#9254de', '#fa8c16', '#eb2f96', '#722ed1',
   '#faad14', '#a0d911', '#1890ff', '#2f54eb', '#fa541c',
-  '#eb2f96', '#52c41a', '#faad14', '#1890ff', '#722ed1',
-  '#13c2c2', '#eb2f96', '#fa8c16', '#2f54eb', '#36cfc9'
+  '#ff4d4f', '#73d13d', '#ff7a45', '#b37feb', '#ffc53d',
+  '#ffec3d', '#40a9ff', '#597ef7', '#ff85c0', '#36cfc9'
 ]
 
 // 获取网卡类型颜色
@@ -1176,6 +1176,7 @@ const getNicItemStyle = (nicType: string) => {
   const brightness = (r * 299 + g * 587 + b * 114) / 1000
   const textColor = brightness > 128 ? '#000000' : '#ffffff'
   
+  console.log("backgroundColor: ",`${color}15`, "borderColor: ",color,"color: ",textColor)
   return {
     backgroundColor: `${color}15`, // 添加透明度
     borderColor: color,
