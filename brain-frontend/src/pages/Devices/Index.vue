@@ -111,7 +111,7 @@
                 v-for="(summary, index) in getNicSummary(row)" 
                 :key="summary.type"
                 class="nic-item"
-                :class="{ 'odd-item': index % 2 === 0, 'even-item': index % 2 === 1 }"
+                :style="getNicItemStyle(summary.type)"
               >
                 <span class="nic-count">{{ summary.count }}</span>
                 <span class="nic-type">{{ summary.displayType }}</span>
@@ -1127,12 +1127,62 @@ const getNicSummary = (device: ServerDetailResponse) => {
     }
   })
   
-  return Object.entries(typeCount).map(([type, count]) => ({
-    type,
-    displayType: type,
-    count
-  })).sort((a, b) => b.count - a.count) // 按数量降序排列
+  return Object.entries(typeCount)
+    .map(([type, count]) => ({
+      type,
+      displayType: type,
+      count
+    }))
+    .sort((a, b) => {
+      // 首先按类型名称字母顺序排序
+      if (a.type !== b.type) {
+        return a.type.localeCompare(b.type)
+      }
+      // 如果类型相同，按数量降序排列
+      return b.count - a.count
+    })
 }
+
+const nicTypeColors = [
+  '#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399',
+  '#7239ea', '#ff85c0', '#36cfc9', '#597ef7', '#9254de',
+  '#13c2c2', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1',
+  '#faad14', '#a0d911', '#1890ff', '#2f54eb', '#fa541c',
+  '#eb2f96', '#52c41a', '#faad14', '#1890ff', '#722ed1',
+  '#13c2c2', '#eb2f96', '#fa8c16', '#2f54eb', '#36cfc9'
+]
+
+// 获取网卡类型颜色
+const getNicTypeColor = (nicType: string) => {
+  // 根据类型名称生成稳定的哈希值
+  let hash = 0
+  for (let i = 0; i < nicType.length; i++) {
+    hash = nicType.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  
+  // 使用绝对值取模确保在数组范围内
+  const index = Math.abs(hash) % nicTypeColors.length
+  return nicTypeColors[index]
+}
+
+const getNicItemStyle = (nicType: string) => {
+  const color = getNicTypeColor(nicType)
+  
+  // 计算文字颜色（根据背景色亮度决定用黑色还是白色文字）
+  const hex = color.replace('#', '')
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000
+  const textColor = brightness > 128 ? '#000000' : '#ffffff'
+  
+  return {
+    backgroundColor: `${color}15`, // 添加透明度
+    borderColor: color,
+    color: textColor
+  }
+}
+
 
 const getTagNames = (): string[] => {
   return availableTags.value.map(tag => tag.name)
