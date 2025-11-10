@@ -14,14 +14,100 @@
               <el-icon><Refresh /></el-icon>
               {{ refreshing ? '更新中...' : '更新信息' }}
             </el-button>
-            <el-button type="primary" @click="handleEdit">
-              <el-icon><Edit /></el-icon>
-              编辑服务器
-            </el-button>
+            <!-- 操作下拉框 -->
+            <el-dropdown @command="(command) => handleCommand(command)" size="small">
+              <el-button type="primary">
+                操作<el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu class="action-dropdown-menu">
+                  <el-dropdown-item command="edit" class="dropdown-item">
+                    <el-icon><Edit /></el-icon>
+                    <span>编辑</span>
+                  </el-dropdown-item>
+                  
+                  <!-- 修改启动项 -->
+                  <el-dropdown-item 
+                    command="bootEntry" 
+                    class="dropdown-item boot-entry-item"
+                  >
+                    <el-icon><Setting /></el-icon>
+                    <span>修改启动项</span>
+                  </el-dropdown-item>
+
+                  <!-- 电源操作 -->
+                  <el-dropdown-item 
+                    command="powerCycle" 
+                    class="dropdown-item power-cycle-item"
+                  >
+                    <el-icon><Refresh /></el-icon>
+                    <span>冷重启</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item 
+                    command="powerReset" 
+                    class="dropdown-item power-reset-item"
+                  >
+                    <el-icon><RefreshRight /></el-icon>
+                    <span>热重启</span>
+                  </el-dropdown-item>
+                  
+                  <!-- 占用服务器按钮 -->
+                  <el-dropdown-item 
+                    command="occupy" 
+                    :disabled="isDeviceOccupied && !isCurrentUserOccupier"
+                    class="occupy-item occupy-server-item dropdown-item"
+                  >
+                    <el-icon><Timer /></el-icon>
+                    <span>
+                      {{ getOccupyButtonText() }}
+                    </span>
+                    <el-tooltip 
+                      v-if="isDeviceOccupied && !isCurrentUserOccupier"
+                      effect="dark" 
+                      content="当前服务器已被占用，请联系占用人"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </el-dropdown-item>
+                  
+                  <!-- 释放占用按钮 -->
+                  <el-dropdown-item 
+                    command="release" 
+                    :disabled="!isDeviceOccupied || !isCurrentUserOccupier"
+                    class="occupy-item end-occupy-item dropdown-item"
+                  >
+                    <el-icon><Unlock /></el-icon>
+                    <span>释放占用</span>
+                    <el-tooltip 
+                      v-if="!isDeviceOccupied"
+                      effect="dark" 
+                      content="服务器未被占用"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                    <el-tooltip 
+                      v-else-if="isDeviceOccupied && !isCurrentUserOccupier"
+                      effect="dark" 
+                      content="当前用户不是占用人，请联系占用人"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="delete" divided class="danger-item dropdown-item">
+                    <el-icon><Delete /></el-icon>
+                    <span>删除</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </div>
       </template>
 
+      <!-- 其余内容保持不变 -->
       <el-descriptions :column="2" border>
         <!-- 基本信息 -->
         <el-descriptions-item label="创建时间">{{ formatTime(deviceData.created_at) }}</el-descriptions-item>
@@ -166,25 +252,315 @@
         </el-card>
       </div>
     </el-card>
+
+    <!-- 占用/修改时间对话框 -->
+    <el-dialog
+      v-model="occupyDialogVisible"
+      :title="occupyDialogTitle"
+      width="480px"
+      class="occupy-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="dialog-header">
+        <div class="device-info">
+          <el-icon class="server-icon"><Monitor /></el-icon>
+          <div class="info-content">
+            <div class="hostname">{{ deviceData.bmc?.hostname }}</div>
+            <div class="ip-address">{{ deviceData.device?.ip }}</div>
+          </div>
+        </div>
+        <div class="user-info">
+          <el-avatar :size="32" style="background-color: #409eff;">
+            {{ currentUser?.charAt(0).toUpperCase() }}
+          </el-avatar>
+          <span class="username">{{ currentUser }}</span>
+        </div>
+      </div>
+
+      <div v-if="isModifyMode && deviceData.time" class="original-time">
+        <el-icon><Clock /></el-icon>
+        <span>原截止时间：</span>
+        <strong>{{ getEndTimeDisplay() }}</strong>
+      </div>
+
+      <el-form :model="occupyForm" class="occupy-form" label-width="auto">
+        <div class="form-section">
+          <div class="section-title">
+            <el-icon><Calendar /></el-icon>
+            <span>{{ isModifyMode ? '设置新的结束时间' : '设置占用结束时间' }}</span>
+          </div>
+          
+          <el-form-item class="compact-item">
+            <template #label>
+              <span class="form-label">结束时间</span>
+              <span class="required">*</span>
+            </template>
+            <el-date-picker
+              v-model="occupyForm.endTime"
+              type="datetime"
+              placeholder="选择占用结束时间"
+              style="width: 100%"
+              :disabled-date="disabledDate"
+              :shortcuts="timeShortcuts"
+              class="enhanced-picker"
+            />
+          </el-form-item>
+
+          <el-form-item class="compact-item">
+            <template #label>
+              <span class="form-label">占用时长</span>
+            </template>
+            <div class="duration-display">
+              <el-tag 
+                :type="getDurationType()" 
+                class="duration-tag"
+                :class="getDurationSize()"
+              >
+                <el-icon><Watch /></el-icon>
+                {{ calculateDuration() }}
+              </el-tag>
+              <div v-if="occupyForm.endTime" class="duration-detail">
+                <span class="end-time">截止: {{ getEndTimeDisplayFromForm() }}</span>
+              </div>
+            </div>
+          </el-form-item>
+        </div>
+      </el-form>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="occupyDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleOccupy" 
+            :loading="occupyLoading"
+            :disabled="!occupyForm.endTime"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            {{ isModifyMode ? '确认修改' : '确认占用' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 修改启动项对话框 -->
+    <el-dialog
+      v-model="bootEntryDialogVisible"
+      title="修改启动项"
+      width="600px"
+      class="boot-entry-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="boot-entries-content" v-loading="bootEntriesLoading">
+        <div class="dialog-header">
+          <div class="device-info">
+            <el-icon class="server-icon"><Monitor /></el-icon>
+            <div class="info-content">
+              <div class="hostname">{{ deviceData.bmc?.hostname }}</div>
+              <div class="ip-address">{{ deviceData.device?.ip }}</div>
+            </div>
+          </div>
+          <div class="user-info">
+            <el-avatar :size="32" style="background-color: #409eff;">
+              {{ currentUser?.charAt(0).toUpperCase() }}
+            </el-avatar>
+            <span class="username">{{ currentUser }}</span>
+          </div>
+        </div>
+        <!-- 启动项选择 -->
+        <div class="boot-selection">
+          <div class="section-title">
+            <el-icon><Setting /></el-icon>
+            <span>选择下次启动项</span>
+          </div>
+
+          <div v-if="bootEntriesList.length > 0" class="boot-entries-list">
+            <div
+              v-for="entry in bootEntriesList"
+              :key="entry.key"
+              class="boot-entry-item"
+              :class="{
+                'current-entry': entry.isCurrent,
+                'selected-entry': selectedBootEntry === entry.key
+              }"
+              @click="selectedBootEntry = entry.key"
+            >
+              <div class="boot-entry-content">
+                <div class="boot-entry-main">
+                  <el-radio 
+                    v-model="selectedBootEntry" 
+                    :label="entry.key"
+                    class="boot-radio"
+                  >
+                    <div class="boot-entry-text">{{ entry.value }}</div>
+                  </el-radio>
+                  <div class="boot-entry-tags">
+                    <el-tag v-if="entry.isCurrent" type="success" size="small">当前</el-tag>
+                    <el-tag v-if="entry.isNext" type="warning" size="small">下次</el-tag>
+                    <el-tag v-if="entry.isDefault" type="info" size="small">默认</el-tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="no-boot-entries">
+            <el-empty description="暂无启动项信息" />
+          </div>
+
+          <!-- 启动选项 -->
+          <div class="boot-options">
+            <el-checkbox v-model="setAsDefaultBoot" class="default-boot-checkbox">
+              设置为默认启动项
+            </el-checkbox>
+            <div class="option-tip">
+              勾选后，此启动项将作为服务器的默认启动项
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="bootEntryDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleSetBootEntry" 
+            :loading="bootEntryLoading"
+            :disabled="!selectedBootEntry"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            确认修改
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 电源重启确认对话框 -->
+    <el-dialog
+      v-model="powerDialogVisible"
+      :title="powerDialogTitle"
+      width="400px"
+      class="power-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="power-dialog-content">
+        <div class="dialog-tip">
+          <el-alert
+            :title="powerType === 'cycle' ? '冷重启将完全断电后重新启动服务器' : '热重启将保持通电状态重新启动服务器'"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
+        </div>
+        <div class="confirm-message">
+          <p>
+            确定要对服务器 <strong>"{{ deviceData.bmc?.hostname }}"</strong> 执行{{ powerType === 'cycle' ? '冷重启' : '热重启' }}吗？
+          </p>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="powerDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handlePowerConfirm" 
+            :loading="powerLoading"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            确认重启
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Refresh, Loading } from '@element-plus/icons-vue'
+import { 
+  Edit, 
+  Refresh, 
+  Loading, 
+  Timer, 
+  Unlock, 
+  InfoFilled,
+  Delete,
+  Setting,
+  RefreshRight,
+  ArrowDown,
+  Monitor,
+  Clock,
+  Calendar,
+  Watch
+} from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { mv200Api } from '@/api/mv200'
 import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse, MVServer } from '@/types/api'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const deviceId = ref<string>('')
 const refreshing = ref(false)
 const bootEntriesLoading = ref(false)
 const bootEntriesData = ref<BootEntriesResponse | null>(null)
 const allMv200s = ref<MVServer[]>([])
+
+// 当前用户信息
+const currentUser = computed(() => authStore.username)
+
+// 占用服务器相关
+const occupyDialogVisible = ref(false)
+const occupyLoading = ref(false)
+const occupyForm = reactive({
+  endTime: null as Date | null
+})
+
+// 启动项管理相关
+const bootEntryDialogVisible = ref(false)
+const bootEntryLoading = ref(false)
+const selectedBootEntry = ref<string>('')
+const setAsDefaultBoot = ref(false)
+
+// 电源操作相关
+const powerDialogVisible = ref(false)
+const powerLoading = ref(false)
+const powerType = ref<'cycle' | 'reset'>('cycle')
 
 const deviceData = ref<ServerDetailResponse>({
   bmc: { hostname: '', ip: '' },
@@ -259,11 +635,77 @@ const handleMv200Detail = (mv200: MVServer | null) => {
   }
 }
 
+// 时间快捷选项
+const timeShortcuts = [
+  {
+    text: '1小时',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 3600 * 1000)
+      return date
+    }
+  },
+  {
+    text: '2小时',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 2 * 3600 * 1000)
+      return date
+    }
+  },
+  {
+    text: '4小时',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 4 * 3600 * 1000)
+      return date
+    }
+  },
+  {
+    text: '8小时',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 8 * 3600 * 1000)
+      return date
+    }
+  },
+  {
+    text: '1天',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 24 * 3600 * 1000)
+      return date
+    }
+  },
+  {
+    text: '3天',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 3 * 24 * 3600 * 1000)
+      return date
+    }
+  },
+  {
+    text: '7天',
+    value: () => {
+      const date = new Date()
+      date.setTime(date.getTime() + 7 * 24 * 3600 * 1000)
+      return date
+    }
+  }
+]
+
 // 根据剩余秒数计算截止时间
 const getEndTimeFromSeconds = (seconds: number): Date => {
   const now = new Date()
   now.setTime(now.getTime() + seconds * 1000)
   return now
+}
+
+// 根据截止时间计算剩余秒数
+const getSecondsFromEndTime = (endTime: Date): number => {
+  const now = new Date()
+  return Math.floor((endTime.getTime() - now.getTime()) / 1000)
 }
 
 // 统一的日期时间格式化函数
@@ -293,6 +735,11 @@ const isDeviceOccupied = computed(() => {
   return false
 })
 
+// 检查当前用户是否是占用人
+const isCurrentUserOccupier = computed(() => {
+  return deviceData.value.user === currentUser.value
+})
+
 // 根据剩余秒数显示截止时间
 const getEndTimeDisplay = () => {
   const device = deviceData.value
@@ -301,6 +748,99 @@ const getEndTimeDisplay = () => {
   const endTime = getEndTimeFromSeconds(device.time)
   return formatDateTime(endTime)
 }
+
+// 获取占用按钮文本
+const getOccupyButtonText = () => {
+  if (isDeviceOccupied.value && isCurrentUserOccupier.value) {
+    return '修改占用'
+  }
+  return '占用服务器'
+}
+
+// 检查是否为修改模式
+const isModifyMode = computed(() => {
+  return isDeviceOccupied.value && isCurrentUserOccupier.value
+})
+
+// 获取对话框标题
+const occupyDialogTitle = computed(() => {
+  return isModifyMode.value ? '修改占用' : '占用服务器'
+})
+
+// 禁用过去的日期
+const disabledDate = (time: Date) => {
+  return time.getTime() < Date.now() - 24 * 60 * 60 * 1000 // 禁用昨天及之前的日期
+}
+
+// 计算占用时长（显示用）
+const calculateDuration = () => {
+  if (!occupyForm.endTime) return '-'
+  
+  const now = new Date()
+  const endTime = new Date(occupyForm.endTime)
+  const durationMs = endTime.getTime() - now.getTime()
+  
+  if (durationMs <= 0) return '结束时间必须晚于当前时间'
+  
+  const seconds = Math.floor(durationMs / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  
+  if (days > 0) {
+    return `${days}天${hours % 24}小时${minutes % 60}分钟`
+  } else if (hours > 0) {
+    return `${hours}小时${minutes % 60}分钟`
+  } else {
+    return `${minutes}分钟`
+  }
+}
+
+// 获取持续秒数
+const getDurationSeconds = () => {
+  if (!occupyForm.endTime) return 0
+  
+  const now = new Date()
+  const endTime = new Date(occupyForm.endTime)
+  const durationMs = endTime.getTime() - now.getTime()
+  
+  return Math.floor(durationMs / 1000)
+}
+
+// 获取时长类型
+const getDurationType = () => {
+  if (!occupyForm.endTime) return 'info'
+  
+  const seconds = getDurationSeconds()
+  const hours = seconds / 3600
+  
+  if (hours <= 1) return 'danger'
+  if (hours <= 4) return 'warning'
+  return 'success'
+}
+
+// 获取时长标签大小
+const getDurationSize = () => {
+  if (!occupyForm.endTime) return ''
+  
+  const durationText = calculateDuration()
+  if (durationText.length > 10) return 'duration-large'
+  return ''
+}
+
+// 获取结束时间显示（表单用）- 统一使用 YYYY/MM/DD HH:mm:ss 格式
+const getEndTimeDisplayFromForm = () => {
+  if (!occupyForm.endTime) return ''
+  
+  const endTime = new Date(occupyForm.endTime)
+  return formatDateTime(endTime)
+}
+
+// 计算电源操作对话框标题
+const powerDialogTitle = computed(() => {
+  const typeText = powerType.value === 'cycle' ? '冷重启' : '热重启'
+  return `${typeText}服务器`
+})
 
 // 检查是否有AIDPU网卡
 const hasAidpuNics = computed(() => {
@@ -402,9 +942,232 @@ const handleRefresh = async () => {
   }
 }
 
-// 编辑服务器
+// 下拉菜单命令处理
+const handleCommand = (command: string) => {
+  switch (command) {
+    case 'edit':
+      handleEdit()
+      break
+    case 'bootEntry':
+      handleBootEntryDialog()
+      break
+    case 'powerCycle':
+      handlePowerOperation('cycle')
+      break
+    case 'powerReset':
+      handlePowerOperation('reset')
+      break
+    case 'occupy':
+      handleOccupyDialog()
+      break
+    case 'release':
+      handleRelease()
+      break
+    case 'delete':
+      handleDelete()
+      break
+  }
+}
+
+// 编辑
 const handleEdit = () => {
   router.push(`/devices/edit/${deviceId.value}`)
+}
+
+// 打开占用服务器对话框
+const handleOccupyDialog = () => {
+  // 设置默认结束时间
+  let defaultEndTime = new Date()
+  defaultEndTime.setTime(defaultEndTime.getTime() + 60 * 60 * 1000) // 默认1小时后
+  
+  // 如果是修改模式，且设备有剩余时间，使用原剩余时间计算新的截止时间
+  if (isModifyMode.value && deviceData.value.time && deviceData.value.time > 0) {
+    defaultEndTime = getEndTimeFromSeconds(deviceData.value.time)
+  }
+  
+  occupyForm.endTime = defaultEndTime
+  occupyDialogVisible.value = true
+}
+
+// 占用/修改时间服务器
+const handleOccupy = async () => {
+  if (!occupyForm.endTime) return
+  
+  try {
+    occupyLoading.value = true
+    
+    // 计算持续秒数
+    const durationSeconds = getDurationSeconds()
+    
+    const updateData = {
+      auto: false,
+      time: durationSeconds, // 传持续秒数
+      // user字段后端会通过token自动获取当前用户
+      device: {
+        ip: deviceData.value.device.ip,
+        username: deviceData.value.device.username,
+        password: '' // 密码不更新
+      },
+      bmc: {
+        hostname: deviceData.value.bmc.hostname,
+        ip: deviceData.value.bmc.ip
+      },
+      tags: deviceData.value.tags || [],
+      notes: deviceData.value.notes || '',
+      os_types: deviceData.value.os_types || []
+    }
+    
+    await deviceApi.update(deviceId.value, updateData)
+    ElMessage.success(`已成功${isModifyMode.value ? '修改占用' : '占用'}服务器 ${deviceData.value.bmc.hostname}`)
+    occupyDialogVisible.value = false
+    loadDeviceDetail() // 重新加载数据
+  } catch (error) {
+    ElMessage.error(`${isModifyMode.value ? '修改占用' : '占用'}服务器失败`)
+  } finally {
+    occupyLoading.value = false
+  }
+}
+
+// 释放占用
+const handleRelease = async () => {
+  if (!isDeviceOccupied.value) {
+    ElMessage.warning('服务器未被占用，无法释放')
+    return
+  }
+  
+  if (!isCurrentUserOccupier.value) {
+    ElMessage.warning('您不是当前占用人，无法释放该服务器')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要释放占用 "${deviceData.value.bmc.hostname}" 吗？`, 
+      '确认结束', 
+      {
+        type: 'warning',
+      }
+    )
+
+    const updateData = {
+      auto: false,
+      time: 0, // 设置为0表示释放占用
+      // user字段后端会自动处理
+      device: {
+        ip: deviceData.value.device.ip,
+        username: deviceData.value.device.username,
+        password: '' // 密码不更新
+      },
+      bmc: {
+        hostname: deviceData.value.bmc.hostname,
+        ip: deviceData.value.bmc.ip
+      },
+      tags: deviceData.value.tags || [],
+      notes: deviceData.value.notes || '',
+      os_types: deviceData.value.os_types || []
+    }
+    
+    await deviceApi.update(deviceId.value, updateData)
+    ElMessage.success('服务器已释放')
+    loadDeviceDetail() // 重新加载数据
+  } catch (error) {
+    // 用户取消释放
+  }
+}
+
+// 处理启动项对话框
+const handleBootEntryDialog = async () => {
+  selectedBootEntry.value = ''
+  setAsDefaultBoot.value = false
+  bootEntryDialogVisible.value = true
+}
+
+// 设置启动项
+const handleSetBootEntry = async () => {
+  if (!selectedBootEntry.value) return
+
+  try {
+    bootEntryLoading.value = true
+    
+    const bootEntryName = bootEntriesData.value?.entries[selectedBootEntry.value]
+    
+    await ElMessageBox.confirm(
+      `确定要设置下次启动项为 "${bootEntryName}" 吗？${
+        setAsDefaultBoot.value ? '同时会设置为默认启动项。' : ''
+      }`,
+      '确认设置启动项',
+      {
+        type: 'warning',
+        confirmButtonText: '确定设置',
+        cancelButtonText: '取消'
+      }
+    )
+
+    // 调用设置启动项接口
+    await deviceApi.setBootEntry(deviceId.value, selectedBootEntry.value, setAsDefaultBoot.value)
+    
+    ElMessage.success('启动项设置成功')
+    bootEntryDialogVisible.value = false
+    
+    // 重置状态
+    selectedBootEntry.value = ''
+    setAsDefaultBoot.value = false
+    
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消操作
+      return
+    }
+    ElMessage.error(error.response?.data?.detail || '设置启动项失败')
+  } finally {
+    bootEntryLoading.value = false
+  }
+}
+
+// 处理电源操作
+const handlePowerOperation = (operation: 'cycle' | 'reset') => {
+  powerType.value = operation
+  powerDialogVisible.value = true
+}
+
+// 确认电源操作
+const handlePowerConfirm = async () => {
+  try {
+    powerLoading.value = true
+
+    if (powerType.value === 'cycle') {
+      await deviceApi.powerCycle(deviceId.value)
+    } else {
+      await deviceApi.powerReset(deviceId.value)
+    }
+    const operationText = powerType.value === 'cycle' ? '冷重启' : '热重启'
+    ElMessage.success(`${operationText}命令已发送`)
+    powerDialogVisible.value = false
+    
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '重启操作失败')
+  } finally {
+    powerLoading.value = false
+  }
+}
+
+// 删除
+const handleDelete = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除设备 "${deviceData.value.bmc.hostname}" 吗？`, 
+      '确认删除', 
+      {
+        type: 'warning',
+      }
+    )
+
+    await deviceApi.delete(deviceId.value)
+    ElMessage.success('删除成功')
+    router.push('/devices')
+  } catch (error) {
+    // 用户取消删除
+  }
 }
 
 onMounted(() => {
@@ -603,6 +1366,96 @@ onMounted(() => {
   border-color: #e6a23c;
 }
 
+/* 操作下拉菜单样式优化 */
+:deep(.action-dropdown-menu) {
+  min-width: 160px;
+}
+
+:deep(.dropdown-item) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+:deep(.dropdown-item .el-dropdown-menu__item) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 8px 12px !important;
+}
+
+:deep(.dropdown-item .el-icon) {
+  margin-right: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+:deep(.dropdown-item span) {
+  flex: 1 !important;
+  text-align: left !important;
+}
+
+/* 启动项按钮样式 */
+:deep(.boot-entry-item:not(.is-disabled)) {
+  color: #7239ea !important;
+}
+
+:deep(.boot-entry-item:not(.is-disabled):hover) {
+  color: #5f2bc3 !important;
+  background-color: #f8f5ff !important;
+}
+
+/* 电源操作按钮样式 */
+:deep(.power-cycle-item:not(.is-disabled)) {
+  color: #e6a23c !important;
+}
+
+:deep(.power-cycle-item:not(.is-disabled):hover) {
+  color: #cf9236 !important;
+  background-color: #fdf6ec !important;
+}
+
+:deep(.power-reset-item:not(.is-disabled)) {
+  color: #f56c6c !important;
+}
+
+:deep(.power-reset-item:not(.is-disabled):hover) {
+  color: #dd6161 !important;
+  background-color: #fef0f0 !important;
+}
+
+/* 占用相关按钮样式优化 */
+:deep(.occupy-item) {
+  font-weight: 600 !important;
+}
+
+:deep(.occupy-server-item:not(.is-disabled)) {
+  color: #409eff !important;
+}
+
+:deep(.occupy-server-item:not(.is-disabled):hover) {
+  color: #337ecc !important;
+  background-color: #f0f7ff !important;
+}
+
+:deep(.end-occupy-item:not(.is-disabled)) {
+  color: #67c23a !important;
+}
+
+:deep(.end-occupy-item:not(.is-disabled):hover) {
+  color: #529b2e !important;
+  background-color: #f0f9eb !important;
+}
+
+:deep(.danger-item:not(.is-disabled)) {
+  color: #f56c6c !important;
+}
+
+:deep(.danger-item:not(.is-disabled):hover) {
+  color: #dd6161 !important;
+  background-color: #fef0f0 !important;
+}
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .info-row {
@@ -646,5 +1499,327 @@ onMounted(() => {
   .compact-table :deep(.el-table__body-wrapper td) {
     padding: 4px 0;
   }
+}
+
+/* 对话框样式 - 从列表页面复制过来的样式 */
+.occupy-dialog,
+.boot-entry-dialog,
+.power-dialog {
+  :deep(.el-dialog__header) {
+    padding: 20px 20px 0;
+    margin-right: 0;
+  }
+  
+  :deep(.el-dialog__body) {
+    padding: 16px 20px;
+  }
+  
+  :deep(.el-dialog__footer) {
+    padding: 0 20px 20px;
+  }
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.device-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.server-icon {
+  font-size: 24px;
+  color: #409eff;
+}
+
+.info-content .hostname {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.info-content .ip-address {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.username {
+  font-weight: 500;
+  color: #374151;
+}
+
+/* 原时间显示 */
+.original-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fffbf0;
+  border: 1px solid #fef3c7;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #92400e;
+}
+
+.original-time .el-icon {
+  color: #d97706;
+}
+
+/* 表单区域 */
+.form-section {
+  background: white;
+  border-radius: 8px;
+  padding: 0;
+}
+
+/* 紧凑表单项 */
+.compact-item {
+  margin-bottom: 20px;
+  
+  :deep(.el-form-item__label) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+    color: #374151;
+    padding-right: 12px;
+  }
+}
+
+.form-label {
+  font-size: 14px;
+}
+
+.required {
+  color: #f56c6c;
+}
+
+.enhanced-picker {
+  :deep(.el-input__wrapper) {
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      border-color: #409eff;
+      box-shadow: 0 0 0 1px #409eff;
+    }
+  }
+  
+  :deep(.el-input__inner) {
+    text-align: center;
+    font-weight: 500;
+  }
+}
+
+/* 时长显示 */
+.duration-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.duration-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  
+  &.duration-large {
+    font-size: 15px;
+    padding: 10px 16px;
+  }
+}
+
+.duration-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.end-time {
+  color: #6b7280;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+}
+
+/* 对话框底部 */
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  width: 100px;
+}
+
+.confirm-btn {
+  width: 120px;
+  font-weight: 600;
+}
+
+/* 启动项相关样式 */
+.boot-entries-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.boot-selection {
+  background: white;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.section-title .el-icon {
+  color: #409eff;
+}
+
+.boot-entries-list {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.boot-entry-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.boot-entry-item:last-child {
+  border-bottom: none;
+}
+
+.boot-entry-item:hover {
+  background-color: #f5f7fa;
+}
+
+.boot-entry-item.current-entry {
+  background-color: #e6f7ff;
+  border-left: 3px solid #1890ff;
+}
+
+.boot-entry-item.selected-entry {
+  background-color: #f0f7ff;
+  border-left: 3px solid #409eff;
+}
+
+.boot-entry-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.boot-entry-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.boot-radio {
+  flex: 1;
+  
+  :deep(.el-radio__label) {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}
+
+.boot-entry-text {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.boot-entry-tags {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.boot-options {
+  padding: 12px 0;
+}
+
+.default-boot-checkbox {
+  margin-bottom: 4px;
+}
+
+.option-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 24px;
+}
+
+.no-boot-entries {
+  padding: 40px 0;
+}
+
+/* 电源重启对话框样式 */
+.power-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dialog-tip {
+  margin-bottom: 8px;
+}
+
+.confirm-message {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.confirm-message p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirm-message strong {
+  color: #409eff;
 }
 </style>

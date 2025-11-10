@@ -188,7 +188,7 @@ EOF
 
 async def init_server_warning(device_id: str):
     """
-    Task function for cleaning up warning messages on a server
+    Task function for initing up warning messages on a server
     """
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": device_id})
@@ -212,7 +212,7 @@ async def init_server_warning(device_id: str):
         LOG.info(f"Automatically cleaned up warning messages for device: {device_id}")
 
     except Exception as e:
-        LOG.error(f"Error in cleanup_server_warning for {device_id}: {str(e)}")
+        LOG.error(f"Error in init_server_warning for {device_id}: {str(e)}")
         raise
 
 

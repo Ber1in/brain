@@ -7,9 +7,9 @@
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索服务器名称、IP、标签、占用人"
+              placeholder="搜索服务器名称、IP、网卡信息、标签、备注、占用人"
               clearable
-              style="width: 350px; margin-right: 16px;"
+              style="width: 400px; margin-right: 16px;"
               @input="handleSearch"
               @clear="handleSearch"
             >
