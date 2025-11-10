@@ -223,8 +223,12 @@ export interface DeviceRequest {
 
 export interface DeviceResponse {
   sn?: string
-  ip: string  // 或者使用 IPv4Address 如果已定义
+  ip: string
   username: string
+  vendor?: string
+  product?: string
+  mac?: string
+  gateway?: string
 }
 
 export interface NicBase {

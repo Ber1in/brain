@@ -26,7 +26,7 @@
         <!-- 基本信息 -->
         <el-descriptions-item label="创建时间">{{ formatTime(deviceData.created_at) }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ formatTime(deviceData.updated_at) }}</el-descriptions-item>
-        <el-descriptions-item label="占用信息" :span="2">
+        <el-descriptions-item label="占用信息">
           <div v-if="isDeviceOccupied">
             <el-tag type="success" style="margin-right: 8px;">{{ deviceData.user }}</el-tag>
             <span>占用至 {{ getEndTimeDisplay() }}</span>
@@ -40,16 +40,10 @@
 
         <!-- 服务器信息 -->
         <el-descriptions-item label="服务器IP">{{ deviceData.device?.ip || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="服务器序列号">{{ deviceData.device?.sn || '-' }}</el-descriptions-item>
         
         <!-- 新增的管理口信息 -->
         <el-descriptions-item label="管理口MAC地址">{{ deviceData.device?.mac || '-' }}</el-descriptions-item>
         <el-descriptions-item label="管理网网关">{{ deviceData.device?.gateway || '-' }}</el-descriptions-item>
-
-        <!-- 网卡信息 -->
-        <el-descriptions-item label="网卡数量" :span="2">
-          {{ deviceData.nics?.length || 0 }} 个
-        </el-descriptions-item>
 
         <!-- 操作系统类型 - 修改后的展示方式 -->
         <el-descriptions-item label="操作系统类型" :span="2">
@@ -94,44 +88,65 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <!-- 网卡详细信息 -->
-      <el-card header="网卡信息" style="margin-top: 20px;" v-if="deviceData.nics && deviceData.nics.length > 0">
-        <el-table :data="deviceData.nics">
-          <el-table-column prop="type" label="类型" width="120" />
-          <el-table-column prop="bdf" label="BDF" width="120" />
-          <el-table-column prop="sn" label="序列号" width="300"/>
-          <!-- SOC IP列调整到MAC地址前面 -->
-          <el-table-column label="SOC IP" width="200">
-            <template #default="{ row }">
-              <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
-                <el-link 
-                  type="primary" 
-                  @click="handleMv200Detail(getMv200ForNic(row.sn))"
-                  class="underlined-link"
-                  :underline="false"
-                >
-                  {{ getMv200ForNic(row.sn)?.ip_address }}
-                </el-link>
-              </div>
-              <span v-else class="empty-text">-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="MAC地址">
-            <template #default="{ row }">
-              <div v-if="row.mac && row.mac.length > 0">
-                <div v-for="mac in row.mac" :key="mac" class="mac-address">
-                  {{ mac }}
+      <!-- 厂商信息和网卡信息并排布局 -->
+      <div class="info-row" style="margin-top: 20px;">
+        <!-- 厂商信息卡片 - 1/3宽度 -->
+        <el-card header="厂商信息" class="vendor-card" v-if="hasVendorInfo">
+          <div class="vendor-info-compact">
+            <div class="vendor-info-item">
+              <div class="vendor-label">厂商</div>
+              <div class="vendor-value">{{ deviceData.device?.vendor || '-' }}</div>
+            </div>
+            <div class="vendor-info-item">
+              <div class="vendor-label">型号</div>
+              <div class="vendor-value">{{ deviceData.device?.product || '-' }}</div>
+            </div>
+            <div class="vendor-info-item">
+              <div class="vendor-label">序列号</div>
+              <div class="vendor-value">{{ deviceData.device?.sn || '-' }}</div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 网卡详细信息 - 2/3宽度 -->
+        <el-card header="网卡信息" class="nic-card" v-if="deviceData.nics && deviceData.nics.length > 0">
+          <el-table :data="deviceData.nics" class="compact-table">
+            <el-table-column prop="type" label="类型" width="150" />
+            <el-table-column prop="bdf" label="BDF" width="120" />
+            <el-table-column prop="sn" label="序列号" width="200"/>
+            <!-- SOC IP列调整到MAC地址前面 -->
+            <el-table-column label="SOC IP" width="150">
+              <template #default="{ row }">
+                <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
+                  <el-link 
+                    type="primary" 
+                    @click="handleMv200Detail(getMv200ForNic(row.sn))"
+                    class="underlined-link"
+                    :underline="false"
+                  >
+                    {{ getMv200ForNic(row.sn)?.ip_address }}
+                  </el-link>
                 </div>
-              </div>
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column v-if="hasAidpuNics" prop="soc_ip" label="SoC IP" />
-          <el-table-column v-if="hasAidpuNics" prop="aidpu_sn" label="AIDPU SN" />
-          <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" />
-          <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" />
-        </el-table>
-      </el-card>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="MAC地址">
+              <template #default="{ row }">
+                <div v-if="row.mac && row.mac.length > 0">
+                  <div v-for="mac in row.mac" :key="mac" class="mac-address">
+                    {{ mac }}
+                  </div>
+                </div>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="hasAidpuNics" prop="soc_ip" label="SoC IP" width="100" />
+            <el-table-column v-if="hasAidpuNics" prop="aidpu_sn" label="AIDPU SN" width="120" />
+            <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" width="100" />
+            <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" width="100" />
+          </el-table>
+        </el-card>
+      </div>
     </el-card>
   </div>
 </template>
@@ -164,6 +179,11 @@ const deviceData = ref<ServerDetailResponse>({
   created_at: '',
   updated_at: '',
   id: ''
+})
+
+// 计算是否有厂商信息
+const hasVendorInfo = computed(() => {
+  return deviceData.value.device?.vendor || deviceData.value.device?.product || deviceData.value.device?.sn
 })
 
 // 计算操作系统类型列表
@@ -420,6 +440,87 @@ onMounted(() => {
   text-decoration-thickness: 2px;
 }
 
+/* 并排布局样式 - 1:2比例 */
+.info-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.vendor-card {
+  flex: 1;
+  min-width: 0;
+  max-width: calc(33.333% - 8px); /* 1/3宽度 */
+}
+
+.nic-card {
+  flex: 2;
+  min-width: 0;
+  max-width: calc(66.667% - 8px); /* 2/3宽度 */
+}
+
+/* 紧凑型厂商信息样式 */
+.vendor-info-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.vendor-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.vendor-info-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.vendor-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.vendor-value {
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 600;
+  font-family: 'Monaco', 'Consolas', monospace;
+  text-align: right;
+  flex: 1;
+  margin-left: 16px;
+}
+
+/* 紧凑表格样式 */
+.compact-table :deep(.el-table__header-wrapper th) {
+  padding: 6px 0;
+  font-size: 12px;
+  background-color: #f8fafc;
+}
+
+.compact-table :deep(.el-table__body-wrapper td) {
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.compact-table :deep(.el-table .cell) {
+  padding: 0 6px;
+  line-height: 1.3;
+}
+
+.compact-table :deep(.el-table) {
+  font-size: 12px;
+}
+
 .os-item {
   padding: 4px 8px;
   margin-bottom: 4px;
@@ -470,5 +571,49 @@ onMounted(() => {
 :deep(.el-button--warning:focus) {
   background-color: #e6a23c;
   border-color: #e6a23c;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .info-row {
+    flex-direction: column;
+  }
+  
+  .vendor-card,
+  .nic-card {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .vendor-info-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px;
+  }
+  
+  .vendor-value {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+  
+  .compact-table :deep(.el-table__header-wrapper th),
+  .compact-table :deep(.el-table__body-wrapper td) {
+    padding: 4px 0;
+  }
 }
 </style>

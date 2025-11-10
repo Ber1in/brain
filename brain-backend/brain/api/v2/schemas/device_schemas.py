@@ -24,6 +24,8 @@ class DeviceResponse(BaseModel):
     username: str
     mac: str = None
     gateway: IPv4Address = None
+    vendor: str = None
+    product: str = None
 
 
 class NicBase(BaseModel):

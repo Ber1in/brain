@@ -25,7 +25,7 @@ db = SQLiteDocumentDB()
 SYSTEM_DISK_COLLECTION = "system_disks"
 IMAGE_COLLECTION = "images"
 MV_SERVER_COLLECTION = "mv_servers"
-BARE_METAL_SERVER_COLLECTION = "bare_metals"
+SERVER_COLLECTION = "servers"
 
 # Constants
 RBD_POOL = "compute"
@@ -39,8 +39,9 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
              f"on MV200 server {disk_data.mv200_id}, creator: {creator}")
 
     # Check if image exists
-    image = db.find_one(IMAGE_COLLECTION, {"id": disk_data.image_id})
-    if not image:
+    try:
+        image = db.find_one(IMAGE_COLLECTION, {"id": disk_data.image_id})
+    except Exception:
         LOG.warning(f"Image '{disk_data.image_id}' not found when creating system disk")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -56,21 +57,31 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
             detail=f"MV200 server '{disk_data.mv200_id}' not found"
         )
 
-    baremetal = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": mv_server.get("bare_id")})
-    if not baremetal:
-        LOG.warning(f"Bare Metal server {mv_server.get('bare_id')} not"
-                    f" found for MV200 {disk_data.mv200_id}")
+    target_server = None
+
+    servers = db.find(SERVER_COLLECTION)
+    for server in servers:
+        for nic in server.get("nics", []):
+            if nic.get("sn") == mv_server["nic_sn"]:
+                target_server = server
+                break
+        if target_server:
+            break
+
+    if not target_server:
+        LOG.warning(
+            f"Bare Metal server not found for MV200 {disk_data.mv200_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Bare Metal server {mv_server.get('bare_id')} not found"
+            detail=f"Bare Metal server not found for MV200 {disk_data.mv200_id}"
         )
 
     # Generate unique ID and RBD path
     mon_host = image.get("mon_host")
     soc_ip = mv_server.get("ip_address")
-    host_ip = baremetal.get("host_ip")
-    gateway = baremetal.get("gateway")
-    mac = baremetal.get("mac")
+    host_ip = target_server["device"]["ip"]
+    gateway = target_server["device"]["gateway"]
+    mac = target_server["device"]["mac"]
     disk_id = str(uuid.uuid4())
     rbd_path = f"{RBD_POOL}/{disk_id}"
 
@@ -94,6 +105,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         "mv200_id": disk_data.mv200_id,
         "mv200_ip": soc_ip,
         "mon_host": mon_host,
+        "bare_id": target_server["id"],
         "size_gb": disk_data.size_gb,
         "flatten": disk_data.flatten,
         "description": disk_data.description,
@@ -169,9 +181,9 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         system_user = data.system_user
         user_data = {"users": [{"name": system_user.name,
                                 "password": system_user.password}]}
-        if baremetal.get("name"):
+        if target_server["bmc"].get("hostname"):
             user_data["hostname"] = re.sub(
-                r'[^A-Za-z0-9-]', '', baremetal.get("name", "")) or "default-host"
+                r'[^A-Za-z0-9-]', '', target_server["bmc"].get("hostname")) or "default-host"
 
         network_config = {
             "version": 1,
@@ -224,25 +236,26 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         raise
 
     efi_status = 0
-    if baremetal.get("os_user") and baremetal.get("os_password"):
+    if target_server["device"].get("username") and target_server["device"].get("password"):
         try:
             efi_uuid = create_efi_boot_entry(
-                host_ip, baremetal.get("os_user"),
-                baremetal.get("os_password"), 40, disk_id, image["name"])
+                host_ip, target_server["device"].get("username"),
+                target_server["device"].get("password"), 40, disk_id, image["name"])
             if not efi_uuid:
                 efi_status = 1
             else:
                 disk_dict["efi_uuid"] = efi_uuid
-                LOG.info(f"EFI create succeeded for server {baremetal['id']}, entry: {efi_uuid}")
+                LOG.info(
+                    f"EFI create succeeded for server {target_server['id']}, entry: {efi_uuid}")
         except Exception as e:
             LOG.warning(
-                f"EFI create failed for server {baremetal['id']}: {e}. "
+                f"EFI create failed for server {target_server['id']}: {e}. "
                 "Frontend will be notified with special code."
             )
             efi_status = 1
     else:
         LOG.warning(
-            f"Skipping EFI creating for server {baremetal['id']} due to missing credentials"
+            f"Skipping EFI creating for server {target_server['id']} due to missing credentials"
         )
         efi_status = 1
 
@@ -258,16 +271,17 @@ async def _delete_system_disk(disk_id, rebuild=False):
     LOG.info(f"Starting deletion process for system disk {disk_id}")
 
     # Check if disk exists
-    existing_disks = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
-    if not existing_disks:
+    try:
+        existing_disk = db.find_one(SYSTEM_DISK_COLLECTION, {"id": disk_id})
+    except Exception:
         LOG.warning(f"System disk {disk_id} not found during deletion")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="System disk not found"
         )
 
-    soc_ip = existing_disks["mv200_ip"]
-    mon_host = existing_disks["mon_host"]
+    soc_ip = existing_disk["mv200_ip"]
+    mon_host = existing_disk["mon_host"]
     LOG.info(f"Found disk {disk_id} with SOC IP: {soc_ip}, mon_host: {mon_host}")
 
     dpuagentclient = get_dpuagentclient(soc_ip)
@@ -299,13 +313,13 @@ async def _delete_system_disk(disk_id, rebuild=False):
     try:
         res = blk_api.delete_vblk_dpu_agent_v1_vblk_del_post(
             dpuagent_api_v1_schemas_vblk_schemas_delete_request={
-                "rbd_path": f"{RBD_POOL}/{disk_id}",
+                "rbd_path": existing_disk["rbd_path"],
                 "gw_pwd": "yunsilicon",
                 "gw_ip": mon_host,
                 "force": True,
                 "bootable": True,
                 "gw_user": "admin",
-                "uuid": existing_disks["blk_id"]})
+                "uuid": existing_disk["blk_id"]})
         LOG.info("Virtual block device deletion response for disk "
                  f"{disk_id}: code={res.code}, message={res.message}")
     except Exception as e:
@@ -337,7 +351,7 @@ async def _delete_system_disk(disk_id, rebuild=False):
     try:
         cephclient = get_cephclient(mon_host)
         ceph_api.RbdApi(cephclient).api_block_image_image_spec_delete(
-            image_spec=quote(existing_disks["rbd_path"], safe=""))
+            image_spec=quote(existing_disk["rbd_path"], safe=""))
         LOG.info(f"Successfully deleted RBD image for disk {disk_id}")
     except Exception as e:
         LOG.error(f"Failed to delete RBD image for system disk {disk_id}, error: {e}")
@@ -354,26 +368,18 @@ async def _delete_system_disk(disk_id, rebuild=False):
         )
 
     LOG.info(f"Successfully completed deletion of system disk {disk_id}")
-    mv_server = db.find_one(MV_SERVER_COLLECTION, {"id": existing_disks["mv200_id"]})
-    if not mv_server:
-        LOG.warning(
-            f"MV200 server {existing_disks['mv200_id']} not found when creating system disk"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"MV200 server {existing_disks['mv200_id']} not found"
-        )
 
-    server = db.find_one(BARE_METAL_SERVER_COLLECTION, {"id": mv_server["bare_id"]})
+    server = db.find_one(SERVER_COLLECTION, {"id": existing_disk["bare_id"]})
     if not server:
-        LOG.warning(f"Server {mv_server['bare_id']} not found for boot entries query")
+        LOG.warning(f"Server {existing_disk['bare_id']} not found for boot entries query")
         raise HTTPException(status_code=404, detail="bare metal not found")
 
     # Try to cleanup orphaned EFI entries, but capture errors
-    if server.get("os_user") and server.get("os_password"):
+    if server["device"].get("username") and server["device"].get("password"):
         try:
             cleanup_orphaned_efi_entries(
-                server.get("host_ip"), server.get("os_user"), server.get("os_password")
+                server["device"].get("ip"), server["device"].get("username"),
+                server["device"].get("password")
             )
             LOG.info(f"EFI cleanup succeeded for server {server['id']}")
         except Exception as e:

@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from datetime import datetime
 import logging
 import os
 
@@ -12,9 +13,13 @@ from brain import app
 from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
 from brain.middleware import RequestIdLogFilter, RequestIdMiddleware
+from brain.json_db import SQLiteDocumentDB
+from brain.utils.task_scheduler import cleanup_server_warning, task_scheduler
 
 LOG_FILE = "/var/log/brain/brain.log"
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+db = SQLiteDocumentDB()
+SERVER_COLLECTION = "servers"
 
 register_routers(app)
 
@@ -71,3 +76,42 @@ uvicorn_access_logger.handlers.clear()
 uvicorn_access_logger.addHandler(file_handler)
 uvicorn_access_logger.addFilter(request_id_filter)
 uvicorn_access_logger.setLevel(logging.INFO)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Restore pending scheduled tasks at startup"""
+    try:
+        # Find all occupied devices
+        occupied_servers = db.find_many(SERVER_COLLECTION, {"time": {"$gt": 0}})
+        logger.info(f"Found {len(occupied_servers)} occupied devices to restore timers")
+
+        for server in occupied_servers:
+            # Calculate remaining time
+            elapsed_time = datetime.now().timestamp() - server["start"]
+            remaining_time = server["time"] - elapsed_time
+
+            if remaining_time > 0:
+                # Restore scheduled task
+                task_id = f"device_cleanup_{server['id']}"
+                success = await task_scheduler.schedule_task(
+                    task_id=task_id,
+                    delay_seconds=int(remaining_time),
+                    task_func=cleanup_server_warning,
+                    device_id=server["id"]
+                )
+
+                if success:
+                    logger.info(
+                        f"Restored timer for device {server['id']}, "
+                        f"remaining: {remaining_time:.0f}s"
+                    )
+                else:
+                    logger.error(f"Failed to restore timer for device {server['id']}")
+            else:
+                # If the time has already expired, clean up immediately
+                logger.info(f"Device {server['id']} occupancy expired, cleaning up...")
+                await cleanup_server_warning(server["id"])
+
+    except Exception as e:
+        logger.error(f"Error while restoring device timers: {str(e)}")

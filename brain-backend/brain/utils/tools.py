@@ -16,7 +16,7 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 
 
-def parse_yuncli_vpd(output: str) -> List[Dict[str, str]]:
+def parse_nics_info(output: str) -> List[Dict[str, str]]:
     """
     Parse yuncli lspci output and return a list of devices.
     If multiple devices have the same Product Name + Part number + Serial number,
@@ -84,46 +84,6 @@ def parse_yuncli_vpd(output: str) -> List[Dict[str, str]]:
             })
 
     return result
-
-
-# def parse_yuncli_vpd(output: str) -> List[Dict[str, str]]:
-#     """
-#     Parse 'yuncli vpd -r' output and extract BDF, Product Name, and SN.
-#     """
-#     devices = []
-#     current_device = {}
-
-#     for line in output.splitlines():
-#         line = line.strip()
-#         if not line:
-#             continue
-
-#         # BDF line
-#         bdf_match = re.match(r"BDF:(\S+):", line)
-#         if bdf_match:
-#             if current_device:
-#                 devices.append(current_device)
-#                 current_device = {}
-#             current_device["bdf"] = bdf_match.group(1)
-#             continue
-
-#         # Product Name
-#         prod_match = re.match(r"Product Name:\s+(.*)", line)
-#         if prod_match:
-#             current_device["type"] = prod_match.group(1).strip()
-#             continue
-
-#         # Serial Number
-#         sn_match = re.match(r"Serial Number\[SN\]:\s+(.*)", line)
-#         if sn_match:
-#             current_device["sn"] = sn_match.group(1).strip()
-#             continue
-
-#     # append the last device
-#     if current_device:
-#         devices.append(current_device)
-
-#     return devices
 
 
 def parse_bdf_mac(output: str) -> Dict[str, List[str]]:
@@ -249,13 +209,15 @@ def ipmi_power_action(bmcip: str, action: str):
 
 
 def update_automatic(ip, user, password):
-    device_sn = ssh_execute(ip, "dmidecode -s system-serial-number", user, password)
+    server_sn = ssh_execute(ip, "cat /sys/class/dmi/id/product_serial", user, password)
+    server_vendor = ssh_execute(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
+    server_product = ssh_execute(ip, "cat /sys/class/dmi/id/product_name", user, password)
 
     # vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
     cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} /Vital Product Data/ "
            "{print; for(i=0;i<5;i++){getline; print}}'")
-    vpd_res = ssh_execute(ip, cmd, user, password)
-    nics = parse_yuncli_vpd(vpd_res)
+    pci_res = ssh_execute(ip, cmd, user, password)
+    nics = parse_nics_info(pci_res)
     mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
     macs = parse_bdf_mac(mac_res)
     for nic in nics:
@@ -273,8 +235,11 @@ def update_automatic(ip, user, password):
     gateway = ssh_execute(ip, "ip route | awk '/default/ {print $3}'", user, password).strip()
 
     device_info = {
-        "sn": device_sn,
+        "sn": server_sn,
         "mac": iface_mac,
-        "gateway": gateway
+        "gateway": gateway,
+        "vendor": server_vendor,
+        "product": server_product
     }
     return device_info, nics
+

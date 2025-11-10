@@ -30,7 +30,6 @@
         style="width: 100%"
         :default-sort="{ prop: 'mv200_ip', order: 'ascending' }"
       >
-        <el-table-column prop="id" label="ID" width="200" />
         <el-table-column label="镜像名称">
           <template #default="{ row }">
             <template v-if="imageMap.get(row.image_id)">
@@ -275,70 +274,24 @@
         </el-button>
       </template>
     </el-dialog>
-
-    <!-- 启动项认证对话框 -->
-    <el-dialog
-      v-model="bootAuthDialogVisible"
-      title="操作系统身份认证"
-      width="400px"
-    >
-      <div class="dialog-tip">
-        <el-alert
-          title="需要操作系统管理员权限来检查启动项状态"
-          type="warning"
-          :closable="false"
-          show-icon
-        />
-      </div>
-      <el-form :model="bootAuthForm" label-width="80px">
-        <el-form-item label="用户名" required>
-          <el-input
-            v-model="bootAuthForm.user"
-            placeholder="请输入操作系统用户名"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="密码" required>
-          <el-input
-            v-model="bootAuthForm.pwd"
-            type="password"
-            placeholder="请输入操作系统密码"
-            clearable
-            show-password
-          />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <el-button @click="handleBootAuthCancel">取消</el-button>
-        <el-button 
-          type="primary" 
-          @click="handleBootAuthConfirm" 
-          :loading="bootAuthLoading"
-          :disabled="!bootAuthForm.user || !bootAuthForm.pwd"
-        >
-          确认
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete, Operation, InfoFilled, Search } from '@element-plus/icons-vue'
+import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete, Operation, Search } from '@element-plus/icons-vue'
 import { systemDisksApi } from '@/api/system-disks'
 import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
-import { bareApi } from '@/api/bare'
-import type { SystemDisk, Image, MVServer, BareMetalServer, BootEntriesResponse } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { SystemDisk, Image, MVServer, ServerDetailResponse, BootEntriesResponse } from '@/types/api'
 
 const loading = ref(false)
 const disks = ref<SystemDisk[]>([])
 const images = ref<Image[]>([])
 const mv200Servers = ref<MVServer[]>([])
-const bares = ref<BareMetalServer[]>([])
+const allDevices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
 
 const uploadDialogVisible = ref(false)
@@ -358,15 +311,6 @@ const rebuildForm = reactive({
 
 const flattenDialogVisible = ref(false)
 const flattenLoading = ref(false)
-
-const bootAuthDialogVisible = ref(false)
-const bootAuthLoading = ref(false)
-const currentBareServer = ref<BareMetalServer | null>(null)
-const bootAuthForm = reactive({
-  user: '',
-  pwd: ''
-})
-let bootAuthResolve: ((value: any) => void) | null = null
 
 const ipSortMethod = (a: SystemDisk, b: SystemDisk) => {
   const ipToNumber = (ip: string) => {
@@ -388,15 +332,11 @@ const hostIpSortMethod = (a: SystemDisk, b: SystemDisk) => {
     return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
   };
   
-  const getHostIP = (disk: SystemDisk) => {
-    const server = mv200Map.value.get(disk.mv200_id);
-    if (!server || !server.bare_id) return '0.0.0.0';
-    const bare_info = bareMap.value.get(server.bare_id);
-    return bare_info ? bare_info.host_ip : '0.0.0.0';
-  };
+  const hostIP_A = getHostIP(a.mv200_id);
+  const hostIP_B = getHostIP(b.mv200_id);
   
-  const ipA = ipToNumber(getHostIP(a));
-  const ipB = ipToNumber(getHostIP(b));
+  const ipA = ipToNumber(hostIP_A);
+  const ipB = ipToNumber(hostIP_B);
   
   if (ipA < ipB) return -1;
   if (ipA > ipB) return 1;
@@ -428,13 +368,22 @@ const mv200Map = computed(() => {
   return map
 })
 
-const bareMap = computed(() => {
-  const map = new Map<string, BareMetalServer>()
-  bares.value.forEach(bare => {
-    map.set(bare.id, bare)
-  })
-  return map
-})
+// 根据MV200 ID获取关联的裸金属服务器
+const getAssociatedServer = (mv200Id: string): ServerDetailResponse | null => {
+  const mv200 = mv200Map.value.get(mv200Id)
+  if (!mv200 || !mv200.nic_sn) return null
+  
+  // 在所有设备中查找匹配的网卡SN
+  for (const device of allDevices.value) {
+    if (device.nics && device.nics.length > 0) {
+      const matchingNic = device.nics.find(nic => nic.sn === mv200.nic_sn)
+      if (matchingNic) {
+        return device
+      }
+    }
+  }
+  return null
+}
 
 const filteredDisks = computed(() => {
   let filtered = disks.value
@@ -474,19 +423,13 @@ const getMV200Name = (serverId: string) => {
 }
 
 const getHostName = (mv200_id: string) => {
-  const server = mv200Map.value.get(mv200_id)
-  if (!server || !server.bare_id) return '-'
-  
-  const bare_info = bareMap.value.get(server.bare_id)
-  return bare_info ? bare_info.name : '-'
+  const server = getAssociatedServer(mv200_id)
+  return server ? server.bmc.hostname : '-'
 }
 
 const getHostIP = (mv200_id: string) => {
-  const server = mv200Map.value.get(mv200_id)
-  if (!server || !server.bare_id) return '-'
-  
-  const bare_info = bareMap.value.get(server.bare_id)
-  return bare_info ? bare_info.host_ip : '-'
+  const server = getAssociatedServer(mv200_id)
+  return server ? server.device.ip : '-'
 }
 
 const loadData = async () => {
@@ -498,20 +441,20 @@ const loadData = async () => {
       disks.value = []
       images.value = []
       mv200Servers.value = []
-      bares.value = []
+      allDevices.value = []
       return
     }
     
-    const [imagesResponse, serversResponse, baresResponse] = await Promise.all([
+    const [imagesResponse, serversResponse, devicesResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
-      bareApi.getAll(),
+      deviceApi.getAll(),
     ])
     
     disks.value = disksResponse.sort((a, b) => ipSort(a.mv200_ip, b.mv200_ip))
     images.value = imagesResponse
     mv200Servers.value = serversResponse
-    bares.value = baresResponse
+    allDevices.value = devicesResponse
 
   } catch (error) {
     ElMessage.error('加载数据失败')
@@ -630,47 +573,16 @@ const handleDelete = async (disk: SystemDisk) => {
     let isInUse = false
     
     try {
-      const mvServer = mv200Map.value.get(disk.mv200_id)
-      if (mvServer && mvServer.bare_id) {
-        const bareServer = bareMap.value.get(mvServer.bare_id)
-        if (bareServer) {
-          let bootEntriesResponse: BootEntriesResponse | null = null
-          
-          try {
-            if (bareServer.os_user && bareServer.os_password) {
-              bootEntriesResponse = await bareApi.getBootEntries(bareServer.id, true)
-            } else {
-              const authResult = await showBootAuthDialog(bareServer)
-              if (!authResult) {
-                loading.value = false
-                return
-              }
-              bootEntriesResponse = authResult
-            }
-            
-            const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
-            const diskEfiUuid = disk.efi_uuid
+      const associatedServer = getAssociatedServer(disk.mv200_id)
+      if (associatedServer) {
+        // 直接调用deviceApi.getBootEntries，不需要用户名密码
+        const bootEntriesResponse = await deviceApi.getBootEntries(associatedServer.id)
+        
+        const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
+        const diskEfiUuid = disk.efi_uuid
 
-            if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
-              isInUse = true
-            }
-            
-          } catch (error) {
-            console.warn('获取启动项失败:', error)
-            const authResult = await showBootAuthDialog(bareServer)
-            if (!authResult) {
-              loading.value = false
-              return
-            }
-            bootEntriesResponse = authResult
-            
-            const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
-            const diskEfiUuid = disk.efi_uuid
-            
-            if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
-              isInUse = true
-            }
-          }
+        if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
+          isInUse = true
         }
       }
     } catch (error) {
@@ -715,67 +627,6 @@ const handleDelete = async (disk: SystemDisk) => {
     }
   } finally {
     loading.value = false
-  }
-}
-
-const showBootAuthDialog = (server: BareMetalServer): Promise<any> => {
-  return new Promise((resolve) => {
-    currentBareServer.value = server
-    bootAuthForm.user = ''
-    bootAuthForm.pwd = ''
-    bootAuthResolve = resolve
-    bootAuthDialogVisible.value = true
-  })
-}
-
-const handleBootAuthConfirm = async () => {
-  if (!currentBareServer.value) return
-  
-  try {
-    bootAuthLoading.value = true
-    const response = await bareApi.getBootEntries(
-      currentBareServer.value.id, 
-      false,
-      bootAuthForm.user, 
-      bootAuthForm.pwd
-    )
-    
-    // 保存成功的凭据到服务器
-    try {
-      await bareApi.updateServerCredentials(currentBareServer.value.id, {
-        user: bootAuthForm.user,
-        pwd: bootAuthForm.pwd
-      })
-      console.log('账号密码已保存')
-      
-      // 更新本地缓存
-      if (bareMap.value.has(currentBareServer.value.id)) {
-        const updatedServer = { ...currentBareServer.value }
-        updatedServer.os_user = bootAuthForm.user
-        updatedServer.os_password = bootAuthForm.pwd
-        bareMap.value.set(currentBareServer.value.id, updatedServer)
-      }
-    } catch (saveError) {
-      console.warn('保存账号密码失败:', saveError)
-      // 不阻止主流程，只是记录警告
-    }
-    
-    bootAuthDialogVisible.value = false
-    if (bootAuthResolve) {
-      bootAuthResolve(response)
-    }
-  } catch (error) {
-    ElMessage.error('认证失败，请检查用户名和密码')
-    console.error('认证失败:', error)
-  } finally {
-    bootAuthLoading.value = false
-  }
-}
-
-const handleBootAuthCancel = () => {
-  bootAuthDialogVisible.value = false
-  if (bootAuthResolve) {
-    bootAuthResolve(null)
   }
 }
 
@@ -922,10 +773,6 @@ onMounted(() => {
 
 .confirm-message strong {
   color: #67c23a;
-}
-
-.dialog-tip {
-  margin-bottom: 20px;
 }
 
 .highlight-name {

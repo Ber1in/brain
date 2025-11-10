@@ -77,7 +77,7 @@
           prop="bmc.hostname" 
           label="服务器名称"
           sortable
-          width="150"
+          width="130"
         >
           <template #default="{ row }">
             <el-link 
@@ -95,7 +95,7 @@
           label="服务器管理IP"
           sortable
           :sort-method="ipSortMethod"
-          width="150"
+          width="130"
         >
           <template #default="{ row }">
             <span class="highlight-ip">{{ row.device.ip }}</span>
@@ -103,14 +103,15 @@
         </el-table-column>
         <el-table-column 
           label="网卡信息"
-          min-width="100"
+          min-width="175"
         >
           <template #default="{ row }">
-            <div v-if="getNicSummary(row).length > 0" class="nic-summary">
+            <div v-if="getNicSummary(row).length > 0" class="nic-summary-compact">
               <div 
-                v-for="summary in getNicSummary(row)" 
+                v-for="(summary, index) in getNicSummary(row)" 
                 :key="summary.type"
                 class="nic-item"
+                :class="{ 'odd-item': index % 2 === 0, 'even-item': index % 2 === 1 }"
               >
                 <span class="nic-count">{{ summary.count }}</span>
                 <span class="nic-type">{{ summary.displayType }}</span>
@@ -121,7 +122,7 @@
         </el-table-column>
         <el-table-column 
           label="标签"
-          min-width="250"
+          min-width="225"
         >
           <template #default="{ row }">
             <div v-if="row.tags && row.tags.length > 0" class="tags-container">
@@ -1959,31 +1960,57 @@ onMounted(() => {
 }
 
 /* 网卡信息样式 */
-.nic-summary {
+.nic-summary-compact {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+.nic-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.nic-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f0f7ff;
+  border: 1px solid #d4e8ff;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .nic-item {
   display: flex;
   align-items: center;
   gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f0f7ff;
+  border: 1px solid #d4e8ff;
   font-size: 12px;
+  line-height: 1.2;
+  min-width: 0;
 }
 
 .nic-count {
   font-weight: 600;
   color: #409eff;
-  min-width: 16px;
+  min-width: 12px;
   text-align: center;
-  background: #f0f7ff;
-  border-radius: 4px;
-  padding: 1px 4px;
+  flex-shrink: 0;
 }
 
 .nic-type {
   color: #606266;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 
 /* 标签容器样式优化 */
@@ -2403,6 +2430,7 @@ onMounted(() => {
 
 .empty-text {
   color: #c0c4cc;
+  font-style: italic;
 }
 
 .danger-item {

@@ -216,6 +216,7 @@ class SQLiteDocumentDB:
             "mv200_id": "",
             "mv200_ip": "",
             "mon_host": "",
+            "bare_id": "",
             "size_gb": 0,
             "flatten": 0,
             "description": "",
@@ -254,7 +255,9 @@ class SQLiteDocumentDB:
             "device": {
                 "sn": "79V5QJ3",
                 "ip": "10.0.3.206",
-                "username": "root"
+                "username": "root",
+                "vendor": "",
+                "product": ""
             },
             "nics": [],
             "tags": [],

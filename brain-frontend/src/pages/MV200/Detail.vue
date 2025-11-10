@@ -27,8 +27,6 @@
         <el-descriptions-item label="名称">{{ mv200Data.name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="SOC IP">{{ mv200Data.ip_address || '-' }}</el-descriptions-item>
         
-        <!-- 序列号和MAC -->
-        <el-descriptions-item label="序列号">{{ mv200Data.sn || '-' }}</el-descriptions-item>
         <el-descriptions-item label="MAC地址">{{ mv200Data.mac || '-' }}</el-descriptions-item>
         
         <!-- 网关和网卡序列号 -->
@@ -217,7 +215,7 @@ const handleRefresh = async () => {
     refreshing.value = true
     
     await ElMessageBox.confirm(
-      '确定要更新MV200信息吗？这将重新获取MV200的版本信息和状态。',
+      '确定要更新MV200信息吗？这将重新获取MV200的硬件信息以及管理网络信息。',
       '确认更新',
       {
         type: 'warning',

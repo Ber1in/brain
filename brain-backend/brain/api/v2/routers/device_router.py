@@ -11,6 +11,7 @@ from brain.api.v2.schemas import device_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute
 from brain.utils import tools
+from brain.utils.task_scheduler import cleanup_server_warning, task_scheduler, init_warning
 
 
 LOG = logging.getLogger(__name__)
@@ -75,19 +76,7 @@ async def create_device(data: device_schemas.ServerRequest):
     LOG.info(f"Server created, ID: {result['id']}")
 
     try:
-        init_command = '''
-sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
-
-cat >> /etc/profile << 'EOF'
-# WARNING_MESSAGE_START
-echo "-----------------------------------------------------------------------------"
-echo "提示：当前服务器无人使用！"
-echo "请先登录: http://10.0.3.248:8089/devices 在[服务器管理]完成'占用服务器'后继续使用"
-echo "-----------------------------------------------------------------------------"
-# WARNING_MESSAGE_END
-EOF
-'''
-        ssh_execute(str(data.device.ip), init_command, data.device.username, data.device.password)
+        init_warning(str(data.device.ip), data.device.username, data.device.password)
     except Exception:
         LOG.warning("Failed to initialize the server usage warning message.")
 
@@ -183,14 +172,6 @@ async def update_device(
 
         if data.bmc and data.bmc.hostname:
             server["bmc"]["hostname"] = data.bmc.hostname
-            exist = db.find(SERVER_COLLECTION,
-                            {"json_extract(bmc, '$.hostname')": data.bmc.hostname})
-            if exist:
-                LOG.warning(f"Server already exists, name: {data.bmc.hostname}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Server with name {data.bmc.hostname} already exists"
-                )
 
         if data.tags is not None:
             server["tags"] = data.tags
@@ -205,7 +186,7 @@ async def update_device(
             ssh_user = server["device"].get("username", "")
             ssh_pass = server["device"].get("password", "")
             time = int(data.time)
-            if time:
+            if time > 0:
                 server["user"] = user
 
                 end_timestamp = server["start"] + time
@@ -228,21 +209,32 @@ EOF
 
                 ssh_execute(ip, command, ssh_user, ssh_pass)
 
+                task_id = f"device_cleanup_{device_id}"
+                success = await task_scheduler.schedule_task(
+                    task_id=task_id,
+                    delay_seconds=time,
+                    task_func=cleanup_server_warning,
+                    device_id=device_id
+                )
+
+                if success:
+                    LOG.info("Successfully scheduled auto cleanup "
+                             f"for device {device_id} in {time} seconds")
+                else:
+                    LOG.error(f"Failed to schedule auto cleanup for device {device_id}")
+
             else:
                 server["user"] = ""
-                clean_command = '''
-sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
-cat >> /etc/profile << 'EOF'
-# WARNING_MESSAGE_START
-echo "-----------------------------------------------------------------------------"
-echo "提示：当前服务器无人使用！"
-echo "请先登录: http://10.0.3.248:8089/devices 在[服务器管理]完成'占用服务器'后继续使用"
-echo "-----------------------------------------------------------------------------"
-# WARNING_MESSAGE_END
-EOF
-'''
-                ssh_execute(ip, clean_command, ssh_user, ssh_pass)
+                init_warning(ip, ssh_user, ssh_pass)
+
+                task_id = f"device_cleanup_{device_id}"
+                success = await task_scheduler.cancel_task(task_id)
+
+                if success:
+                    LOG.info(f"Successfully cancelled auto cleanup for device {device_id}")
+                else:
+                    LOG.info(f"No auto cleanup task found for device {device_id}")
 
     server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

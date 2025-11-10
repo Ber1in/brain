@@ -1,5 +1,5 @@
 <template>
-  <div class="mv200-create">
+  <div >
     <el-card>
       <template #header>
         <h2>录入MV200</h2>
@@ -126,10 +126,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.mv200-create {
-  max-width: 800px;
-  margin: 0 auto;
-}
 
 .form-tip {
   font-size: 12px;
