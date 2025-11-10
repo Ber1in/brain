@@ -83,7 +83,7 @@ async def startup_event():
     """Restore pending scheduled tasks at startup"""
     try:
         # Find all occupied devices
-        occupied_servers = db.find_many(SERVER_COLLECTION, {"time": {"$gt": 0}})
+        occupied_servers = db.find(SERVER_COLLECTION, {"time": {"$gt": 0}})
         logger.info(f"Found {len(occupied_servers)} occupied devices to restore timers")
 
         for server in occupied_servers:
