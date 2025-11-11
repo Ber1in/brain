@@ -29,7 +29,7 @@ export const deviceApi = {
 
   // 获取启动项（支持使用保存的凭据）
   getBootEntries(serverId: string): Promise<BootEntriesResponse> {
-    return apiClient.get(`/api/devices/${serverId}/boot-entries`)
+    return apiClient.get(`/api/devices/${serverId}/boot-entries`, { cache: false })
   },
 
   

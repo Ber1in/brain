@@ -7,7 +7,7 @@ export const mv200Api = {
   },
 
   getById(id: string): Promise<MVServer> {
-    return apiClient.get(`/mv-servers/${id}`)
+    return apiClient.get(`/mv-servers/${id}`, { cache: false })
   },
 
   create(data: MVServerCreate): Promise<MVServer> {

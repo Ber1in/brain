@@ -554,7 +554,7 @@ const handleAutoUpdate = async () => {
   try {
     // 显示确认对话框
     await ElMessageBox.confirm(
-      '确定要自动更新服务器信息吗？这将重新获取服务器的硬件信息和状态。',
+      '确定要自动更新服务器信息吗？这将重新获取服务器的硬件和云脉网卡信息。',
       '确认自动更新',
       {
         type: 'warning',

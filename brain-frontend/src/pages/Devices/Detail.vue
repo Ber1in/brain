@@ -947,7 +947,7 @@ const handleRefresh = async () => {
     refreshing.value = true
     
     await ElMessageBox.confirm(
-      '确定要更新服务器信息吗？这将重新获取服务器的硬件信息和状态。',
+      '确定要更新服务器信息吗？这将重新获取服务器的硬件和云脉网卡信息。',
       '确认更新',
       {
         type: 'warning',
