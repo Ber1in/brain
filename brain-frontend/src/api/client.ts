@@ -37,7 +37,7 @@ interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
 
 // 默认缓存配置
 const DEFAULT_CACHE_CONFIG: Required<CacheConfig> = {
-  ttl: 5 * 60 * 1000, // 5分钟
+  ttl: 10 * 60 * 1000, // 5分钟
   maxSize: 100,
   enableEtag: true
 }
