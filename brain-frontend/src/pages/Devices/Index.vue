@@ -732,6 +732,77 @@ const powerLoading = ref(false)
 const powerType = ref<'cycle' | 'reset'>('cycle')
 const isBatchPowerOperation = ref(false)
 
+class NicColorManager {
+  private colorMap: Map<string, string> = new Map()
+  private availableColors: string[] = [
+    '#1890ff', '#2f54eb', '#52c41a', '#a0d911', '#fa8c16', 
+    '#fa541c', '#722ed1', '#36cfc9', '#f56c6c', '#eb2f96',
+    '#e6a23c', '#909399', '#13c2c2', '#eb2f96', '#52c41a',
+    '#faad14', '#389e0d', '#096dd9', '#d46b08', '#7b1fa2'
+  ]
+  private usedColors: Set<string> = new Set()
+
+  // 为网卡类型分配颜色
+  assignColor(nicType: string): string {
+    // 如果已经为该类型分配过颜色，直接返回
+    if (this.colorMap.has(nicType)) {
+      return this.colorMap.get(nicType)!
+    }
+
+    // 寻找可用的颜色
+    let assignedColor: string | null = null
+    
+    // 首先尝试从未使用的颜色中选择
+    for (const color of this.availableColors) {
+      if (!this.usedColors.has(color)) {
+        assignedColor = color
+        this.usedColors.add(color)
+        break
+      }
+    }
+
+    // 如果所有颜色都被使用了，使用哈希算法分配（确保一致性）
+    if (!assignedColor) {
+      assignedColor = this.getColorByHash(nicType)
+    }
+
+    // 保存映射关系
+    this.colorMap.set(nicType, assignedColor)
+    return assignedColor
+  }
+
+  // 通过哈希算法为类型分配颜色（确保同一类型总是得到相同颜色）
+  private getColorByHash(nicType: string): string {
+    let hash = 0
+    for (let i = 0; i < nicType.length; i++) {
+      hash = nicType.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    
+    // 使用哈希值在可用颜色中选择
+    const index = Math.abs(hash) % this.availableColors.length
+    return this.availableColors[index]
+  }
+
+  // 获取指定类型的颜色
+  getColor(nicType: string): string {
+    return this.assignColor(nicType)
+  }
+
+  // 重置颜色管理器（可选）
+  reset() {
+    this.colorMap.clear()
+    this.usedColors.clear()
+  }
+
+  // 获取所有已分配的颜色映射
+  getColorMap(): Map<string, string> {
+    return new Map(this.colorMap)
+  }
+}
+
+// 创建单例实例
+const nicColorManager = new NicColorManager()
+
 // 计算电源操作对话框标题
 const powerDialogTitle = computed(() => {
   const typeText = powerType.value === 'cycle' ? '冷重启' : '热重启'
@@ -1123,6 +1194,9 @@ const getNicSummary = (device: ServerDetailResponse) => {
       // 通过第一个-切割，取左边的部分
       let displayType = nic.type.split('-')[0].trim()
       
+      // 预先为这个类型分配颜色（确保颜色一致性）
+      nicColorManager.getColor(displayType)
+      
       typeCount[displayType] = (typeCount[displayType] || 0) + 1
     }
   })
@@ -1143,32 +1217,9 @@ const getNicSummary = (device: ServerDetailResponse) => {
     })
 }
 
-const nicTypeColors = [
-  '#1890ff', // 蓝
-  '#2f54eb', // 深蓝
-  '#52c41a', // 绿
-  '#a0d911', // 黄绿
-  '#fa8c16', // 橙
-  '#fa541c', // 红橙
-  '#722ed1', // 紫
-  '#36cfc9', // 青
-  '#f56c6c', // 红
-  '#eb2f96', // 品红
-  '#e6a23c', // 黄橙
-  '#909399', // 灰
-]
-
 // 获取网卡类型颜色
 const getNicTypeColor = (nicType: string) => {
-  // 根据类型名称生成稳定的哈希值
-  let hash = 0
-  for (let i = 0; i < nicType.length; i++) {
-    hash = nicType.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  // 使用绝对值取模确保在数组范围内
-  const index = Math.abs(hash) % nicTypeColors.length
-  return nicTypeColors[index]
+  return nicColorManager.getColor(nicType)
 }
 
 const getNicItemStyle = (nicType: string) => {
@@ -1188,7 +1239,6 @@ const getNicItemStyle = (nicType: string) => {
     color: textColor
   }
 }
-
 
 const getTagNames = (): string[] => {
   return availableTags.value.map(tag => tag.name)
