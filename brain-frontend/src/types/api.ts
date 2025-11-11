@@ -235,19 +235,21 @@ export interface DeviceResponse {
   cpu_mode?: string
 }
 
+export interface NicInfo {
+  mac?: string
+  bdf?: string
+}
+
 export interface NicBase {
   type: string
-  mac: string[]
-  bdf: string
   sn: string
 }
 
 export interface AIDPU_Nic {
   type: string
-  mac: string[]
-  bdf: string
+  nic_info?: Array<NicInfo>
   sn: string
-  soc_ip: string  // 或者使用 IPv4Address 如果已定义
+  soc_ip: string
   aidpu_sn?: string
   firmware_version?: string
   nic_sn?: string

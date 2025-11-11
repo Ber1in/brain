@@ -1239,16 +1239,6 @@ onMounted(() => {
   border-bottom: none;
 }
 
-.bdf-item {
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  color: #374151;
-  padding: 2px 4px;
-  background: #f8fafc;
-  border-radius: 3px;
-  border: 1px solid #e2e8f0;
-}
-
 .mac-address {
   font-family: 'Courier New', monospace;
   font-size: 12px;
