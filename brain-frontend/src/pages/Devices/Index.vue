@@ -735,10 +735,24 @@ const isBatchPowerOperation = ref(false)
 class NicColorManager {
   private colorMap: Map<string, string> = new Map()
   private availableColors: string[] = [
-    '#1890ff', '#2f54eb', '#52c41a', '#a0d911', '#fa8c16', 
-    '#fa541c', '#722ed1', '#36cfc9', '#f56c6c', '#eb2f96',
-    '#e6a23c', '#909399', '#13c2c2', '#eb2f96', '#52c41a',
-    '#faad14', '#389e0d', '#096dd9', '#d46b08', '#7b1fa2'
+    '#eb2f96', // 品红色
+    '#1890ff', // 亮蓝色
+    '#fa8c16', // 橙色
+    '#52c41a', // 鲜绿色
+    '#722ed1', // 紫色
+    '#f56c6c', // 红色
+    '#a0d911', // 黄绿色
+    '#2f54eb', // 深蓝色
+    '#fa541c', // 红橙色
+    '#36cfc9', // 青色
+    '#389e0d', // 深绿色
+    '#e6a23c', // 黄橙色
+    '#096dd9', // 宝蓝色
+    '#faad14', // 金黄色
+    '#7b1fa2', // 深紫色
+    '#13c2c2', // 青蓝色
+    '#d46b08', // 棕橙色
+    '#909399'  // 灰色
   ]
   private usedColors: Set<string> = new Set()
 
