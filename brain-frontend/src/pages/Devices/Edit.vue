@@ -129,28 +129,100 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <!-- 网卡详细信息 -->
-      <el-card header="网卡信息" style="margin-top: 20px;" v-if="deviceData.nics && deviceData.nics.length > 0">
-        <el-table :data="deviceData.nics">
-          <el-table-column prop="type" label="类型" width="120" />
-          <el-table-column prop="bdf" label="BDF" width="120" />
-          <el-table-column prop="sn" label="序列号" />
-          <el-table-column label="MAC地址">
-            <template #default="{ row }">
-              <div v-if="row.mac && row.mac.length > 0">
-                <div v-for="mac in row.mac" :key="mac" class="mac-address">
-                  {{ mac }}
+      <!-- 服务器信息、CPU信息、网卡信息并排布局 1:1:3 -->
+      <div class="info-row" style="margin-top: 20px;">
+        <!-- 服务器信息卡片 - 1/5宽度 -->
+        <el-card header="服务器信息" class="server-info-card" v-if="hasServerInfo">
+          <div class="compact-info-list">
+            <div class="info-item">
+              <div class="info-label">厂商</div>
+              <div class="info-value">{{ deviceData.device?.vendor || '-' }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">型号</div>
+              <div class="info-value">{{ deviceData.device?.product || '-' }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">序列号</div>
+              <div class="info-value">{{ deviceData.device?.sn || '-' }}</div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- CPU信息卡片 - 1/5宽度 -->
+        <el-card header="CPU信息" class="cpu-info-card" v-if="hasCpuInfo">
+          <div class="compact-info-list">
+            <div class="info-item">
+              <div class="info-label">厂商</div>
+              <div class="info-value">{{ deviceData.device?.cpu_vendor || '-' }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">型号</div>
+              <div class="info-value">{{ deviceData.device?.cpu_mode || '-' }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">架构</div>
+              <div class="info-value">{{ deviceData.device?.arch || '-' }}</div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 网卡详细信息 - 3/5宽度 -->
+        <el-card header="网卡信息" class="nic-card" v-if="deviceData.nics && deviceData.nics.length > 0">
+          <el-table :data="processedNics" class="compact-table">
+            <el-table-column prop="type" label="类型" width="110" />
+            <el-table-column prop="sn" label="序列号" width="170"/>
+            <!-- BDF列移到MAC地址前面 -->
+            <el-table-column label="BDF" width="80">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="bdf-item">{{ info.bdf || '-' }}</div>
+                  </div>
                 </div>
-              </div>
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column v-if="hasAidpuNics" prop="soc_ip" label="SoC IP" />
-          <el-table-column v-if="hasAidpuNics" prop="aidpu_sn" label="AIDPU SN" />
-          <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" />
-          <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" />
-        </el-table>
-      </el-card>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="MAC地址">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="mac-address">{{ info.mac || '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <!-- SOC IP列 -->
+            <el-table-column label="SOC IP" width="150">
+              <template #default="{ row }">
+                <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
+                  <el-link 
+                    type="primary" 
+                    @click="handleMv200Detail(getMv200ForNic(row.sn))"
+                    class="underlined-link"
+                    :underline="false"
+                  >
+                    {{ getMv200ForNic(row.sn)?.ip_address }}
+                  </el-link>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="hasAidpuNics" prop="aidpu_sn" label="AIDPU SN" width="120" />
+            <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" width="100" />
+            <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" width="100" />
+          </el-table>
+        </el-card>
+      </div>
     </el-card>
   </div>
 </template>
@@ -162,7 +234,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Check, Loading } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { tagApi } from '@/api/tag'
-import type { ServerDetailResponse, ServerUpdateRequest, AIDPU_Nic, TagResponse, BootEntriesResponse } from '@/types/api'
+import { mv200Api } from '@/api/mv200'
+import type { ServerDetailResponse, ServerUpdateRequest, AIDPU_Nic, TagResponse, BootEntriesResponse, MVServer } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -171,6 +244,8 @@ const autoUpdateLoading = ref(false)
 const tagsLoading = ref(false)
 const bootEntriesLoading = ref(false)
 const deviceId = ref<string>('')
+const allMv200s = ref<MVServer[]>([])
+const bootEntriesData = ref<BootEntriesResponse | null>(null)
 
 const deviceData = ref<ServerDetailResponse>({
   bmc: { hostname: '', ip: '' },
@@ -204,7 +279,57 @@ const form = reactive<ServerUpdateRequest>({
 })
 
 const availableTags = ref<TagResponse[]>([])
-const bootEntriesData = ref<BootEntriesResponse | null>(null)
+
+// 计算是否有服务器信息
+const hasServerInfo = computed(() => {
+  return deviceData.value.device?.vendor || deviceData.value.device?.product || deviceData.value.device?.sn
+})
+
+// 计算是否有CPU信息
+const hasCpuInfo = computed(() => {
+  return deviceData.value.device?.arch || deviceData.value.device?.cpu_vendor || deviceData.value.device?.cpu_mode
+})
+
+// 处理网卡数据，统一处理 nic_info
+const processedNics = computed(() => {
+  if (!deviceData.value.nics) return []
+  
+  return deviceData.value.nics.map(nic => {
+    // 所有网卡都有 nic_info 数组，但普通网卡可能没有
+    const nicInfo = (nic as any).nic_info || []
+    
+    return {
+      ...nic,
+      nic_info: nicInfo,
+      // 标记是否为AIDPU网卡
+      isAidpu: 'soc_ip' in nic,
+      displayType: nic.type
+    }
+  })
+})
+
+// 检查是否有AIDPU网卡
+const hasAidpuNics = computed(() => {
+  return deviceData.value.nics?.some(nic => 'soc_ip' in nic)
+})
+
+// 根据网卡序列号获取对应的MV200信息
+const getMv200ForNic = (nicSn: string): MVServer | null => {
+  if (!nicSn || !allMv200s.value.length) return null
+  
+  // 查找nic_sn匹配的MV200
+  const matchedMv200 = allMv200s.value.find(mv200 => mv200.nic_sn === nicSn)
+  return matchedMv200 || null
+}
+
+// MV200详情页面跳转
+const handleMv200Detail = (mv200: MVServer | null) => {
+  if (mv200 && mv200.id) {
+    router.push(`/mv200/detail/${mv200.id}`)
+  } else {
+    ElMessage.warning('无法找到MV200详情')
+  }
+}
 
 // 计算操作系统类型列表
 const bootEntriesList = computed(() => {
@@ -281,13 +406,6 @@ const getEndTimeDisplay = () => {
   return formatDateTime(endTime)
 }
 
-// 检查是否有AIDPU网卡
-const hasAidpuNics = computed(() => {
-  return deviceData.value.nics?.some(nic => 
-    'soc_ip' in nic && (nic as AIDPU_Nic).soc_ip
-  )
-})
-
 // 格式化时间显示
 const formatTime = (timeStr: string) => {
   if (!timeStr) return '-'
@@ -303,6 +421,16 @@ const formatTime = (timeStr: string) => {
     }).replace(/\//g, '/')
   } catch (error) {
     return timeStr // 如果解析失败，返回原始字符串
+  }
+}
+
+// 加载所有MV200数据
+const loadAllMv200s = async () => {
+  try {
+    const data = await mv200Api.getAll()
+    allMv200s.value = data
+  } catch (error) {
+    console.error('加载MV200列表失败:', error)
   }
 }
 
@@ -410,8 +538,11 @@ const loadDeviceData = async () => {
     form.notes = data.notes || ''
     form.time = data.time || ''
     
-    // 同时加载启动项信息
-    await loadBootEntries()
+    // 同时加载启动项信息和MV200数据
+    await Promise.all([
+      loadBootEntries(),
+      loadAllMv200s()
+    ])
   } catch (error) {
     ElMessage.error('加载服务器数据失败')
     router.push('/devices')
@@ -455,8 +586,11 @@ const handleAutoUpdate = async () => {
     form.tags = result.tags || []
     form.notes = result.notes || ''
     
-    // 重新加载启动项信息
-    await loadBootEntries()
+    // 重新加载启动项信息和MV200数据
+    await Promise.all([
+      loadBootEntries(),
+      loadAllMv200s()
+    ])
     
     ElMessage.success('自动更新成功')
   } catch (error: any) {
@@ -524,19 +658,155 @@ onMounted(() => {
   gap: 12px;
 }
 
+/* 并排布局样式 - 1:1:3比例 */
+.info-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.server-info-card {
+  flex: 1.5;
+  min-width: 0;
+  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+}
+
+.cpu-info-card {
+  flex: 1.5;
+  min-width: 0;
+  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+}
+
+.nic-card {
+  flex: 3;
+  min-width: 0;
+  max-width: calc(50% - 11px); /* 3/6 = 50% */
+}
+
+/* 紧凑信息列表样式 */
+.compact-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.info-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  min-width: 50px;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 600;
+  font-family: 'Monaco', 'Consolas', monospace;
+  text-align: right;
+  flex: 1;
+  margin-left: 12px;
+  word-break: break-all;
+}
+
+/* 紧凑表格样式 */
+.compact-table :deep(.el-table__header-wrapper th) {
+  padding: 6px 0;
+  font-size: 12px;
+  background-color: #f8fafc;
+}
+
+.compact-table :deep(.el-table__body-wrapper td) {
+  padding: 6px 0;
+  font-size: 12px;
+  vertical-align: top;
+}
+
+.compact-table :deep(.el-table .cell) {
+  padding: 0 6px;
+  line-height: 1.3;
+}
+
+.compact-table :deep(.el-table) {
+  font-size: 12px;
+}
+
+/* BDF和MAC配对展示样式 */
+.bdf-mac-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.bdf-mac-pair:last-child {
+  border-bottom: none;
+}
+
+.bdf-item {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
 .mac-address {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  margin-bottom: 2px;
+  font-weight: 500;
+  color: #1f2937;
 }
 
-.form-tip {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
+/* 空文本样式 */
+.empty-text {
+  color: #9ca3af;
+  font-style: italic;
 }
 
-/* 操作系统类型样式 */
+/* SOC IP链接样式 */
+.soc-ip-link {
+  display: flex;
+  align-items: center;
+}
+
+.soc-ip-link :deep(.el-link) {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.4;
+  padding: 0;
+  margin: 0;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-weight: 500;
+}
+
+/* 下划线链接样式 */
+.underlined-link {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.underlined-link:hover {
+  text-decoration-thickness: 2px;
+}
+
 .os-item {
   padding: 4px 8px;
   margin-bottom: 4px;
@@ -639,5 +909,59 @@ onMounted(() => {
   background-color: #fabf78;
   border-color: #fabf78;
   opacity: 0.6;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .info-row {
+    flex-direction: column;
+  }
+  
+  .server-info-card,
+  .cpu-info-card,
+  .nic-card {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .info-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px;
+  }
+  
+  .info-value {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+  
+  .compact-table :deep(.el-table__header-wrapper th),
+  .compact-table :deep(.el-table__body-wrapper td) {
+    padding: 4px 0;
+  }
+  
+  .bdf-mac-pair {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .bdf-item {
+    font-size: 10px;
+  }
 }
 </style>

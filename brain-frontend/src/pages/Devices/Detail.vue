@@ -218,7 +218,7 @@
             <el-table-column prop="type" label="类型" width="110" />
             <el-table-column prop="sn" label="序列号" width="170"/>
             <!-- BDF列移到MAC地址前面 -->
-            <el-table-column label="BDF" width="70">
+            <el-table-column label="BDF" width="80">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
