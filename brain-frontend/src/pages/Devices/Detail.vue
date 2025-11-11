@@ -214,11 +214,39 @@
 
         <!-- 网卡详细信息 - 3/5宽度 -->
         <el-card header="网卡信息" class="nic-card" v-if="deviceData.nics && deviceData.nics.length > 0">
-          <el-table :data="deviceData.nics" class="compact-table">
+          <el-table :data="processedNics" class="compact-table">
             <el-table-column prop="type" label="类型" width="110" />
-            <el-table-column prop="bdf" label="BDF" width="70" />
             <el-table-column prop="sn" label="序列号" width="170"/>
-            <!-- SOC IP列调整到MAC地址前面 -->
+            <!-- BDF列移到MAC地址前面 -->
+            <el-table-column label="BDF" width="70">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="bdf-item">{{ info.bdf || '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="MAC地址">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="mac-address">{{ info.mac || '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <!-- SOC IP列 -->
             <el-table-column label="SOC IP" width="150">
               <template #default="{ row }">
                 <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
@@ -234,17 +262,6 @@
                 <span v-else class="empty-text">-</span>
               </template>
             </el-table-column>
-            <el-table-column label="MAC地址">
-              <template #default="{ row }">
-                <div v-if="row.mac && row.mac.length > 0">
-                  <div v-for="mac in row.mac" :key="mac" class="mac-address">
-                    {{ mac }}
-                  </div>
-                </div>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="hasAidpuNics" prop="soc_ip" label="SoC IP" width="100" />
             <el-table-column v-if="hasAidpuNics" prop="aidpu_sn" label="AIDPU SN" width="120" />
             <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" width="100" />
             <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" width="100" />
@@ -529,7 +546,7 @@ import {
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { mv200Api } from '@/api/mv200'
-import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse, MVServer } from '@/types/api'
+import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse, MVServer, NicBase, NicInfo } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -617,6 +634,24 @@ const bootEntriesList = computed(() => {
   return result
 })
 
+// 处理网卡数据，统一处理 nic_info
+const processedNics = computed(() => {
+  if (!deviceData.value.nics) return []
+  
+  return deviceData.value.nics.map(nic => {
+    // 所有网卡都有 nic_info 数组，但普通网卡可能没有
+    const nicInfo = (nic as any).nic_info || []
+    
+    return {
+      ...nic,
+      nic_info: nicInfo,
+      // 标记是否为AIDPU网卡
+      isAidpu: 'soc_ip' in nic,
+      displayType: nic.type
+    }
+  })
+})
+
 // 根据网卡序列号获取对应的MV200信息
 const getMv200ForNic = (nicSn: string): MVServer | null => {
   if (!nicSn || !allMv200s.value.length) return null
@@ -634,6 +669,11 @@ const handleMv200Detail = (mv200: MVServer | null) => {
     ElMessage.warning('无法找到MV200详情')
   }
 }
+
+// 检查是否有AIDPU网卡
+const hasAidpuNics = computed(() => {
+  return deviceData.value.nics?.some(nic => 'soc_ip' in nic)
+})
 
 // 时间快捷选项
 const timeShortcuts = [
@@ -840,13 +880,6 @@ const getEndTimeDisplayFromForm = () => {
 const powerDialogTitle = computed(() => {
   const typeText = powerType.value === 'cycle' ? '冷重启' : '热重启'
   return `${typeText}服务器`
-})
-
-// 检查是否有AIDPU网卡
-const hasAidpuNics = computed(() => {
-  return deviceData.value.nics?.some(nic => 
-    'soc_ip' in nic && (nic as AIDPU_Nic).soc_ip
-  )
 })
 
 // 格式化时间显示
@@ -1193,10 +1226,40 @@ onMounted(() => {
   gap: 12px;
 }
 
+/* BDF和MAC配对展示样式 */
+.bdf-mac-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.bdf-mac-pair:last-child {
+  border-bottom: none;
+}
+
+.bdf-item {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #374151;
+  padding: 2px 4px;
+  background: #f8fafc;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+}
+
 .mac-address {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  margin-bottom: 2px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* 空文本样式 */
+.empty-text {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 /* SOC IP链接样式 */
@@ -1303,6 +1366,7 @@ onMounted(() => {
 .compact-table :deep(.el-table__body-wrapper td) {
   padding: 6px 0;
   font-size: 12px;
+  vertical-align: top;
 }
 
 .compact-table :deep(.el-table .cell) {
@@ -1498,6 +1562,15 @@ onMounted(() => {
   .compact-table :deep(.el-table__header-wrapper th),
   .compact-table :deep(.el-table__body-wrapper td) {
     padding: 4px 0;
+  }
+  
+  .bdf-mac-pair {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .bdf-item {
+    font-size: 10px;
   }
 }
 

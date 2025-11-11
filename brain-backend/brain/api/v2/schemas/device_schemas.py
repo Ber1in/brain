@@ -31,10 +31,14 @@ class DeviceResponse(BaseModel):
     cpu_mode: str = None
 
 
+class NicInfo(BaseModel):
+    mac: str = None
+    bdf: str = None
+
+
 class NicBase(BaseModel):
     type: str
-    mac: List[str] = None
-    bdf: str = None
+    nic_info: List[NicInfo] = None
     sn: str
 
 

@@ -72,24 +72,19 @@ def parse_nics_info(output: str) -> List[Dict[str, str]]:
     result = []
     for key, dev_list in counter.items():
         prod_name, part_num, sn = key
-        if len(dev_list) > 1:
-            # Duplicate, return only sn and type
-            result.append({"sn": sn, "type": prod_name})
-        else:
-            # Unique, return sn, type, bdf
-            result.append({
-                "sn": sn,
-                "type": prod_name,
-                "bdf": dev_list[0].get("bdf")
-            })
+        result.append({
+            "sn": sn,
+            "type": prod_name,
+            "nic_info": [{"bdf": d["bdf"]} for d in dev_list]
+        })
 
     return result
 
 
-def parse_bdf_mac(output: str) -> Dict[str, List[str]]:
+def parse_bdf_mac(output: str) -> Dict[str, str]:
     """
-    Parse output of `yuncli mac -r` into a dict {bdf: [mac1, mac2, ...]}
-    Remove leading '0000:' from BDF.
+    Parse `yuncli mac -r` output into {bdf_with_func: mac}
+    e.g. {"b3:00.0": "xx:xx:xx:xx:xx:xx"}
     """
     result = {}
     current_bdf = None
@@ -97,20 +92,26 @@ def parse_bdf_mac(output: str) -> Dict[str, List[str]]:
         line = line.strip()
         if not line:
             continue
+
         bdf_match = re.match(r'BDF:([0-9a-fA-F:.]+):', line)
         if bdf_match:
             raw_bdf = bdf_match.group(1)
-            # Remove leading '0000:' if present
             if raw_bdf.startswith('0000:'):
                 raw_bdf = raw_bdf[5:]
             current_bdf = raw_bdf
-            result[current_bdf] = []
-        else:
-            if current_bdf:
-                parts = line.split()
-                if len(parts) == 2:
-                    mac = parts[1]
-                    result[current_bdf].append(mac)
+            continue
+
+        if current_bdf:
+            parts = line.split()
+            if len(parts) == 2:
+                func, mac = parts
+                try:
+                    func = int(func)
+                    full_bdf = f"{current_bdf[:-1]}{func}"
+                    result[full_bdf] = mac
+                except ValueError:
+                    pass
+
     return result
 
 
@@ -228,9 +229,10 @@ def update_automatic(ip, user, password):
     mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
     macs = parse_bdf_mac(mac_res)
     for nic in nics:
-        bdf = nic.get('bdf')
-        if bdf and bdf in macs:
-            nic['mac'] = macs[bdf]
+        for info in nic["nic_info"]:
+            bdf = info["bdf"]
+            if bdf in macs:
+                info["mac"] = macs[bdf]
 
     iface_name = ssh_execute(
         ip,
