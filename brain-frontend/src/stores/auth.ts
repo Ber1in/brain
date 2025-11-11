@@ -33,7 +33,6 @@ export const useAuthStore = defineStore('auth', () => {
       second: '2-digit',
       hour12: false
     })
-    console.log(`[${timestamp}] 标签页状态: ${active ? '活跃' : '闲置'}`)
   }
 
   // 检查是否需要刷新token（只在活跃状态下）

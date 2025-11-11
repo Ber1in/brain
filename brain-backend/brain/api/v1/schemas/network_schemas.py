@@ -87,4 +87,14 @@ class InterfaceDelete(BaseModel):
 class InterfaceInfo(InterfaceCreate):
     """Schema for returning interface info"""
     id: str = Field(..., description="Unique ID of the network interface")
+    mv200_id: str
+    ip: str
+    mtu: int
+    vlan_tag: int
+    mac: str
+    description: str = Field(None)
+    gateway: str = Field(None)
     ifname: str = Field(None)
+    creator: str = Field(None)
+    dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
+

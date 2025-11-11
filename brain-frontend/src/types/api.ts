@@ -184,6 +184,7 @@ export interface InterfaceInfo {
   description?: string
   id: string
   ifname?: string
+  creator?: string
 }
 
 export interface InterfaceCreate {

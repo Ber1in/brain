@@ -245,7 +245,8 @@ class SQLiteDocumentDB:
             "dns": "[]",
             "description": "",
             "xsc_id": 0,
-            "ifname": ""
+            "ifname": "",
+            "creator": ""
         },
         "servers": {
             "bmc": {

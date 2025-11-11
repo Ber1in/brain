@@ -7,9 +7,9 @@
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索网口名、SOC、裸金属服务器、IP地址、MTU、VLAN或描述"
+              placeholder="搜索网口名、SOC、IP地址、MTU、VLAN、描述或创建人"
               clearable
-              style="width: 400px; margin-right: 16px;"
+              style="width: 450px; margin-right: 16px;"
               @input="handleSearch"
               @clear="handleSearch"
             >
@@ -103,6 +103,19 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
+        <el-table-column 
+          prop="creator" 
+          label="创建人" 
+          width="120"
+          sortable
+        >
+          <template #default="{ row }">
+            <el-tag v-if="row.creator" type="primary">
+              {{ row.creator }}
+            </el-tag>
+            <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-dropdown @command="(command) => handleCommand(command, row)" size="small">
@@ -210,6 +223,13 @@ const hostIpSortMethod = (a: InterfaceInfo, b: InterfaceInfo) => {
   if (ipA < ipB) return -1;
   if (ipA > ipB) return 1;
   return 0;
+};
+
+// 创建人排序函数
+const creatorSortMethod = (a: InterfaceInfo, b: InterfaceInfo) => {
+  const creatorA = a.creator || '';
+  const creatorB = b.creator || '';
+  return creatorA.localeCompare(creatorB);
 };
 
 // 辅助函数：用于数据加载时的排序
@@ -366,6 +386,9 @@ const filteredInterfaces = computed(() => {
       const mv200Name = getMv200Name(intf.mv200_id).toLowerCase()
       const mv200Ip = getMv200Ip(intf.mv200_id).toLowerCase()
       if (mv200Name.includes(keyword) || mv200Ip.includes(keyword)) return true
+
+      // 搜索创建人
+      if (intf.creator && intf.creator.toLowerCase().includes(keyword)) return true
 
       return false
     })
@@ -543,6 +566,12 @@ onMounted(() => {
   font-weight: 500;
   font-family: 'Courier New', monospace;
   font-size: 12px;
+}
+
+/* 空文本样式 */
+.empty-text {
+  color: #c0c4cc;
+  font-style: italic;
 }
 
 /* DNS服务器列表样式 */

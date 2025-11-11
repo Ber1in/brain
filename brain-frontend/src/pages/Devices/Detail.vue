@@ -357,7 +357,7 @@
     <el-dialog
       v-model="bootEntryDialogVisible"
       title="修改启动项"
-      width="600px"
+      width="700px"
       class="boot-entry-dialog"
       :close-on-click-modal="false"
     >

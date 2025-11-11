@@ -451,7 +451,7 @@
     <el-dialog
       v-model="bootEntryDialogVisible"
       title="修改启动项"
-      width="600px"
+      width="700px"
       class="boot-entry-dialog"
       :close-on-click-modal="false"
     >
@@ -1144,12 +1144,18 @@ const getNicSummary = (device: ServerDetailResponse) => {
 }
 
 const nicTypeColors = [
-  '#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399',
-  '#7239ea', '#ff85c0', '#36cfc9', '#597ef7', '#52c41a',
-  '#13c2c2', '#9254de', '#fa8c16', '#eb2f96', '#722ed1',
-  '#faad14', '#a0d911', '#1890ff', '#2f54eb', '#fa541c',
-  '#ff4d4f', '#73d13d', '#ff7a45', '#b37feb', '#ffc53d',
-  '#ffec3d', '#40a9ff', '#597ef7', '#ff85c0', '#36cfc9'
+  '#1890ff', // 蓝
+  '#2f54eb', // 深蓝
+  '#52c41a', // 绿
+  '#a0d911', // 黄绿
+  '#fa8c16', // 橙
+  '#fa541c', // 红橙
+  '#722ed1', // 紫
+  '#36cfc9', // 青
+  '#f56c6c', // 红
+  '#eb2f96', // 品红
+  '#e6a23c', // 黄橙
+  '#909399', // 灰
 ]
 
 // 获取网卡类型颜色
@@ -1176,7 +1182,6 @@ const getNicItemStyle = (nicType: string) => {
   const brightness = (r * 299 + g * 587 + b * 114) / 1000
   const textColor = brightness > 128 ? '#000000' : '#ffffff'
   
-  console.log("backgroundColor: ",`${color}15`, "borderColor: ",color,"color: ",textColor)
   return {
     backgroundColor: `${color}15`, // 添加透明度
     borderColor: color,

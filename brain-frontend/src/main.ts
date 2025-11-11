@@ -30,7 +30,6 @@ const setupPageVisibility = () => {
     authStore.setTabActive(isVisible)
     
     if (isVisible && authStore.accessToken) {
-      console.log('页面变为可见，检查token状态')
       authStore.onTabActivated().then(isValid => {
         if (!isValid && authStore.autoLogin) {
           authStore.logout('登录已过期，请重新登录')

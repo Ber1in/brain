@@ -47,6 +47,25 @@
             <el-icon><Connection /></el-icon>
             <span>XSC网口管理</span>
           </el-menu-item>
+
+          <el-sub-menu index="more-menu">
+            <template #title>
+              <el-icon><Menu /></el-icon>
+              <span>更多</span>
+            </template>
+            <el-menu-item index="/settings">
+              <el-icon><Setting /></el-icon>
+              <span>系统设置</span>
+            </el-menu-item>
+            <el-menu-item index="/logs">
+              <el-icon><Document /></el-icon>
+              <span>操作日志</span>
+            </el-menu-item>
+            <el-menu-item index="/help">
+              <el-icon><QuestionFilled /></el-icon>
+              <span>帮助文档</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </el-aside>
 

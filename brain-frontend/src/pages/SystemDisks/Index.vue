@@ -90,11 +90,14 @@
         <el-table-column 
           prop="creator" 
           label="创建人" 
-          width="90"
+          width="120"
           sortable
         >
           <template #default="{ row }">
-            <span class="highlight-creator">{{ row.creator }}</span>
+            <el-tag v-if="row.creator" type="primary">
+              {{ row.creator }}
+            </el-tag>
+            <span v-else class="empty-text">-</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -789,6 +792,11 @@ onMounted(() => {
 .highlight-deleted {
   color: #c0c4cc;
   font-weight: 500;
+  font-style: italic;
+}
+
+.empty-text {
+  color: #c0c4cc;
   font-style: italic;
 }
 

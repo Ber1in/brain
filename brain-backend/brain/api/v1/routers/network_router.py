@@ -23,7 +23,7 @@ MV_SERVER_COLLECTION = "mv_servers"
 
 
 @router.post("/networks", response_model=network_schemas.InterfaceInfo)
-async def create_interface(data: network_schemas.InterfaceCreate):
+async def create_interface(data: network_schemas.InterfaceCreate, user=Depends(authenticate_user)):
     """Create a new network interface"""
     interface_id = str(uuid.uuid4())
     LOG.info(f"Creating interface {interface_id} on SoC {data.mv200_id} with IP {data.ip}")
@@ -108,6 +108,7 @@ async def create_interface(data: network_schemas.InterfaceCreate):
         raise
 
     interface_data["id"] = interface_id
+    interface_data["creator"] = user
     db.insert(NETWORK_COLLECTION, interface_data)
     LOG.info(f"Interface {interface_id} inserted into database")
     return interface_data
