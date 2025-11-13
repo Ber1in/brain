@@ -54,11 +54,15 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
             current = matched_tag or current_commit
         else:
             current = repo.active_branch.name
+
+        latest_commit = repo.head.commit.hexsha
+
     except Exception as e:
         LOG.warning(f"Failed to determine current branch/tag for user {user}: {e}")
         current = None
+        latest_commit = None
 
-    return {"branchs": branchs, "tags": tags, "current": current}
+    return {"branchs": branchs, "tags": tags, "current": current, "latest_commit": latest_commit}
 
 
 @router.post("/qa_auto/switch", status_code=204)
@@ -99,4 +103,9 @@ def execute_cases(data: qa_schemas.CasesResponse, user=Depends(authenticate_user
 
 @router.get("/qa_auto/execute-history", response_model=qa_schemas.ExecuteListResponse)
 def execute_history(user=Depends(authenticate_user)):
-    return {"items": [{"url": "https://test.com", "time": "2025/11/13 11:37:17"}]}
+    return {"items": [{"url": "http://10.0.3.206:8088/docs#/", "time": "2025/11/13 11:37:17", 
+                       "current": "aidpu_for_mr",
+                       "commit": "4854441363f5604a6d8d271d8e40a84f8a2919a0"},
+                       {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+                       "current": "aidpu_for_mr_11111111111111111111111111222222",
+                       "commit": "f6b7c96447942157219b3a3095a54ec51211b975"}]}

@@ -7,123 +7,202 @@
         </div>
       </template>
 
-      <!-- 代码版本选择区域 -->
-      <div class="version-section">
-        <div class="section-title">
-          <el-icon><Setting /></el-icon>
-          <span>代码版本选择</span>
-        </div>
-        
-        <!-- 当前版本信息 -->
-        <div class="current-version" v-if="currentVersionDisplay">
-          <el-tag type="info" class="current-tag">
-            <el-icon><Position /></el-icon>
-            {{ currentVersionDisplay }}
-          </el-tag>
-        </div>
-        
-        <div class="version-control">
-          <div class="mode-selector">
-            <el-radio-group v-model="checkoutMode" @change="handleModeChange">
-              <el-radio-button label="branch">分支</el-radio-button>
-              <el-radio-button label="tag">标签</el-radio-button>
-            </el-radio-group>
+      <!-- 代码版本选择和执行历史区域 -->
+      <div class="top-section">
+        <!-- 代码版本选择区域 -->
+        <div class="version-section">
+          <div class="section-title">
+            <el-icon><Setting /></el-icon>
+            <span>代码版本选择</span>
           </div>
-
-          <div class="version-selection">
-            <!-- 分支选择 -->
-            <div v-if="checkoutMode === 'branch'" class="selection-group">
-              <el-select 
-                v-model="selectedBranch" 
-                placeholder="请选择分支或输入分支名称" 
-                style="width: 300px"
-                @change="handleBranchChange"
-                :loading="branchLoading"
-                filterable
-                clearable
-                :filter-method="filterBranch"
-                :reserve-keyword="false"
-              >
-                <el-option-group label="分支列表">
-                  <el-option 
-                    v-for="branch in filteredBranchList" 
-                    :key="branch" 
-                    :label="branch" 
-                    :value="branch"
-                  >
-                    <div class="branch-option">
-                      <span>{{ branch }}</span>
-                      <el-tag 
-                        v-if="branch === currentBranch" 
-                        size="small" 
-                        type="success"
-                        class="current-indicator"
-                      >
-                        当前
-                      </el-tag>
-                    </div>
-                  </el-option>
-                </el-option-group>
-              </el-select>
-              <div class="selection-info" v-if="selectedBranch">
-                <el-tag type="success">
-                  <el-icon><Check /></el-icon>
-                  已选择分支: {{ selectedBranch }}
-                </el-tag>
-              </div>
+          
+          <!-- 当前版本信息 -->
+          <div class="current-version" v-if="currentVersionDisplay">
+            <el-tag type="info" class="current-tag">
+              <el-icon><Position /></el-icon>
+              本地{{ currentVersionDisplay }}
+            </el-tag>
+          </div>
+          <div class="current-version" v-if="latestCommit">
+            <el-tooltip :content="latestCommit" placement="top">
+              <el-tag type="info" class="current-tag">
+                <el-icon><Position /></el-icon>
+                本地最新commit id: 
+                <span class="commit-hash">{{ formatCommitHash(latestCommit) }}</span>
+              </el-tag>
+            </el-tooltip>
+          </div>
+          <div class="version-control">
+            <div class="mode-selector">
+              <el-radio-group v-model="checkoutMode" @change="handleModeChange">
+                <el-radio-button label="branch">分支</el-radio-button>
+                <el-radio-button label="tag">标签</el-radio-button>
+              </el-radio-group>
             </div>
 
-            <!-- 标签选择 -->
-            <div v-else class="selection-group">
-              <el-select 
-                v-model="selectedTag" 
-                placeholder="请选择标签或输入标签名称" 
-                style="width: 300px"
-                @change="handleTagChange"
-                :loading="tagLoading"
-                filterable
-                clearable
-                :filter-method="filterTag"
-                :reserve-keyword="false"
-              >
-                <el-option-group label="标签列表">
-                  <el-option 
-                    v-for="tag in filteredTagList" 
-                    :key="tag" 
-                    :label="tag" 
-                    :value="tag"
-                  >
-                    <div class="tag-option">
-                      <span>{{ tag }}</span>
-                      <el-tag 
-                        v-if="tag === currentTag" 
-                        size="small" 
-                        type="success"
-                        class="current-indicator"
-                      >
-                        当前
-                      </el-tag>
-                    </div>
-                  </el-option>
-                </el-option-group>
-              </el-select>
-              <div class="selection-info" v-if="selectedTag">
-                <el-tag type="warning">
-                  <el-icon><Check /></el-icon>
-                  已选择标签: {{ selectedTag }}
-                </el-tag>
+            <div class="version-selection">
+              <!-- 分支选择 -->
+              <div v-if="checkoutMode === 'branch'" class="selection-group">
+                <el-select 
+                  v-model="selectedBranch" 
+                  placeholder="请选择仓库分支或输入分支名称" 
+                  style="width: 300px"
+                  @change="handleBranchChange"
+                  :loading="branchLoading"
+                  filterable
+                  clearable
+                  :filter-method="filterBranch"
+                  :reserve-keyword="false"
+                >
+                  <el-option-group label="分支列表">
+                    <el-option 
+                      v-for="branch in filteredBranchList" 
+                      :key="branch" 
+                      :label="branch" 
+                      :value="branch"
+                    >
+                      <div class="branch-option">
+                        <span>{{ branch }}</span>
+                        <el-tag 
+                          v-if="branch === currentBranch" 
+                          size="small" 
+                          type="success"
+                          class="current-indicator"
+                        >
+                          当前
+                        </el-tag>
+                      </div>
+                    </el-option>
+                  </el-option-group>
+                </el-select>
+                <div class="selection-info" v-if="selectedBranch">
+                  <el-tag type="success">
+                    <el-icon><Check /></el-icon>
+                    已选择分支: {{ selectedBranch }}
+                  </el-tag>
+                </div>
               </div>
-            </div>
 
+              <!-- 标签选择 -->
+              <div v-else class="selection-group">
+                <el-select 
+                  v-model="selectedTag" 
+                  placeholder="请选择仓库标签或输入标签名称" 
+                  style="width: 300px"
+                  @change="handleTagChange"
+                  :loading="tagLoading"
+                  filterable
+                  clearable
+                  :filter-method="filterTag"
+                  :reserve-keyword="false"
+                >
+                  <el-option-group label="标签列表">
+                    <el-option 
+                      v-for="tag in filteredTagList" 
+                      :key="tag" 
+                      :label="tag" 
+                      :value="tag"
+                    >
+                      <div class="tag-option">
+                        <span>{{ tag }}</span>
+                        <el-tag 
+                          v-if="tag === currentTag" 
+                          size="small" 
+                          type="success"
+                          class="current-indicator"
+                        >
+                          当前
+                        </el-tag>
+                      </div>
+                    </el-option>
+                  </el-option-group>
+                </el-select>
+                <div class="selection-info" v-if="selectedTag">
+                  <el-tag type="warning">
+                    <el-icon><Check /></el-icon>
+                    已选择标签: {{ selectedTag }}
+                  </el-tag>
+                </div>
+              </div>
+
+              <el-button 
+                type="primary" 
+                @click="handleCheckout" 
+                :loading="checkoutLoading"
+                :disabled="!canCheckout"
+              >
+                <el-icon><Switch /></el-icon>
+                更新代码
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 执行历史区域 -->
+        <div class="history-section">
+          <div class="section-title">
+            <el-icon><Clock /></el-icon>
+            <span>测试执行历史</span>
             <el-button 
               type="primary" 
-              @click="handleCheckout" 
-              :loading="checkoutLoading"
-              :disabled="!canCheckout"
+              @click="loadExecuteHistory" 
+              :loading="historyLoading"
+              size="small"
+              class="refresh-btn"
             >
-              <el-icon><Switch /></el-icon>
-              切换代码
+              <el-icon><Refresh /></el-icon>
+              刷新
             </el-button>
+          </div>
+          
+          <div class="history-content">
+            <el-table 
+              :data="executeHistory" 
+              empty-text="暂无执行历史"
+              v-loading="historyLoading"
+              style="width: 100%"
+              height="300"
+            >
+              <el-table-column prop="time" label="执行时间" width="160" sortable />
+              <el-table-column prop="current" label="执行分支/标签" width="250">
+                <template #default="{ row }">
+                  <el-tooltip v-if="row.current && row.current.length > 30" :content="row.current" placement="top">
+                    <el-tag size="small" type="info" class="current-tag">
+                      {{ formatBranchTag(row.current) }}
+                    </el-tag>
+                  </el-tooltip>
+                  <el-tag v-else-if="row.current" size="small" type="info" class="current-tag">
+                    {{ row.current }}
+                  </el-tag>
+                  <span v-else class="no-data">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="commit" label="执行时Commit" width="140">
+                <template #default="{ row }">
+                  <el-tooltip v-if="row.commit" :content="row.commit" placement="top">
+                    <el-tag size="small" type="success" class="commit-tag">
+                      {{ formatCommitHash(row.commit) }}
+                    </el-tag>
+                  </el-tooltip>
+                  <span v-else class="no-data">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="url" label="执行结果" width="140">
+                <template #default="{ row }">
+                  <el-link 
+                    v-if="row.url" 
+                    :href="row.url" 
+                    target="_blank" 
+                    type="primary"
+                    :underline="false"
+                  >
+                    <el-icon><Link /></el-icon>
+                    查看测试报告
+                  </el-link>
+                  <span v-else class="no-data">-</span>
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
         </div>
       </div>
@@ -141,7 +220,7 @@
               v-model="newDirectory" 
               placeholder="输入测试用例目录路径，如: products/api_coverage"
               @keyup.enter="addDirectory"
-              style="width: 400px"
+              style="width: 500px"
             >
               <template #append>
                 <el-button @click="addDirectory" :disabled="!newDirectory.trim()">
@@ -153,7 +232,7 @@
           </div>
 
           <div class="dir-list" v-if="directories.length > 0">
-            <div class="dir-list-title">待收集目录:</div>
+            <div class="dir-list-title">待扫描目录:</div>
             <div class="dir-tags">
               <el-tag
                 v-for="(dir, index) in directories"
@@ -176,7 +255,7 @@
             class="collect-btn"
           >
             <el-icon><Search /></el-icon>
-            收集测试用例
+            扫描测试用例
           </el-button>
         </div>
 
@@ -193,16 +272,6 @@
               <el-icon><VideoPlay /></el-icon>
               运行用例 ({{ rightTestCases.length }})
             </el-button>
-            <div class="history-section">
-                <el-button 
-                    type="info" 
-                    @click="openHistoryDialog"
-                    class="history-btn"
-                >
-                    <el-icon><Clock /></el-icon>
-                    执行历史
-                </el-button>
-            </div>
           </div>
 
           <div class="selection-container">
@@ -222,48 +291,50 @@
                 </div>
                 <span class="count-info">已选择: {{ leftSelectedCount }} 个</span>
               </div>
-              <div class="tree-container">
-                <el-tree
-                  ref="leftTreeRef"
-                  :data="filteredLeftTestCasesTree"
-                  node-key="id"
-                  show-checkbox
-                  :default-expand-all="false"
-                  :expand-on-click-node="true"
-                  @check="handleLeftTreeCheck"
-                  v-loading="treeLoading"
-                  :filter-node-method="filterNode"
-                >
-                  <template #default="{ node, data }">
-                    <div class="tree-node">
-                      <div class="node-content">
-                        <el-icon v-if="data.type === 'directory'" class="node-icon">
-                          <Folder />
-                        </el-icon>
-                        <el-icon v-else-if="data.type === 'file'" class="node-icon">
-                          <Document />
-                        </el-icon>
-                        <el-icon v-else-if="data.type === 'class'" class="node-icon">
-                          <Collection />
-                        </el-icon>
-                        <el-icon v-else class="node-icon">
-                          <Position />
-                        </el-icon>
-                        
-                        <span class="node-label">{{ data.label }}</span>
-                        
-                        <el-tag 
-                          v-if="data.testCaseCount && data.type !== 'testCase'" 
-                          size="small" 
-                          type="info"
-                          class="count-tag"
-                        >
-                          {{ data.testCaseCount }}
-                        </el-tag>
+              <div class="tree-container-wrapper">
+                <div class="tree-container">
+                  <el-tree
+                    ref="leftTreeRef"
+                    :data="filteredLeftTestCasesTree"
+                    node-key="id"
+                    show-checkbox
+                    :default-expand-all="false"
+                    :expand-on-click-node="true"
+                    @check="handleLeftTreeCheck"
+                    v-loading="treeLoading"
+                    :filter-node-method="filterNode"
+                  >
+                    <template #default="{ node, data }">
+                      <div class="tree-node">
+                        <div class="node-content">
+                          <el-icon v-if="data.type === 'directory'" class="node-icon">
+                            <Folder />
+                          </el-icon>
+                          <el-icon v-else-if="data.type === 'file'" class="node-icon">
+                            <Document />
+                          </el-icon>
+                          <el-icon v-else-if="data.type === 'class'" class="node-icon">
+                            <Collection />
+                          </el-icon>
+                          <el-icon v-else class="node-icon">
+                            <Position />
+                          </el-icon>
+                          
+                          <span class="node-label">{{ data.label }}</span>
+                          
+                          <el-tag 
+                            v-if="data.testCaseCount && data.type !== 'testCase'" 
+                            size="small" 
+                            type="info"
+                            class="count-tag"
+                          >
+                            {{ data.testCaseCount }}
+                          </el-tag>
+                        </div>
                       </div>
-                    </div>
-                  </template>
-                </el-tree>
+                    </template>
+                  </el-tree>
+                </div>
               </div>
             </div>
 
@@ -304,58 +375,66 @@
                 </div>
                 <span class="count-info">已选择: {{ rightSelectedCount }} 个</span>
               </div>
-              <div class="tree-container">
-                <el-tree
-                  ref="rightTreeRef"
-                  :data="filteredRightTestCasesTree"
-                  node-key="id"
-                  show-checkbox
-                  :default-expand-all="false"
-                  :expand-on-click-node="true"
-                  @check="handleRightTreeCheck"
-                  :filter-node-method="filterNode"
-                >
-                  <template #default="{ node, data }">
-                    <div class="tree-node">
-                      <div class="node-content">
-                        <el-icon v-if="data.type === 'directory'" class="node-icon">
-                          <Folder />
-                        </el-icon>
-                        <el-icon v-else-if="data.type === 'file'" class="node-icon">
-                          <Document />
-                        </el-icon>
-                        <el-icon v-else-if="data.type === 'class'" class="node-icon">
-                          <Collection />
-                        </el-icon>
-                        <el-icon v-else class="node-icon">
-                          <Position />
-                        </el-icon>
-                        
-                        <span class="node-label">{{ data.label }}</span>
-                        
-                        <el-tag 
-                          v-if="data.testCaseCount && data.type !== 'testCase'" 
-                          size="small" 
-                          type="info"
-                          class="count-tag"
-                        >
-                          {{ data.testCaseCount }}
-                        </el-tag>
-                        
-                        <!-- 移除按钮 -->
-                        <el-button
-                          v-if="data.type === 'testCase' || data.type === 'class'"
-                          link
-                          type="danger"
-                          @click.stop="removeFromRight(data)"
-                          class="remove-btn"
-                        >
-                          <el-icon><Delete /></el-icon>
-                        </el-button>
+              <div class="tree-container-wrapper">
+                <div class="tree-container">
+                  <el-tree
+                    ref="rightTreeRef"
+                    :data="filteredRightTestCasesTree"
+                    node-key="id"
+                    show-checkbox
+                    :default-expand-all="false"
+                    :expand-on-click-node="true"
+                    @check="handleRightTreeCheck"
+                    :filter-node-method="filterNode"
+                  >
+                    <template #default="{ node, data }">
+                      <div class="tree-node">
+                        <div class="node-content">
+                          <el-icon v-if="data.type === 'directory'" class="node-icon">
+                            <Folder />
+                          </el-icon>
+                          <el-icon v-else-if="data.type === 'file'" class="node-icon">
+                            <Document />
+                          </el-icon>
+                          <el-icon v-else-if="data.type === 'class'" class="node-icon">
+                            <Collection />
+                          </el-icon>
+                          <el-icon v-else class="node-icon">
+                            <Position />
+                          </el-icon>
+                          
+                          <span class="node-label">{{ data.label }}</span>
+                          
+                          <el-tag 
+                            v-if="data.testCaseCount && data.type !== 'testCase'" 
+                            size="small" 
+                            type="info"
+                            class="count-tag"
+                          >
+                            {{ data.testCaseCount }}
+                          </el-tag>
+                          
+                          <!-- 移除按钮 -->
+                          <el-button
+                            v-if="data.type === 'testCase' || data.type === 'class'"
+                            link
+                            type="danger"
+                            @click.stop="removeFromRight(data)"
+                            class="remove-btn"
+                          >
+                            <el-icon><Delete /></el-icon>
+                          </el-button>
+                        </div>
                       </div>
-                    </div>
-                  </template>
-                </el-tree>
+                    </template>
+                  </el-tree>
+                </div>
+                <div class="scroll-indicator">
+                  <div class="scroll-track">
+                    <div class="scroll-thumb"></div>
+                  </div>
+                  <span>左右滑动查看更多</span>
+                </div>
               </div>
             </div>
           </div>
@@ -385,7 +464,6 @@
           <ul class="operation-list">
             <li>切换到 {{ checkoutMode === 'branch' ? '分支' : '标签' }} <strong>{{ checkoutMode === 'branch' ? selectedBranch : selectedTag }}</strong></li>
             <li>拉取最新的代码</li>
-            <li>更新测试用例列表</li>
           </ul>
           <div class="current-warning" v-if="isSwitchingToCurrent">
             <el-alert
@@ -411,62 +489,13 @@
             type="primary" 
             @click="handleCheckoutConfirm" 
             :loading="checkoutLoading"
-            :disabled="isSwitchingToCurrent"
             size="large"
             class="confirm-btn"
           >
             <template #loading>
               <el-icon class="is-loading"><Loading /></el-icon>
             </template>
-            {{ isSwitchingToCurrent ? '已是当前版本' : '确认切换' }}
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- 执行历史对话框 -->
-    <el-dialog
-      v-model="historyDialogVisible"
-      title="测试执行历史"
-      width="800px"
-      class="history-dialog"
-    >
-      <div class="history-content">
-        <el-table 
-          :data="executeHistory" 
-          empty-text="暂无执行历史"
-          v-loading="historyLoading"
-          style="width: 100%"
-        >
-          <el-table-column prop="time" label="执行时间" width="180" sortable />
-          <el-table-column prop="url" label="执行结果">
-            <template #default="{ row }">
-              <el-link 
-                v-if="row.url" 
-                :href="row.url" 
-                target="_blank" 
-                type="primary"
-                :underline="false"
-              >
-                <el-icon><Link /></el-icon>
-                查看测试报告
-              </el-link>
-              <span v-else class="no-url">-</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-      
-      <template #footer>
-        <div class="history-footer">
-          <el-button @click="historyDialogVisible = false">关闭</el-button>
-          <el-button 
-            type="primary" 
-            @click="loadExecuteHistory" 
-            :loading="historyLoading"
-          >
-            <el-icon><Refresh /></el-icon>
-            刷新
+            确认更新
           </el-button>
         </div>
       </template>
@@ -475,7 +504,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus'
 import { 
   Setting, 
@@ -507,6 +536,7 @@ const branchList = ref<string[]>([])
 const tagList = ref<string[]>([])
 const currentBranch = ref('')
 const currentTag = ref('')
+const latestCommit = ref('')
 const branchSearchText = ref('')
 const tagSearchText = ref('')
 const newDirectory = ref('')
@@ -533,9 +563,7 @@ const collectLoading = ref(false)
 const checkoutDialogVisible = ref(false)
 const treeLoading = ref(false)
 const executeHistory = ref<ExecuteResponse[]>([])
-const historyDialogVisible = ref(false)
 const historyLoading = ref(false)
-
 
 // 计算属性
 const canCheckout = computed(() => {
@@ -654,9 +682,9 @@ const handleCheckoutConfirm = async () => {
     
     await testApi.switchBranchOrTag(request)
     
-    ElMessage.success(`已成功切换到 ${checkoutMode.value === 'branch' ? '分支' : '标签'} ${
+    ElMessage.success(`已成功更新到 ${checkoutMode.value === 'branch' ? '分支' : '标签'} ${
       checkoutMode.value === 'branch' ? selectedBranch.value : selectedTag.value
-    }`)
+    } 的最新代码`)
     
     checkoutDialogVisible.value = false
     
@@ -677,7 +705,7 @@ const handleCheckoutConfirm = async () => {
     showTestCasesTree.value = false
     
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '切换代码版本失败')
+    ElMessage.error(error.response?.data?.detail || '更新代码版本失败')
   } finally {
     checkoutLoading.value = false
   }
@@ -700,6 +728,7 @@ const loadBranchAndTag = async () => {
     const data: BranchAndTagResponse = await testApi.getBranchAndTag()
     branchList.value = data.branchs || []
     tagList.value = data.tags || []
+    latestCommit.value = data.latest_commit || ''
     
     if (data.current) {
       if (branchList.value.includes(data.current)) {
@@ -713,6 +742,24 @@ const loadBranchAndTag = async () => {
   } catch (error) {
     ElMessage.error('加载分支标签列表失败')
   }
+}
+
+// 格式化 commit hash 显示
+const formatCommitHash = (commit: string): string => {
+  if (!commit) return ''
+  if (commit.length > 12) {
+    return commit.substring(0, 12) + '...'
+  }
+  return commit
+}
+
+// 格式化分支/标签显示
+const formatBranchTag = (text: string): string => {
+  if (!text) return ''
+  if (text.length > 30) {
+    return text.substring(0, 30) + '...'
+  }
+  return text
 }
 
 // 构建树形结构
@@ -841,7 +888,7 @@ const handleCollectTestCases = async () => {
     const cases = response.cases || []
     
     if (cases.length === 0) {
-      ElMessage.warning('未收集到任何测试用例')
+      ElMessage.warning('未扫描到任何测试用例')
       return
     }
     
@@ -849,10 +896,10 @@ const handleCollectTestCases = async () => {
     leftTestCasesTree.value = buildTestCasesTree(cases)
     showTestCasesTree.value = true
     
-    ElMessage.success(`成功收集 ${cases.length} 个测试用例`)
+    ElMessage.success(`成功扫描 ${cases.length} 个测试用例`)
     
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '收集测试用例失败')
+    ElMessage.error(error.response?.data?.detail || '扫描测试用例失败')
   } finally {
     collectLoading.value = false
   }
@@ -910,6 +957,9 @@ watch(rightTestCases, (newCases) => {
 const moveToRight = () => {
   if (!leftTreeRef.value) return
   
+  // 保存左侧树当前的展开状态
+  const leftExpandedKeys = saveTreeExpandedKeys(leftTreeRef.value)
+  
   // 获取所有选中的节点
   const allCheckedNodes = leftTreeRef.value.getCheckedNodes(false, true) || []
   
@@ -948,12 +998,20 @@ const moveToRight = () => {
     leftTreeRef.value.setCheckedKeys([])
   }
   
+  // 恢复左侧树的展开状态
+  nextTick(() => {
+    restoreTreeExpandedKeys(leftTreeRef.value, leftExpandedKeys)
+  })
+  
   ElMessage.success(`已添加 ${casesToAdd.length} 个测试用例`)
 }
 
 // 移回左侧
 const moveToLeft = () => {
   if (!rightTreeRef.value) return
+  
+  // 保存右侧树当前的展开状态
+  const rightExpandedKeys = saveTreeExpandedKeys(rightTreeRef.value)
   
   // 获取右侧选中的节点
   const allCheckedNodes = rightTreeRef.value.getCheckedNodes(false, true) || []
@@ -988,12 +1046,20 @@ const moveToLeft = () => {
     rightTreeRef.value.setCheckedKeys([])
   }
   
+  // 恢复右侧树的展开状态
+  nextTick(() => {
+    restoreTreeExpandedKeys(rightTreeRef.value, rightExpandedKeys)
+  })
+  
   ElMessage.success(`已移除 ${casesToRemove.length} 个测试用例`)
 }
 
 // 从右侧单个移除
 const removeFromRight = (data: any) => {
   if (data.type === 'testCase' || data.type === 'class') {
+    // 保存右侧树当前的展开状态
+    const rightExpandedKeys = saveTreeExpandedKeys(rightTreeRef.value)
+    
     rightTestCases.value = rightTestCases.value.filter(item => 
       item.fullPath !== (data.fullPath || data.id)
     )
@@ -1004,8 +1070,32 @@ const removeFromRight = (data: any) => {
     )
     leftTestCasesTree.value = buildTestCasesTree(remainingCases)
     
+    // 恢复右侧树的展开状态
+    nextTick(() => {
+      restoreTreeExpandedKeys(rightTreeRef.value, rightExpandedKeys)
+    })
+    
     ElMessage.success('已移除测试用例')
   }
+}
+
+// 保存和恢复树展开状态的方法
+const saveTreeExpandedKeys = (treeRef: InstanceType<typeof ElTree> | null): string[] => {
+  if (!treeRef) return []
+  return treeRef.getCurrentKey() ? [treeRef.getCurrentKey() as string] : [] // 获取当前展开的节点
+}
+
+const restoreTreeExpandedKeys = (treeRef: InstanceType<typeof ElTree> | null, keys: string[]) => {
+  if (!treeRef || keys.length === 0) return
+  // 使用 nextTick 确保在树渲染完成后恢复展开状态
+  nextTick(() => {
+    keys.forEach(key => {
+      const node = treeRef.getNode(key)
+      if (node) {
+        treeRef.setCurrentKey(key) // 设置当前节点
+      }
+    })
+  })
 }
 
 const filteredLeftTestCasesTree = computed(() => {
@@ -1051,13 +1141,6 @@ const filterTreeData = (treeData: any[], filterText: string): any[] => {
   return filter(treeData)
 }
 
-
-// 打开历史记录对话框
-const openHistoryDialog = async () => {
-  historyDialogVisible.value = true
-  await loadExecuteHistory()
-}
-
 // 加载执行历史
 const loadExecuteHistory = async () => {
   try {
@@ -1074,8 +1157,6 @@ const loadExecuteHistory = async () => {
     historyLoading.value = false
   }
 }
-
-
 
 // 修改 handleRunSelected 方法，执行成功后刷新历史记录
 const handleRunSelected = async () => {
@@ -1133,73 +1214,11 @@ const handleRunSelected = async () => {
 
 onMounted(() => {
   loadBranchAndTag()
+  loadExecuteHistory()
 })
 </script>
 
 <style scoped>
-/* 历史记录区域样式 */
-.history-section {
-  margin-top: 20px;
-  text-align: center;
-}
-
-.history-btn {
-  margin: 0 auto;
-}
-
-/* 历史记录对话框样式 */
-.history-dialog {
-  :deep(.el-dialog__body) {
-    padding: 20px;
-  }
-}
-
-.history-content {
-  min-height: 400px;
-}
-
-.no-url {
-  color: #c0c4cc;
-  font-style: italic;
-}
-
-.history-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-:deep(.el-table .cell) {
-  display: flex;
-  align-items: center;
-}
-
-:deep(.el-link) {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.filter-input {
-  flex-shrink: 0;
-}
-
 /* 页面布局样式 */
 .qa-platform {
   padding: 20px;
@@ -1211,16 +1230,43 @@ onMounted(() => {
   align-items: center;
 }
 
-/* 区域样式 */
-.version-section,
-.collect-section {
+/* 顶部区域样式 */
+.top-section {
+  display: flex;
+  gap: 20px;
   margin-bottom: 30px;
+}
+
+.version-section {
+  flex: 1;
   padding: 20px;
   background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
 }
 
+.history-section {
+  flex: 1;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-content {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.refresh-btn {
+  margin-left: auto;
+}
+
+/* 区域标题样式 */
 .section-title {
   display: flex;
   align-items: center;
@@ -1238,6 +1284,10 @@ onMounted(() => {
 /* 当前版本样式 */
 .current-version {
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .current-tag {
@@ -1247,6 +1297,25 @@ onMounted(() => {
 
 .current-tag .el-icon {
   margin-right: 4px;
+}
+
+.commit-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.commit-tag {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+}
+
+.commit-hash {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #67c23a;
+  margin-left: 4px;
 }
 
 /* 版本控制样式 */
@@ -1296,7 +1365,15 @@ onMounted(() => {
   margin-left: 8px;
 }
 
-/* 目录配置样式 */
+/* 测试用例收集区域 */
+.collect-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
 .directory-config {
   display: flex;
   flex-direction: column;
@@ -1363,16 +1440,19 @@ onMounted(() => {
   display: flex;
   height: 500px;
   background: white;
+  min-height: 0;
 }
 
-/* 左右面板样式 - 固定1:1比例 */
+/* 左右面板样式 */
 .left-panel,
 .right-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
   border: 1px solid #e2e8f0;
-  min-width: 0; /* 防止内容溢出 */
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -1382,7 +1462,7 @@ onMounted(() => {
   padding: 12px 16px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0; /* 防止头部被压缩 */
+  flex-shrink: 0;
 }
 
 .panel-header h4 {
@@ -1396,10 +1476,54 @@ onMounted(() => {
   color: #64748b;
 }
 
+.filter-input {
+  flex-shrink: 0;
+}
+
+/* 树容器包装器 */
+.tree-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .tree-container {
   flex: 1;
   overflow: auto;
   padding: 8px;
+  min-width: 0;
+  min-height: 0;
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+
+/* 自定义滚动条样式 - 确保可见 */
+.tree-container::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+
+.tree-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+  border: 1px solid #e1e1e1;
+}
+
+.tree-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 6px;
+  border: 2px solid #f1f1f1;
+}
+
+.tree-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.tree-container::-webkit-scrollbar-corner {
+  background: #f1f1f1;
 }
 
 /* 传输按钮样式 */
@@ -1422,27 +1546,32 @@ onMounted(() => {
   margin: 0;
 }
 
+/* 树节点样式 */
+:deep(.el-tree) {
+  min-width: max-content;
+  width: 100%;
+  min-height: 0;
+}
+
+:deep(.el-tree > .el-tree-node) {
+  min-width: max-content;
+}
+
+:deep(.el-tree-node) {
+  min-width: max-content;
+}
+
 :deep(.el-tree-node__content) {
   cursor: pointer;
   height: 34px;
+  min-width: max-content;
+  width: auto;
 }
 
 :deep(.el-tree-node__content:hover) {
   background-color: #f5f7fa;
 }
 
-/* 移除按钮样式 */
-.remove-btn {
-  padding: 4px;
-  margin-left: 8px;
-  opacity: 0.7;
-}
-
-.remove-btn:hover {
-  opacity: 1;
-}
-
-/* 树节点样式 */
 .tree-node {
   width: 100%;
   min-width: 0;
@@ -1453,7 +1582,8 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-  min-width: 0;
+  min-width: max-content;
+  width: 100%;
 }
 
 .node-icon {
@@ -1466,10 +1596,10 @@ onMounted(() => {
   font-size: 14px;
   color: #1f2937;
   white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
 }
 
 .count-tag {
@@ -1477,8 +1607,47 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
+.remove-btn {
+  padding: 4px;
+  margin-left: 8px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.remove-btn:hover {
+  opacity: 1;
+}
+
 .run-btn {
   font-weight: 600;
+}
+
+/* 历史记录表格样式 */
+.no-data {
+  color: #c0c4cc;
+  font-style: italic;
+}
+
+:deep(.el-table) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-table__body-wrapper) {
+  flex: 1;
+  overflow: auto;
+}
+
+:deep(.el-table .cell) {
+  display: flex;
+  align-items: center;
+}
+
+:deep(.el-link) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* 对话框样式 */
@@ -1547,8 +1716,33 @@ onMounted(() => {
   font-weight: 600;
 }
 
+/* 移除滑动指示器相关样式 */
+.scroll-indicator {
+  display: none;
+}
+
+.scroll-track {
+  display: none;
+}
+
+.scroll-thumb {
+  display: none;
+}
+
 /* 响应式设计 */
+@media (max-width: 1200px) {
+  .top-section {
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 768px) {
+  .current-version {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
   .card-header {
     flex-direction: column;
     gap: 16px;
@@ -1581,19 +1775,47 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .transfer-btn {
-    width: 100px;
-  }
-
   .transfer-buttons {
     flex-direction: row;
     padding: 12px 20px;
     order: 3;
   }
 
+  .transfer-btn {
+    width: 100px;
+  }
+
   .left-panel,
   .right-panel {
     min-height: 200px;
   }
+  
+  .tree-container {
+    overflow: auto !important;
+  }
+}
+
+/* 确保表格滚动条正常工作 */
+:deep(.el-table__body-wrapper) {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+
+:deep(.el-table__body-wrapper::-webkit-scrollbar) {
+  height: 8px;
+  width: 8px;
+}
+
+:deep(.el-table__body-wrapper::-webkit-scrollbar-track) {
+  background: #f1f1f1;
+}
+
+:deep(.el-table__body-wrapper::-webkit-scrollbar-thumb) {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+:deep(.el-table__body-wrapper::-webkit-scrollbar-thumb:hover) {
+  background: #a8a8a8;
 }
 </style>

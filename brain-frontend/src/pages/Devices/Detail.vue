@@ -247,7 +247,7 @@
               </template>
             </el-table-column>
             <!-- SOC IP列 -->
-            <el-table-column label="SOC IP" width="150">
+            <el-table-column label="SOC IP" width="140">
               <template #default="{ row }">
                 <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
                   <el-link 

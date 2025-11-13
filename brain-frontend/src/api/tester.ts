@@ -22,6 +22,6 @@ export const testApi = {
   },
 
   getExecuteHistory(): Promise<ExecuteListResponse> {
-    return apiClient.get('/api/qa_auto/execute-history', { cache: false })
+    return apiClient.get('/api/qa_auto/execute-history')
   }
 }

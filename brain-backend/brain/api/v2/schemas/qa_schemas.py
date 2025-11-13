@@ -23,6 +23,7 @@ class BranchAndTagResponse(BaseModel):
     branchs: List[str] = None
     tags: List[str] = None
     current: str
+    latest_commit: str
 
 
 class DirNeedCollectRequest(BaseModel):
@@ -36,6 +37,8 @@ class CasesResponse(BaseModel):
 class ExecuteResponse(BaseModel):
     url: str = None
     time: str = None
+    current: str = None
+    commit: str = None
 
 
 class ExecuteListResponse(BaseModel):

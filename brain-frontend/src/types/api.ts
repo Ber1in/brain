@@ -314,6 +314,8 @@ export interface CheckoutRequest {
 export interface ExecuteResponse {
   url?: string
   time?: string
+  current?: string
+  commit?: string
 }
 
 export interface ExecuteListResponse {
@@ -323,7 +325,8 @@ export interface ExecuteListResponse {
 export interface BranchAndTagResponse {
   branchs?: string[] | null;
   tags?: string[] | null;
-  current?: string
+  current: string
+  latest_commit: string
 }
 
 export interface DirNeedCollectRequest {
