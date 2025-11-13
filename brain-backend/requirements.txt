@@ -13,3 +13,5 @@ certifi
 aenum
 paramiko
 pyghmi
+python-gitlab
+GitPython

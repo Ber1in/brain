@@ -305,3 +305,31 @@ export interface TagResponse {
 export interface TagsResponse {
   tags: TagResponse[]
 }
+
+export interface CheckoutRequest {
+  branch?: string | null;
+  tag?: string | null;
+}
+
+export interface ExecuteResponse {
+  url?: string
+  time?: string
+}
+
+export interface ExecuteListResponse {
+  items?:Array<ExecuteResponse> | null
+}
+
+export interface BranchAndTagResponse {
+  branchs?: string[] | null;
+  tags?: string[] | null;
+  current?: string
+}
+
+export interface DirNeedCollectRequest {
+  dirs: string[];
+}
+
+export interface CasesResponse {
+  cases?: string[] | null;
+}

@@ -184,6 +184,11 @@ const router = createRouter({
       name: '修改服务器信息',
       component: () => import('@/pages/Devices/Edit.vue')
     },
+    {
+      path: '/tester',
+      name: '质量保证平台',
+      component: () => import('@/pages/Tester/Index.vue')
+    },
   ],
 })
 
