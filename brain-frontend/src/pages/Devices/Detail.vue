@@ -333,6 +333,9 @@
               placeholder="选择占用结束时间"
               style="width: 100%"
               :disabled-date="disabledDate"
+              :disabled-hours="disabledHours"
+              :disabled-minutes="disabledMinutes"
+              :disabled-seconds="disabledSeconds"
               :shortcuts="timeShortcuts"
               class="enhanced-picker"
             />
@@ -739,14 +742,6 @@ const timeShortcuts = [
       date.setTime(date.getTime() + 3 * 24 * 3600 * 1000)
       return date
     }
-  },
-  {
-    text: '7天',
-    value: () => {
-      const date = new Date()
-      date.setTime(date.getTime() + 7 * 24 * 3600 * 1000)
-      return date
-    }
   }
 ]
 
@@ -822,9 +817,108 @@ const occupyDialogTitle = computed(() => {
   return isModifyMode.value ? '修改占用' : '占用服务器'
 })
 
-// 禁用过去的日期
+// 禁用超过3天的日期和时间
 const disabledDate = (time: Date) => {
-  return time.getTime() < Date.now() - 24 * 60 * 60 * 1000 // 禁用昨天及之前的日期
+  const now = new Date()
+  const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+  
+  // 只允许选择今天、明天、后天、大后天（4天内）
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const maxDate = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) // 大后天
+  
+  // 禁用今天之前和3天后的日期
+  return time.getTime() < today.getTime() || time.getTime() > maxDate.getTime()
+}
+
+// 禁用小时
+const disabledHours = () => {
+  const now = new Date()
+  const selectedDate = occupyForm.endTime
+  
+  if (!selectedDate) return []
+  
+  const disabledHours: number[] = []
+  const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  // 如果选择的是今天，禁用当前时间之前的小时
+  if (selectedDay.getTime() === today.getTime()) {
+    for (let i = 0; i < now.getHours(); i++) {
+      disabledHours.push(i)
+    }
+  }
+  
+  // 如果选择的是3天后，禁用当前时间之后的小时
+  const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+  if (selectedDay.getTime() === threeDaysLater.getTime()) {
+    for (let i = now.getHours() + 1; i < 24; i++) {
+      disabledHours.push(i)
+    }
+  }
+  
+  return disabledHours
+}
+
+// 禁用分钟
+const disabledMinutes = (selectedHour: number) => {
+  const now = new Date()
+  const selectedDate = occupyForm.endTime
+  
+  if (!selectedDate) return []
+  
+  const disabledMinutes: number[] = []
+  const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  // 如果选择的是今天且选中的小时等于当前小时，禁用当前时间之前的分钟
+  if (selectedDay.getTime() === today.getTime() && selectedHour === now.getHours()) {
+    for (let i = 0; i < now.getMinutes(); i++) {
+      disabledMinutes.push(i)
+    }
+  }
+  
+  // 如果选择的是3天后且选中的小时等于当前小时，禁用当前时间之后的分钟
+  const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+  if (selectedDay.getTime() === threeDaysLater.getTime() && selectedHour === now.getHours()) {
+    for (let i = now.getMinutes() + 1; i < 60; i++) {
+      disabledMinutes.push(i)
+    }
+  }
+  
+  return disabledMinutes
+}
+
+// 禁用秒数
+const disabledSeconds = (selectedHour: number, selectedMinute: number) => {
+  const now = new Date()
+  const selectedDate = occupyForm.endTime
+  
+  if (!selectedDate) return []
+  
+  const disabledSeconds: number[] = []
+  const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  // 如果选择的是今天且选中的小时和分钟都等于当前时间，禁用当前时间之前的秒数
+  if (selectedDay.getTime() === today.getTime() && 
+      selectedHour === now.getHours() && 
+      selectedMinute === now.getMinutes()) {
+    for (let i = 0; i < now.getSeconds(); i++) {
+      disabledSeconds.push(i)
+    }
+  }
+  
+  // 如果选择的是3天后且选中的小时和分钟都等于当前时间，禁用当前时间之后的秒数
+  const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+  if (selectedDay.getTime() === threeDaysLater.getTime() && 
+      selectedHour === now.getHours() && 
+      selectedMinute === now.getMinutes()) {
+    for (let i = now.getSeconds() + 1; i < 60; i++) {
+      disabledSeconds.push(i)
+    }
+  }
+  
+  return disabledSeconds
 }
 
 // 计算占用时长（显示用）
@@ -980,9 +1074,11 @@ const handleRefresh = async () => {
     // 重新加载详情数据和启动项信息
     await loadDeviceDetail()
     
+    // 强制重新计算 computed 属性
+    deviceData.value = { ...deviceData.value }
+    
   } catch (error: any) {
     if (error === 'cancel' || error === 'close') {
-      // 用户取消操作，不显示错误信息
       return
     }
     ElMessage.error(error.response?.data?.detail || '更新服务器信息失败')

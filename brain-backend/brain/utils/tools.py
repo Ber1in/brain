@@ -213,28 +213,35 @@ def update_automatic(ip, user, password):
     server_sn = ssh_execute(ip, "cat /sys/class/dmi/id/product_serial", user, password)
     server_vendor = ssh_execute(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
     server_product = ssh_execute(ip, "cat /sys/class/dmi/id/product_name", user, password)
-    cpu_infos = ssh_execute(
-        ip,
-        ('lscpu | awk -F":" \'/Architecture:|Vendor ID:|Model name'
-         ':/ {gsub(/^[ \t]+/, "", $2); print $2}\''),
-        user,
-        password
-    ).strip().split("\n")
 
-    # vpd_res = ssh_execute(ip, "yuncli vpd -r", user, password)
-    cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} /Vital Product Data/ "
-           "{print; for(i=0;i<5;i++){getline; print}}'")
-    pci_res = ssh_execute(ip, cmd, user, password)
+    cpu_cmd = (
+        "lscpu | awk -F\":\" "
+        "'/Architecture:|Vendor ID:|Model name:/ "
+        "{gsub(/^[ \\t]+/, \"\", $2); print $2}'"
+    )
+    cpu_infos = ssh_execute(ip, cpu_cmd, user, password).strip().split("\n")
+
+    # PCI VPD
+    pci_cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} "
+               "/Vital Product Data/ {print; for(i=0;i<5;i++){getline; print}}'")
+    pci_res = ssh_execute(ip, pci_cmd, user, password)
     nics = parse_nics_info(pci_res)
+
     mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
     macs = parse_bdf_mac(mac_res)
 
-    cmd = r"for i in /sys/class/net/*/address; do echo \"$(basename $(dirname $i)) $(cat $i)\"; done"
-    out = ssh_execute(ip, cmd, user, password)
+    # Remote iface map
+    map_cmd = ("for i in /sys/class/net/*/address; do "
+               "echo \"$(basename $(dirname $i)) $(cat $i)\"; "
+               "done")
+    out = ssh_execute(ip, map_cmd, user, password)
+
     remote_map = {}
     for raw in out.splitlines():
         line = raw.strip()
-        if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
+
+        if ((line.startswith('"') and line.endswith('"')) or
+                (line.startswith("'") and line.endswith("'"))):
             line = line[1:-1].strip()
 
         if not line:
@@ -258,11 +265,10 @@ def update_automatic(ip, user, password):
             if iface:
                 info["iface"] = iface
 
-    iface_name = ssh_execute(
-        ip,
-        ("ip route get 10.0.3.248 | head -1 | awk '{for(i=1;i<=NF;i++)"
-         " if($i==\"dev\") print $(i+1)}'"), 
-        user, password)
+    # Primary route interface
+    route_cmd = ("ip route get 10.0.3.248 | head -1 | "
+                 "awk '{for(i=1;i<=NF;i++) if($i==\"dev\") print $(i+1)}'")
+    iface_name = ssh_execute(ip, route_cmd, user, password)
 
     iface_mac = ssh_execute(ip, f"cat /sys/class/net/{iface_name}/address", user, password).strip()
     gateway = ssh_execute(ip, "ip route | awk '/default/ {print $3}'", user, password).strip()
@@ -278,4 +284,3 @@ def update_automatic(ip, user, password):
         "cpu_mode": cpu_infos[2]
     }
     return device_info, nics
-

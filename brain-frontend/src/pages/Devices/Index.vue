@@ -341,29 +341,36 @@
               placeholder="选择占用结束时间"
               style="width: 100%"
               :disabled-date="disabledDate"
+              :disabled-hours="disabledHours"
+              :disabled-minutes="disabledMinutes"
+              :disabled-seconds="disabledSeconds"
               :shortcuts="timeShortcuts"
               class="enhanced-picker"
             />
           </el-form-item>
 
-          <el-form-item class="compact-item">
-            <template #label>
-              <span class="form-label">占用时长</span>
-            </template>
-            <div class="duration-display">
-              <el-tag 
-                :type="getDurationType()" 
-                class="duration-tag"
-                :class="getDurationSize()"
-              >
-                <el-icon><Watch /></el-icon>
-                {{ calculateDuration() }}
-              </el-tag>
-              <div v-if="occupyForm.endTime" class="duration-detail">
-                <span class="end-time">截止: {{ getEndTimeDisplayFromForm() }}</span>
-              </div>
+        <el-form-item class="compact-item">
+          <template #label>
+            <span class="form-label">占用时长</span>
+          </template>
+          <div class="duration-display">
+            <el-tag 
+              :type="getDurationType()" 
+              class="duration-tag"
+              :class="getDurationSize()"
+            >
+              <el-icon><Watch /></el-icon>
+              {{ calculateDuration() }}
+            </el-tag>
+            <div v-if="occupyForm.endTime" class="duration-detail">
+              <span class="end-time">截止: {{ getEndTimeDisplayFromForm() }}</span>
+              <span class="duration-tip" v-if="getDurationSeconds() > 259200">
+                <el-icon><Warning /></el-icon>
+                超过3天限制
+              </span>
             </div>
-          </el-form-item>
+          </div>
+        </el-form-item>
         </div>
       </el-form>
       
@@ -1311,7 +1318,7 @@ const handleTagDialogBlur = (event: FocusEvent) => {
   }
 }
 
-// 时间快捷选项
+// 时间快捷选项 - 最多3天
 const timeShortcuts = [
   {
     text: '1小时',
@@ -1354,18 +1361,18 @@ const timeShortcuts = [
     }
   },
   {
-    text: '3天',
+    text: '2天',
     value: () => {
       const date = new Date()
-      date.setTime(date.getTime() + 3 * 24 * 3600 * 1000)
+      date.setTime(date.getTime() + 2 * 24 * 3600 * 1000)
       return date
     }
   },
   {
-    text: '7天',
+    text: '3天',
     value: () => {
       const date = new Date()
-      date.setTime(date.getTime() + 7 * 24 * 3600 * 1000)
+      date.setTime(date.getTime() + 3 * 24 * 3600 * 1000)
       return date
     }
   }
@@ -1443,9 +1450,108 @@ const occupyDialogTitle = computed(() => {
   return isModifyMode.value ? '修改占用' : '占用服务器'
 })
 
-// 禁用过去的日期
+// 禁用超过3天的日期
+// 禁用超过3天的日期和时间
 const disabledDate = (time: Date) => {
-  return time.getTime() < Date.now() - 24 * 60 * 60 * 1000 // 禁用昨天及之前的日期
+  const now = new Date()
+  const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+  
+  // 只允许选择今天、明天、后天、大后天（4天内）
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const maxDate = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) // 大后天
+  
+  // 禁用今天之前和3天后的日期
+  return time.getTime() < today.getTime() || time.getTime() > maxDate.getTime()
+}
+
+const disabledHours = () => {
+  const now = new Date()
+  const selectedDate = occupyForm.endTime
+  
+  if (!selectedDate) return []
+  
+  const disabledHours: number[] = []
+  const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  // 如果选择的是今天，禁用当前时间之前的小时
+  if (selectedDay.getTime() === today.getTime()) {
+    for (let i = 0; i < now.getHours(); i++) {
+      disabledHours.push(i)
+    }
+  }
+  
+  // 如果选择的是3天后，禁用当前时间之后的小时
+  const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+  if (selectedDay.getTime() === threeDaysLater.getTime()) {
+    for (let i = now.getHours() + 1; i < 24; i++) {
+      disabledHours.push(i)
+    }
+  }
+  
+  return disabledHours
+}
+
+// 禁用分钟
+const disabledMinutes = (selectedHour: number) => {
+  const now = new Date()
+  const selectedDate = occupyForm.endTime
+  
+  if (!selectedDate) return []
+  
+  const disabledMinutes: number[] = []
+  const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  // 如果选择的是今天且选中的小时等于当前小时，禁用当前时间之前的分钟
+  if (selectedDay.getTime() === today.getTime() && selectedHour === now.getHours()) {
+    for (let i = 0; i < now.getMinutes(); i++) {
+      disabledMinutes.push(i)
+    }
+  }
+  
+  // 如果选择的是3天后且选中的小时等于当前小时，禁用当前时间之后的分钟
+  const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+  if (selectedDay.getTime() === threeDaysLater.getTime() && selectedHour === now.getHours()) {
+    for (let i = now.getMinutes() + 1; i < 60; i++) {
+      disabledMinutes.push(i)
+    }
+  }
+  
+  return disabledMinutes
+}
+
+// 禁用秒数
+const disabledSeconds = (selectedHour: number, selectedMinute: number) => {
+  const now = new Date()
+  const selectedDate = occupyForm.endTime
+  
+  if (!selectedDate) return []
+  
+  const disabledSeconds: number[] = []
+  const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  // 如果选择的是今天且选中的小时和分钟都等于当前时间，禁用当前时间之前的秒数
+  if (selectedDay.getTime() === today.getTime() && 
+      selectedHour === now.getHours() && 
+      selectedMinute === now.getMinutes()) {
+    for (let i = 0; i < now.getSeconds(); i++) {
+      disabledSeconds.push(i)
+    }
+  }
+  
+  // 如果选择的是3天后且选中的小时和分钟都等于当前时间，禁用当前时间之后的秒数
+  const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+  if (selectedDay.getTime() === threeDaysLater.getTime() && 
+      selectedHour === now.getHours() && 
+      selectedMinute === now.getMinutes()) {
+    for (let i = now.getSeconds() + 1; i < 60; i++) {
+      disabledSeconds.push(i)
+    }
+  }
+  
+  return disabledSeconds
 }
 
 // 计算占用时长（显示用）
@@ -1792,6 +1898,13 @@ const handleOccupy = async () => {
     
     // 计算持续秒数
     const durationSeconds = getDurationSeconds()
+    
+    // 检查是否超过3天（259200秒）
+    const maxDuration = 3 * 24 * 60 * 60 // 3天的秒数
+    if (durationSeconds > maxDuration) {
+      ElMessage.error('占用时间不能超过3天')
+      return
+    }
     
     const updateData: ServerUpdateRequest = {
       auto: false,

@@ -2,7 +2,6 @@
 # All rights reserved.
 
 import os
-from typing import List
 import gitlab
 import git
 import logging
@@ -106,6 +105,6 @@ def execute_history(user=Depends(authenticate_user)):
     return {"items": [{"url": "http://10.0.3.206:8088/docs#/", "time": "2025/11/13 11:37:17", 
                        "current": "aidpu_for_mr",
                        "commit": "4854441363f5604a6d8d271d8e40a84f8a2919a0"},
-                       {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+                      {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
                        "current": "aidpu_for_mr_11111111111111111111111111222222",
                        "commit": "f6b7c96447942157219b3a3095a54ec51211b975"}]}
