@@ -238,6 +238,7 @@ export interface DeviceResponse {
 export interface NicInfo {
   mac?: string
   bdf?: string
+  iface?: string
 }
 
 export interface NicBase {

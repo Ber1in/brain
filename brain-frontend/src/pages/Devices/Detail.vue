@@ -232,6 +232,21 @@
                 <span v-else class="empty-text">-</span>
               </template>
             </el-table-column>
+            <!-- 网口名列 -->
+            <el-table-column label="网口名" width="100">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="iface-name">{{ info.iface !== null ? info.iface : '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="MAC地址">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
@@ -928,7 +943,8 @@ const loadBootEntries = async () => {
 const loadDeviceDetail = async () => {
   try {
     const data = await deviceApi.getById(deviceId.value)
-    deviceData.value = data
+    
+    deviceData.value = { ...data }
     
     // 同时加载启动项信息和MV200数据
     await Promise.all([
@@ -1282,26 +1298,33 @@ onMounted(() => {
 /* 并排布局样式 - 1:1:3比例 */
 .info-row {
   display: flex;
-  gap: 16px;
+  gap: 3px;
   align-items: flex-start;
 }
 
 .server-info-card {
-  flex: 1.5;
+  flex: 1.2;
   min-width: 0;
-  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+  max-width: calc(20% ); /* 1.2/6 = 20% */
 }
 
 .cpu-info-card {
-  flex: 1.5;
+  flex: 1.4;
   min-width: 0;
-  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+  max-width: calc(23% + 10px); /* 1.4/6 = 20% */
 }
 
 .nic-card {
-  flex: 3;
+  flex: 3.4;
   min-width: 0;
-  max-width: calc(50% - 11px); /* 3/6 = 50% */
+  max-width: calc(60% - 11px); /* 3.6/6 = 60% */
+}
+
+.iface-name {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
 }
 
 /* 紧凑信息列表样式 */
@@ -1316,7 +1339,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px 6px;
   background: #f8fafc;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
@@ -1332,7 +1355,7 @@ onMounted(() => {
   font-size: 13px;
   color: #64748b;
   font-weight: 500;
-  min-width: 50px;
+  min-width: 30px;
 }
 
 .info-value {
@@ -1342,7 +1365,6 @@ onMounted(() => {
   font-family: 'Monaco', 'Consolas', monospace;
   text-align: right;
   flex: 1;
-  margin-left: 12px;
   word-break: break-all;
 }
 

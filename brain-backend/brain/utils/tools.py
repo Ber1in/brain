@@ -228,11 +228,35 @@ def update_automatic(ip, user, password):
     nics = parse_nics_info(pci_res)
     mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
     macs = parse_bdf_mac(mac_res)
+
+    cmd = r"for i in /sys/class/net/*/address; do echo \"$(basename $(dirname $i)) $(cat $i)\"; done"
+    out = ssh_execute(ip, cmd, user, password)
+    remote_map = {}
+    for raw in out.splitlines():
+        line = raw.strip()
+        if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
+            line = line[1:-1].strip()
+
+        if not line:
+            continue
+
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+
+        iface, mac = parts[0].strip(), parts[1].strip().lower()
+        remote_map[mac] = iface
+
     for nic in nics:
         for info in nic["nic_info"]:
-            bdf = info["bdf"]
-            if bdf in macs:
-                info["mac"] = macs[bdf]
+            mac = macs.get(info["bdf"])
+            if not mac:
+                continue
+
+            info["mac"] = mac
+            iface = remote_map.get(mac)
+            if iface:
+                info["iface"] = iface
 
     iface_name = ssh_execute(
         ip,

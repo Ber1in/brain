@@ -34,6 +34,7 @@ class DeviceResponse(BaseModel):
 class NicInfo(BaseModel):
     mac: str = None
     bdf: str = None
+    iface: str = None
 
 
 class NicBase(BaseModel):
