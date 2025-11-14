@@ -13,24 +13,42 @@
         <div class="version-section">
           <div class="section-title">
             <el-icon><Setting /></el-icon>
-            <span>代码版本选择</span>
+            <span>测试代码版本选择</span>
           </div>
           
           <!-- 当前版本信息 -->
-          <div class="current-version" v-if="currentVersionDisplay">
-            <el-tag type="info" class="current-tag">
-              <el-icon><Position /></el-icon>
-              本地{{ currentVersionDisplay }}
-            </el-tag>
-          </div>
-          <div class="current-version" v-if="latestCommit">
-            <el-tooltip :content="latestCommit" placement="top">
+          <div class="current-version">
+            <div v-if="!branchList.length && !tagList.length" class="loading-version">
               <el-tag type="info" class="current-tag">
-                <el-icon><Position /></el-icon>
-                本地最新commit id: 
-                <span class="commit-hash">{{ formatCommitHash(latestCommit) }}</span>
+                <el-icon><Loading /></el-icon>
+                正在查询本地代码版本...
               </el-tag>
-            </el-tooltip>
+            </div>
+            <div v-else class="version-info">
+              <div class="version-item" v-if="currentBranch">
+                <el-tag type="info" class="current-tag">
+                  <el-icon><Position /></el-icon>
+                  本地当前分支: 
+                  <span class="commit-hash">{{ currentBranch }}</span>
+                </el-tag>
+              </div>
+              <div class="version-item" v-if="currentTag">
+                <el-tag type="info" class="current-tag">
+                  <el-icon><Position /></el-icon>
+                  本地当前标签: 
+                  <span class="commit-hash">{{ currentTag }}</span>
+                </el-tag>
+              </div>
+              <div class="version-item" v-if="latestCommit">
+                <el-tooltip :content="latestCommit" placement="top">
+                  <el-tag type="info" class="current-tag">
+                    <el-icon><Position /></el-icon>
+                    本地最新commit id: 
+                    <span class="commit-hash">{{ formatCommitHash(latestCommit) }}</span>
+                  </el-tag>
+                </el-tooltip>
+              </div>
+            </div>
           </div>
           <div class="version-control">
             <div class="mode-selector">
@@ -1284,25 +1302,35 @@ onMounted(() => {
 /* 当前版本样式 */
 .current-version {
   margin-bottom: 16px;
+}
+
+.loading-version {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+}
+
+.version-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.version-item {
+  display: flex;
+  align-items: center;
 }
 
 .current-tag {
   font-weight: 600;
   padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .current-tag .el-icon {
-  margin-right: 4px;
-}
-
-.commit-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin-right: 0;
+  flex-shrink: 0;
 }
 
 .commit-tag {

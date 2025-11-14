@@ -22,30 +22,39 @@ PROJECT_PATH = 'yunsilicon-software/qa_auto'
 @router.get("/qa_auto/branchs-tags", response_model=qa_schemas.BranchAndTagResponse)
 def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
+    LOG.info(f"[{user}] GitLab authentication started")
     gl.auth()
 
-    branchs = []
-    tags = []
+    branchs, tags = [], []
     project = gl.projects.get(PROJECT_PATH)
 
+    # list branches
+    LOG.info(f"Listing branches")
     for branch in project.branches.list(all=True):
         branchs.append(branch.name)
 
+    # list tags
+    LOG.info(f"Listing tags")
     for tag in project.tags.list(all=True):
         tags.append(tag.name)
 
     user_repo_dir = f"/tmp/{user}/qa_auto"
+    LOG.info(f"[{user}] Local repo dir = {user_repo_dir}")
 
     try:
         if not os.path.exists(user_repo_dir):
+            LOG.info(f"[{user}] Repo does not exist, cloning...")
             os.makedirs(os.path.dirname(user_repo_dir), exist_ok=True)
-            LOG.info(f"Cloning repository for user {user} into {user_repo_dir}")
-            clone_url = f"https://oauth2:{PRIVATE_TOKEN}@git-sha.yunsilicon.com/{PROJECT_PATH}.git"
+            clone_url = (f"https://oauth2:{PRIVATE_TOKEN}@"
+                         f"git-sha.yunsilicon.com/{PROJECT_PATH}.git")
             git.Repo.clone_from(clone_url, user_repo_dir)
+        else:
+            LOG.info(f"[{user}] Repo exists, skip cloning")
 
         repo = git.Repo(user_repo_dir)
 
         if repo.head.is_detached:
+            LOG.info(f"[{user}] Repo is in detached HEAD")
             current_commit = repo.head.commit.hexsha
             matched_tag = next(
                 (t.name for t in repo.tags if t.commit == repo.head.commit), None
@@ -55,43 +64,69 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
             current = repo.active_branch.name
 
         latest_commit = repo.head.commit.hexsha
+        LOG.info(f"[{user}] current={current}, latest={latest_commit}")
 
     except Exception as e:
-        LOG.warning(f"Failed to determine current branch/tag for user {user}: {e}")
+        LOG.error(f"[{user}] Failed to read repo: {e}")
         current = None
         latest_commit = None
 
-    return {"branchs": branchs, "tags": tags, "current": current, "latest_commit": latest_commit}
+    return {
+        "branchs": branchs,
+        "tags": tags,
+        "current": current,
+        "latest_commit": latest_commit,
+    }
 
 
 @router.post("/qa_auto/switch", status_code=204)
 def switch_branch_or_tag(data: qa_schemas.CheckoutRequest, user=Depends(authenticate_user)):
+    LOG.info(f"[{user}] Switching to branch={data.branch}, tag={data.tag}")
+
     try:
-        repo = git.Repo(f"/tmp/{user}/qa_auto")
+        repo_path = f"/tmp/{user}/qa_auto"
+        repo = git.Repo(repo_path)
+
         repo.git.fetch("--all", "--tags")
+        LOG.info(f"[{user}] Fetch completed")
 
         if data.branch:
             branch = data.branch
+            LOG.info(f"[{user}] Switching to branch {branch}")
+
             if branch not in [h.name for h in repo.heads]:
+                LOG.info(f"[{user}] Branch {branch} not found, creating")
                 repo.git.checkout("-b", branch, f"origin/{branch}")
             else:
                 repo.git.checkout(branch)
+
             repo.git.pull()
+            LOG.info(f"[{user}] Branch {branch} updated")
 
         elif data.tag:
             tag = data.tag
+            LOG.info(f"[{user}] Switching to tag {tag}")
+
             if tag not in [t.name for t in repo.tags]:
+                LOG.warning(f"[{user}] Tag {tag} not found")
                 raise HTTPException(status_code=404, detail=f"Tag '{tag}' not found")
+
             repo.git.checkout(f"tags/{tag}")
+            LOG.info(f"[{user}] Switched to tag {tag}")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to switch: {str(e)}")
+        LOG.error(f"[{user}] Switch failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to switch: {e}")
 
 
 @router.post("/qa_auto/commands", response_model=qa_schemas.CasesResponse)
 def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenticate_user)):
-    LOG.info(f"Starting test collection for: {data.dirs}")
-    commands = collect_tests_with_detailed_report(data.dirs, f"/tmp/{user}/qa_auto")
+    LOG.info(f"[{user}] Collecting tests from: {data.dirs}")
+
+    commands = collect_tests_with_detailed_report(
+        data.dirs,
+        f"/tmp/{user}/qa_auto"
+    )
     return {"cases": commands}
 
 
