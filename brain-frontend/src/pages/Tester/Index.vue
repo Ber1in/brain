@@ -394,20 +394,22 @@
                           <el-icon v-else-if="data.type === 'class'" class="node-icon">
                             <Collection />
                           </el-icon>
-                          <el-icon v-else class="node-icon">
+                          <el-icon v-else-if="data.type === 'testCase'" class="node-icon">
                             <Position />
+                          </el-icon>
+                          <el-icon v-else class="node-icon">
+                            <QuestionFilled />
                           </el-icon>
                           
                           <span class="node-label">{{ data.label }}</span>
                           
-                          <el-tag 
-                            v-if="data.testCaseCount && data.type !== 'testCase'" 
-                            size="small" 
-                            type="info"
-                            class="count-tag"
+                          <!-- 在所有非测试用例节点后面显示用例数量 -->
+                          <span 
+                            v-if="data.type !== 'testCase'" 
+                            class="count-badge"
                           >
-                            {{ data.testCaseCount }}
-                          </el-tag>
+                            ({{ data.testCaseCount || 0 }})
+                          </span>
                         </div>
                       </div>
                     </template>
@@ -483,18 +485,16 @@
                           
                           <span class="node-label">{{ data.label }}</span>
                           
-                          <el-tag 
-                            v-if="data.testCaseCount && data.type !== 'testCase'" 
-                            size="small" 
-                            type="info"
-                            class="count-tag"
+                          <span 
+                            v-if="data.type !== 'testCase'" 
+                            class="count-badge"
                           >
-                            {{ data.testCaseCount }}
-                          </el-tag>
+                            ({{ data.testCaseCount || 0 }})
+                          </span>
                           
                           <!-- 移除按钮 -->
                           <el-button
-                            v-if="data.type === 'testCase' || data.type === 'class'"
+                            v-if="data.type === 'testCase'"
                             link
                             type="danger"
                             @click.stop="removeFromRight(data)"
@@ -1464,7 +1464,27 @@ const buildTestCasesTree = (cases: string[]) => {
       currentLevel = node
     }
     
-    if (parts.length > 1) {
+    // 处理测试用例部分
+    if (parts.length === 2) {
+      // 格式：file::test_case
+      // 这种情况没有类名，直接创建测试用例节点
+      const testCasePart = parts[1]
+      const testCaseId = currentPath + '::' + testCasePart
+      const testCaseNode = {
+        id: testCaseId,
+        label: testCasePart,
+        type: 'testCase',
+        fullPath: testCase,
+        testCaseCount: 1
+      }
+      
+      if (!currentLevel.children) {
+        currentLevel.children = []
+      }
+      currentLevel.children.push(testCaseNode)
+      
+    } else if (parts.length === 3) {
+      // 格式：file::class::test_case
       const classPart = parts[1]
       const classId = currentPath + '::' + classPart
       let classNode = currentLevel.children?.find((child: any) => child.label === classPart)
@@ -1475,8 +1495,7 @@ const buildTestCasesTree = (cases: string[]) => {
           label: classPart,
           type: 'class',
           children: [],
-          testCaseCount: 0,
-          fullPath: testCase
+          testCaseCount: 0
         }
         if (!currentLevel.children) {
           currentLevel.children = []
@@ -1484,23 +1503,23 @@ const buildTestCasesTree = (cases: string[]) => {
         currentLevel.children.push(classNode)
       }
       
-      if (parts.length > 2) {
-        const methodPart = parts[2]
-        const methodId = classId + '::' + methodPart
-        const methodNode = {
-          id: methodId,
-          label: methodPart,
-          type: 'testCase',
-          fullPath: testCase,
-          testCaseCount: 1
-        }
-        
-        if (!classNode.children) {
-          classNode.children = []
-        }
-        classNode.children.push(methodNode)
+      const methodPart = parts[2]
+      const methodId = classId + '::' + methodPart
+      const methodNode = {
+        id: methodId,
+        label: methodPart,
+        type: 'testCase',
+        fullPath: testCase,
+        testCaseCount: 1
       }
-    } else {
+      
+      if (!classNode.children) {
+        classNode.children = []
+      }
+      classNode.children.push(methodNode)
+    } else if (parts.length === 1) {
+      // 格式：file (只有文件路径，没有测试用例)
+      // 这种情况不应该出现，但为了容错处理
       const methodNode = {
         id: currentPath,
         label: pathParts[pathParts.length - 1],
@@ -1516,6 +1535,7 @@ const buildTestCasesTree = (cases: string[]) => {
     }
   })
   
+  // 递归计算每个节点的测试用例数量
   const calculateTestCaseCount = (node: any): number => {
     if (node.type === 'testCase') {
       return 1
@@ -1856,7 +1876,7 @@ const saveCurrentCombination = () => {
   const minutes = String(now.getMinutes()).padStart(2, '0')
   const seconds = String(now.getSeconds()).padStart(2, '0')
   
-  saveCombinationForm.value.name = `集合_${year}${month}${day}_${hours}${minutes}${seconds}`
+  saveCombinationForm.value.name = `集合_${year}/${month}/${day}_${hours}:${minutes}:${seconds}`
   saveCombinationDialogVisible.value = true
 }
 
