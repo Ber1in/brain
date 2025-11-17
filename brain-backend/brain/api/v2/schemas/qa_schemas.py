@@ -34,6 +34,30 @@ class CasesResponse(BaseModel):
     cases: List[str] = None
 
 
+class ExecuteNicInfo(BaseModel):
+    iface: str
+    ipv4: str = None
+    ipv6: str = None
+    bdf: str
+
+    @root_validator
+    def check_ip(cls, values):
+        ipv4, ipv6 = values.get("ipv4"), values.get("ipv6")
+        if not ipv4 and not ipv6:
+            raise ValueError("Either ipv4 or ipv6 must be provided.")
+        return values
+
+
+class Server(BaseModel):
+    device_id: str
+    nics: List[ExecuteNicInfo] = None
+
+
+class ExecuteRequest(BaseModel):
+    cases: List[str] = None
+    servers: List[Server] = None
+
+
 class ExecuteResponse(BaseModel):
     url: str = None
     time: str = None
@@ -43,3 +67,15 @@ class ExecuteResponse(BaseModel):
 
 class ExecuteListResponse(BaseModel):
     items: List[ExecuteResponse] = None
+
+
+class CaseCombinationsResponse(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    cases: List[str] = None
+
+
+class CaseCombinationsRequest(BaseModel):
+    name: str
+    cases: List[str] = None

@@ -337,3 +337,32 @@ export interface DirNeedCollectRequest {
 export interface CasesResponse {
   cases?: string[] | null;
 }
+
+export interface CaseNicInfo {
+  iface: string;
+  ipv4?: string;
+  ipv6?: string;
+  bdf: string;
+}
+
+export interface Server {
+  device_id: string;
+  nics?: CaseNicInfo[];
+}
+
+export interface ExecuteRequest {
+  cases?: string[];
+  servers?: Server[];
+}
+
+export interface CaseCombinationsResponse {
+  id: string;
+  name: string;
+  created_at: string;
+  cases?: string[];
+}
+
+export interface CaseCombinationRequest {
+  name: string;
+  cases?: string[];
+}

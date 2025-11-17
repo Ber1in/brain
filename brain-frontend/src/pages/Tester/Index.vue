@@ -229,67 +229,142 @@
       <div class="collect-section">
         <div class="section-title">
           <el-icon><Collection /></el-icon>
-          <span>测试用例收集</span>
+          <span>测试用例管理</span>
         </div>
 
-        <div class="directory-config">
-          <div class="dir-input-group">
-            <el-input 
-              v-model="newDirectory" 
-              placeholder="输入测试用例目录路径，如: products/api_coverage"
-              @keyup.enter="addDirectory"
-              style="width: 500px"
-            >
-              <template #append>
-                <el-button @click="addDirectory" :disabled="!newDirectory.trim()">
-                  <el-icon><Plus /></el-icon>
-                  添加
-                </el-button>
-              </template>
-            </el-input>
-          </div>
+        <!-- 左右布局 -->
+        <div class="management-layout">
+          <!-- 左侧：目录配置 -->
+          <div class="left-management">
+            <div class="directory-config">
+              <div class="dir-input-group">
+                <el-input 
+                  v-model="newDirectory" 
+                  placeholder="输入测试用例目录路径，如: products/api_coverage"
+                  @keyup.enter="addDirectory"
+                  style="width: 100%"
+                >
+                  <template #append>
+                    <el-button @click="addDirectory" :disabled="!newDirectory.trim()">
+                      <el-icon><Plus /></el-icon>
+                      添加
+                    </el-button>
+                  </template>
+                </el-input>
+              </div>
 
-          <div class="dir-list" v-if="directories.length > 0">
-            <div class="dir-list-title">待扫描目录:</div>
-            <div class="dir-tags">
-              <el-tag
-                v-for="(dir, index) in directories"
-                :key="index"
-                closable
-                @close="removeDirectory(index)"
-                type="info"
-                class="dir-tag"
+              <div class="dir-list" v-if="directories.length > 0">
+                <div class="dir-list-title">待扫描目录:</div>
+                <div class="dir-tags">
+                  <el-tag
+                    v-for="(dir, index) in directories"
+                    :key="index"
+                    closable
+                    @close="removeDirectory(index)"
+                    type="info"
+                    class="dir-tag"
+                  >
+                    {{ dir }}
+                  </el-tag>
+                </div>
+              </div>
+
+              <el-button 
+                type="success" 
+                @click="handleCollectTestCases" 
+                :loading="collectLoading"
+                :disabled="directories.length === 0"
+                class="collect-btn"
               >
-                {{ dir }}
-              </el-tag>
+                <el-icon><Search /></el-icon>
+                扫描测试用例
+              </el-button>
             </div>
           </div>
 
-          <el-button 
-            type="success" 
-            @click="handleCollectTestCases" 
-            :loading="collectLoading"
-            :disabled="directories.length === 0"
-            class="collect-btn"
-          >
-            <el-icon><Search /></el-icon>
-            扫描测试用例
-          </el-button>
+          <!-- 右侧：用例集合管理 -->
+          <div class="right-management">
+            <div class="combinations-section">
+              <div class="section-title">
+                <el-icon><FolderOpened /></el-icon>
+                <span>测试用例集合管理</span>
+              </div>
+              
+              <div class="combinations-control">
+                <div class="combination-selection">
+                  <el-select 
+                    v-model="selectedCombinationId" 
+                    placeholder="选择已有用例集合" 
+                    style="width: 100%"
+                    @change="handleCombinationChange"
+                    clearable
+                    filterable
+                  >
+                    <el-option 
+                      v-for="combination in combinations" 
+                      :key="combination.id" 
+                      :label="combination.name" 
+                      :value="combination.id"
+                    >
+                      <div class="combination-option">
+                        <span>{{ combination.name }}</span>
+                        <el-tag size="small" type="info" class="case-count">
+                          {{ combination.cases?.length || 0 }} 用例
+                        </el-tag>
+                        <span class="create-time">{{ formatTime(combination.created_at) }}</span>
+                      </div>
+                    </el-option>
+                  </el-select>
+                  
+                  <div class="combination-buttons">
+                    <el-button 
+                      type="success" 
+                      @click="loadCombinationToRight"
+                      :disabled="!selectedCombinationId"
+                      style="width: 100%"
+                    >
+                      <el-icon><Lightning /></el-icon>
+                      加载集合
+                    </el-button>
+                    <el-button 
+                      type="danger" 
+                      @click="deleteCombination"
+                      :disabled="!selectedCombinationId"
+                      style="width: 100%"
+                    >
+                      <el-icon><Delete /></el-icon>
+                      删除集合
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- 测试用例选择区域 - 一分为二 -->
-        <div class="test-cases-selection" v-if="showTestCasesTree">
+        <!-- 测试用例选择区域 -->
+        <div class="test-cases-selection">
           <div class="selection-header">
-            <h3>测试用例管理</h3>
-            <el-button 
-              type="primary" 
-              :disabled="rightTestCases.length === 0"
-              @click="handleRunSelected"
-              class="run-btn"
-            >
-              <el-icon><VideoPlay /></el-icon>
-              运行用例 ({{ rightTestCases.length }})
-            </el-button>
+            <h3>测试用例列表</h3>
+            <div class="action-buttons">
+              <el-button 
+                type="primary" 
+                @click="saveCurrentCombination" 
+                :disabled="rightTestCases.length === 0"
+              >
+                <el-icon><FolderAdd /></el-icon>
+                保存为新集合
+              </el-button>
+              <el-button 
+                type="primary" 
+                :disabled="rightTestCases.length === 0"
+                @click="handleRunSelected"
+                class="run-btn"
+              >
+                <el-icon><VideoPlay /></el-icon>
+                运行用例 ({{ rightTestCases.length }})
+              </el-button>
+            </div>
           </div>
 
           <div class="selection-container">
@@ -447,12 +522,6 @@
                     </template>
                   </el-tree>
                 </div>
-                <div class="scroll-indicator">
-                  <div class="scroll-track">
-                    <div class="scroll-thumb"></div>
-                  </div>
-                  <span>左右滑动查看更多</span>
-                </div>
               </div>
             </div>
           </div>
@@ -518,6 +587,242 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 保存集合对话框 -->
+    <el-dialog
+      v-model="saveCombinationDialogVisible"
+      title="保存测试用例集合"
+      width="500px"
+    >
+      <el-form :model="saveCombinationForm" label-width="80px">
+        <el-form-item label="集合名称" required>
+          <el-input 
+            v-model="saveCombinationForm.name" 
+            placeholder="请输入集合名称"
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="用例数量">
+          <span>{{ rightTestCases.length }} 个测试用例</span>
+        </el-form-item>
+        <el-form-item label="用例列表">
+          <div class="case-preview">
+            <el-tag
+              v-for="(testCase, index) in rightTestCases.slice(0, 10)"
+              :key="index"
+              size="small"
+              class="preview-tag"
+            >
+              {{ getTestCaseName(testCase.fullPath) }}
+            </el-tag>
+            <div v-if="rightTestCases.length > 10" class="more-cases">
+              还有 {{ rightTestCases.length - 10 }} 个用例...
+            </div>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="saveCombinationDialogVisible = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="confirmSaveCombination"
+          :disabled="!saveCombinationForm.name.trim()"
+        >
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 服务器选择对话框 -->
+    <el-dialog
+      v-model="serverDialogVisible"
+      title="选择执行服务器"
+      width="800px"
+      class="server-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="server-dialog-content">
+        <el-alert
+          title="请选择用于执行测试用例的服务器，并为非MV200网卡配置IP地址"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 20px;"
+        />
+
+        <!-- 服务器选择 -->
+        <div class="server-selection">
+          <div class="section-title">
+            <el-icon><Monitor /></el-icon>
+            <span>选择服务器</span>
+          </div>
+          <div class="server-list">
+            <el-checkbox-group v-model="selectedServers">
+              <div 
+                v-for="server in availableServers" 
+                :key="server.id"
+                class="server-item"
+              >
+                <el-checkbox :label="server.id">
+                  <div class="server-info">
+                    <span class="server-name">{{ server.bmc.hostname }}</span>
+                    <span class="server-ip">{{ server.device.ip }}</span>
+                    <el-tag v-if="server.user" size="small" type="success">
+                      占用人: {{ server.user }}
+                    </el-tag>
+                  </div>
+                </el-checkbox>
+              </div>
+            </el-checkbox-group>
+            <div v-if="availableServers.length === 0" class="no-servers">
+              <el-empty description="暂无可用服务器，请先占用服务器" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 网卡配置 -->
+        <div class="nic-configuration" v-if="selectedServers.length > 0">
+          <div class="section-title">
+            <el-icon><Connection /></el-icon>
+            <span>网卡IP配置 (可选)</span>
+            <el-tag type="info" size="small">仅需为非MV200网卡配置IP</el-tag>
+          </div>
+          <div class="nic-config-list">
+            <div 
+              v-for="server in selectedServersWithNics" 
+              :key="server.id"
+              class="server-nics"
+            >
+              <div class="server-header">
+                <h4>{{ server.bmc.hostname }} ({{ server.device.ip }})</h4>
+                <div class="server-nic-stats">
+                  <el-tag size="small" type="info">
+                    总共 {{ getTotalNicCount(server) }} 张网卡
+                  </el-tag>
+                  <el-tag v-if="getMv200NicCount(server) > 0" size="small" type="success">
+                    已忽略 {{ getMv200NicCount(server) }} 张MV200网卡
+                  </el-tag>
+                  <el-tag size="small" type="warning">
+                    可配置 {{ getConfigurableNicCount(server) }} 张网卡
+                  </el-tag>
+                </div>
+              </div>
+              
+              <!-- 修改网卡列表部分 -->
+              <div class="nics-list">
+                <!-- 显示可配置的非MV200网卡 -->
+                <div 
+                  v-for="nic in getConfigurableNics(server)" 
+                  :key="nic?.sn || nic?.type"
+                  class="nic-item"
+                >
+                  <div class="nic-info">
+                    <div class="nic-type">
+                      {{ nic.type || '未知类型' }}
+                      <el-tag v-if="nic.nic_info" size="small" type="primary" style="margin-left: 8px;">
+                        {{ nic.nic_info.length }} 个网口
+                      </el-tag>
+                    </div>
+                    <div class="nic-details">
+                      <span class="nic-sn">SN: {{ nic.sn || '未知SN' }}</span>
+                    </div>
+                  </div>
+                  
+                  <!-- 网口配置区域 - 每个网口单独配置 -->
+                  <div class="nic-interfaces-config" v-if="nic.nic_info && nic.nic_info.length > 0">
+                    <div 
+                      v-for="(nicInfo, index) in nic.nic_info" 
+                      :key="index"
+                      class="nic-interface"
+                    >
+                      <div class="interface-header">
+                        <div class="interface-info">
+                          <span class="iface-name">{{ nicInfo.iface || `网口${index + 1}` }}</span>
+                          <span class="bdf">{{ nicInfo.bdf || '未知BDF' }}</span>
+                        </div>
+                        <el-switch
+                          v-model="nicInfo.enableConfig"
+                          @change="handleInterfaceConfigChange(nicInfo)"
+                          active-text="配置IP"
+                          inactive-text="不配置"
+                        />
+                      </div>
+                      
+                      <!-- IP配置区域，只在启用配置时显示 -->
+                      <div class="ip-inputs" v-if="nicInfo.enableConfig">
+                        <el-input
+                          v-model="nicInfo.ipv4"
+                          placeholder="IPv4地址"
+                          style="width: 200px; margin-right: 10px;"
+                        />
+                        <el-input
+                          v-model="nicInfo.ipv6"
+                          placeholder="IPv6地址"
+                          style="width: 200px;"
+                        />
+                        <el-alert
+                          v-if="!nicInfo.ipv4 && !nicInfo.ipv6"
+                          title="请至少配置一个IP地址（IPv4或IPv6）"
+                          type="warning"
+                          :closable="false"
+                          show-icon
+                          style="margin-top: 8px; width: 420px;"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div v-else class="no-interfaces">
+                    <el-alert
+                      title="此网卡没有可配置的网口"
+                      type="info"
+                      :closable="false"
+                      show-icon
+                    />
+                  </div>
+                </div>
+                
+                <!-- 显示没有可配置网卡的情况 -->
+                <div v-if="getConfigurableNicCount(server) === 0" class="no-configurable-nics">
+                  <el-alert
+                    title="此服务器没有需要配置IP的网卡（所有网卡均为MV200类型或无可配置网口）"
+                    type="info"
+                    :closable="false"
+                    show-icon
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="serverDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleExecuteConfirm" 
+            :loading="executeLoading"
+            :disabled="!canExecute"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            开始执行
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -541,10 +846,29 @@ import {
   Delete,
   Clock,
   Link,
-  Refresh
+  Refresh,
+  Monitor,
+  Connection,
+  FolderOpened,
+  FolderAdd,
+  Lightning
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
-import type { BranchAndTagResponse, CheckoutRequest, CasesResponse, ExecuteResponse, ExecuteListResponse } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import { useAuthStore } from '@/stores/auth'
+import type { 
+  BranchAndTagResponse, 
+  CheckoutRequest, 
+  CasesResponse, 
+  ExecuteResponse, 
+  ExecuteListResponse,
+  ServerDetailResponse,
+  ExecuteRequest,
+  Server,
+  CaseNicInfo,
+  CaseCombinationResponse,
+  CaseCombinationRequest 
+} from '@/types/api'
 
 // 响应式数据
 const checkoutMode = ref<'branch' | 'tag'>('branch')
@@ -568,6 +892,21 @@ const leftTestCasesTree = ref<any[]>([]) // 左侧树形数据
 const rightTestCases = ref<any[]>([]) // 右侧已添加用例
 const leftSelectedCases = ref<string[]>([]) // 左侧选中的用例
 const rightTestCasesTree = ref<any[]>([]) // 右侧树形数据
+
+// 用例集合相关数据
+const combinations = ref<CaseCombinationsResponse[]>([])
+const selectedCombinationId = ref('')
+const saveCombinationDialogVisible = ref(false)
+const saveCombinationForm = ref<CaseCombinationRequest>({
+  name: '',
+  cases: []
+})
+
+// 服务器相关数据
+const availableServers = ref<ServerDetailResponse[]>([])
+const selectedServers = ref<string[]>([])
+const serverDialogVisible = ref(false)
+const executeLoading = ref(false)
 
 const leftTreeRef = ref<InstanceType<typeof ElTree>>()
 const rightTreeRef = ref<InstanceType<typeof ElTree>>()
@@ -642,6 +981,9 @@ const leftSelectedCount = computed(() => {
 })
 
 const leftTotalCount = computed(() => {
+  if (collectedCases.value.length === 0) {
+    return collectedCases.value.length
+  }
   return collectedCases.value.length - rightTestCases.value.length
 })
 
@@ -657,6 +999,42 @@ const rightSelectedCount = computed(() => {
   })
   
   return leafNodes.length
+})
+
+// 服务器相关计算属性
+const selectedServersWithNics = computed(() => {
+  return availableServers.value.filter(server => 
+    selectedServers.value.includes(server.id!)
+  )
+})
+
+// 当前选择的集合
+const currentCombination = computed(() => {
+  return combinations.value.find(c => c.id === selectedCombinationId.value)
+})
+
+// 修改 canExecute 计算属性，按网口级别检查
+const canExecute = computed(() => {
+  if (selectedServers.value.length === 0) return false
+  
+  // 检查所有启用了配置的网口是否都正确配置了IP
+  for (const server of selectedServersWithNics.value) {
+    for (const nic of server.nics || []) {
+      // 跳过MV200网卡
+      if (isMv200Nic(nic.type)) continue
+      
+      if (nic.nic_info) {
+        for (const nicInfo of nic.nic_info) {
+          // 如果启用了配置但未配置任何IP，则不能执行
+          if (nicInfo.enableConfig && !nicInfo.ipv4 && !nicInfo.ipv6) {
+            return false
+          }
+        }
+      }
+    }
+  }
+  
+  return true
 })
 
 // 方法
@@ -762,6 +1140,50 @@ const loadBranchAndTag = async () => {
   }
 }
 
+// 检查是否为MV200网卡
+const isMv200Nic = (nicType: string | undefined): boolean => {
+  if (!nicType) return false
+  const typeLower = nicType.toLowerCase()
+  return typeLower.includes('mv200') || typeLower.includes('marvell') || typeLower.includes('88e')
+}
+
+const hasSkippedMv200Nics = (server: ServerDetailResponse): boolean => {
+  if (!server.nics) return false
+  return server.nics.some(nic => isMv200Nic(nic.type))
+}
+
+const getTotalNicCount = (server: ServerDetailResponse): number => {
+  return server.nics?.length || 0
+}
+
+const getMv200NicCount = (server: ServerDetailResponse): number => {
+  if (!server.nics) return 0
+  return server.nics.filter(nic => isMv200Nic(nic.type)).length
+}
+
+const getConfigurableNicCount = (server: ServerDetailResponse): number => {
+  return getConfigurableNics(server).length
+}
+
+const getConfigurableNics = (server: ServerDetailResponse): any[] => {
+  if (!server.nics) return []
+  
+  return server.nics.filter(nic => {
+    // 跳过MV200网卡
+    if (isMv200Nic(nic.type)) return false
+    // 只显示有网口信息的网卡
+    return nic.nic_info && nic.nic_info.length > 0
+  })
+}
+
+const handleInterfaceConfigChange = (nicInfo: any) => {
+  if (!nicInfo.enableConfig) {
+    // 当关闭配置时，清空已配置的IP
+    nicInfo.ipv4 = ''
+    nicInfo.ipv6 = ''
+  }
+}
+
 // 格式化 commit hash 显示
 const formatCommitHash = (commit: string): string => {
   if (!commit) return ''
@@ -778,6 +1200,19 @@ const formatBranchTag = (text: string): string => {
     return text.substring(0, 30) + '...'
   }
   return text
+}
+
+// 格式化时间显示
+const formatTime = (timeStr: string): string => {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  return date.toLocaleDateString()
+}
+
+// 获取测试用例的简短名称
+const getTestCaseName = (fullPath: string): string => {
+  const parts = fullPath.split('::')
+  return parts[parts.length - 1] || fullPath
 }
 
 // 构建树形结构
@@ -913,6 +1348,9 @@ const handleCollectTestCases = async () => {
     collectedCases.value = cases
     leftTestCasesTree.value = buildTestCasesTree(cases)
     showTestCasesTree.value = true
+    
+    // 加载用例集合列表
+    await loadCombinations()
     
     ElMessage.success(`成功扫描 ${cases.length} 个测试用例`)
     
@@ -1176,33 +1614,231 @@ const loadExecuteHistory = async () => {
   }
 }
 
-// 修改 handleRunSelected 方法，执行成功后刷新历史记录
+// 用例集合相关方法
+// 加载用例集合列表
+const loadCombinations = async () => {
+  try {
+    const response = await testApi.getCustomCombinations()
+    combinations.value = response
+  } catch (error) {
+    ElMessage.error('加载用例集合失败')
+  }
+}
+
+// 处理集合选择变化
+const handleCombinationChange = (combinationId: string) => {
+  if (!combinationId) {
+    // 清空选择
+    selectedCombinationId.value = ''
+  }
+}
+
+// 保存当前集合
+const saveCurrentCombination = () => {
+  if (rightTestCases.value.length === 0) {
+    ElMessage.warning('请先选择测试用例')
+    return
+  }
+  
+  // 生成包含年月日时分秒的默认名称
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  const seconds = String(now.getSeconds()).padStart(2, '0')
+  
+  saveCombinationForm.value.name = `集合_${year}${month}${day}_${hours}${minutes}${seconds}`
+  saveCombinationDialogVisible.value = true
+}
+
+// 确认保存集合
+const confirmSaveCombination = async () => {
+  try {
+    const casePaths = rightTestCases.value.map(item => item.fullPath)
+    
+    const request: CaseCombinationRequest = {
+      name: saveCombinationForm.value.name.trim(),
+      cases: casePaths
+    }
+    
+    await testApi.saveCustomCombination(request)
+    
+    ElMessage.success('用例集合保存成功')
+    saveCombinationDialogVisible.value = false
+    saveCombinationForm.value.name = ''
+    
+    // 重新加载集合列表
+    await loadCombinations()
+    
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '保存用例集合失败')
+  }
+}
+
+// 加载集合到右侧
+const loadCombinationToRight = async () => {
+  if (!selectedCombinationId.value) {
+    ElMessage.warning('请先选择用例集合')
+    return
+  }
+  
+  const combination = currentCombination.value
+  if (!combination || !combination.cases || combination.cases.length === 0) {
+    ElMessage.warning('该集合没有测试用例')
+    return
+  }
+  
+  try {
+    // 清空右侧现有用例
+    rightTestCases.value = []
+    
+    // 添加集合中的用例到右侧
+    combination.cases.forEach((casePath: string) => {
+      if (!rightTestCases.value.some(item => item.fullPath === casePath)) {
+        rightTestCases.value.push({
+          fullPath: casePath
+        })
+      }
+    })
+    
+    // 如果有扫描过用例，更新左侧树
+    if (collectedCases.value.length > 0) {
+      const remainingCases = collectedCases.value.filter(casePath => 
+        !rightTestCases.value.some(item => item.fullPath === casePath)
+      )
+      leftTestCasesTree.value = buildTestCasesTree(remainingCases)
+    }
+    
+    ElMessage.success(`已加载集合 "${combination.name}" 的 ${combination.cases.length} 个测试用例`)
+    
+  } catch (error) {
+    ElMessage.error('加载用例集合失败')
+  }
+}
+
+// 删除集合
+const deleteCombination = async () => {
+  if (!selectedCombinationId.value) {
+    return
+  }
+  
+  const combination = currentCombination.value
+  if (!combination) return
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除集合 "${combination.name}" 吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    // 调用删除接口
+    await testApi.deleteCustomCombination(combination.id)
+    
+    ElMessage.success('集合删除成功')
+    
+    // 重新加载集合列表
+    await loadCombinations()
+    
+    // 清空选择
+    selectedCombinationId.value = ''
+    
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除集合失败')
+    }
+  }
+}
+
+// 修改 handleRunSelected 方法，打开服务器选择对话框
 const handleRunSelected = async () => {
   if (rightTestCases.value.length === 0) {
     ElMessage.warning('请先添加测试用例')
     return
   }
   
-  const selectedCases = rightTestCases.value.map(item => item.fullPath)
-  
   try {
-    await ElMessageBox.confirm(
-      `确定要运行 ${selectedCases.length} 个测试用例吗？`,
-      '确认运行测试',
-      {
-        type: 'warning',
-        confirmButtonText: '开始运行',
-        cancelButtonText: '取消'
-      }
-    )
+    // 加载可用服务器
+    await loadAvailableServers()
     
-    // 显示运行中状态
-    const loadingMessage = ElMessage.success('开始运行测试用例...')
-    
-    // 调用后端执行接口
-    const request: CasesResponse = {
-      cases: selectedCases
+    if (availableServers.value.length === 0) {
+      ElMessage.warning('没有可用的服务器，请先占用服务器')
+      return
     }
+    
+    // 重置选择
+    selectedServers.value = []
+    
+    // 打开服务器选择对话框
+    serverDialogVisible.value = true
+    
+  } catch (error) {
+    ElMessage.error('加载服务器列表失败')
+  }
+}
+
+// 确认执行
+const handleExecuteConfirm = async () => {
+  try {
+    executeLoading.value = true
+    
+    // 构建请求数据
+    const selectedCases = rightTestCases.value.map(item => item.fullPath)
+    
+    // 构建服务器配置 - 按网口级别配置，使用 device_id
+    const servers: Server[] = selectedServersWithNics.value.map(server => {
+      const configuredNics: CaseNicInfo[] = []
+      
+      if (server.nics) {
+        server.nics.forEach(nic => {
+          // 跳过MV200网卡
+          if (isMv200Nic(nic.type)) return
+          
+          // 处理非MV200网卡的每个网口
+          if (nic.nic_info) {
+            nic.nic_info.forEach(nicInfo => {
+              // 只有当启用了配置且配置了至少一个IP时才添加到请求中
+              if (nicInfo.enableConfig && (nicInfo.ipv4 || nicInfo.ipv6)) {
+                const caseNicInfo: CaseNicInfo = {
+                  iface: nicInfo.iface,
+                  bdf: nicInfo.bdf
+                }
+                
+                if (nicInfo.ipv4) {
+                  caseNicInfo.ipv4 = nicInfo.ipv4
+                }
+                if (nicInfo.ipv6) {
+                  caseNicInfo.ipv6 = nicInfo.ipv6
+                }
+                
+                configuredNics.push(caseNicInfo)
+              }
+            })
+          }
+        })
+      }
+      
+      return {
+        device_id: server.id!, // 使用 device_id 而不是 device_ip
+        nics: configuredNics.length > 0 ? configuredNics : undefined
+      }
+    })
+    
+    const request: ExecuteRequest = {
+      cases: selectedCases,
+      servers: servers.length > 0 ? servers : undefined
+    }
+    
+    console.log('执行请求数据:', request) // 调试用
+    
+    // 调用执行接口
+    const loadingMessage = ElMessage.success('开始运行测试用例...')
     
     const response: ExecuteResponse = await testApi.executeTestCasesWithResponse(request)
     
@@ -1223,16 +1859,67 @@ const handleRunSelected = async () => {
       ElMessage.success('测试用例执行请求已发送')
     }
     
+    // 关闭对话框
+    serverDialogVisible.value = false
+    
   } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '执行测试用例失败')
-    }
+    ElMessage.error(error.response?.data?.detail || '执行测试用例失败')
+  } finally {
+    executeLoading.value = false
+  }
+}
+
+const loadAvailableServers = async () => {
+  try {
+    const servers = await deviceApi.getAll()
+    const authStore = useAuthStore()
+    const currentUser = authStore.username
+    
+    // 过滤出当前用户占用的服务器
+    availableServers.value = servers.filter(server => 
+      server.user === currentUser && server.time && server.time > 0
+    )
+    
+    // 为每个网卡的每个网口初始化配置属性
+    availableServers.value.forEach(server => {
+      if (server.nics) {
+        server.nics.forEach(nic => {
+          if (nic.nic_info) {
+            nic.nic_info.forEach(nicInfo => {
+              // 初始化 enableConfig 为 false
+              if (nicInfo.enableConfig === undefined) {
+                nicInfo.enableConfig = false
+              }
+              // 确保 ipv4 和 ipv6 字段存在
+              if (!nicInfo.ipv4) nicInfo.ipv4 = ''
+              if (!nicInfo.ipv6) nicInfo.ipv6 = ''
+            })
+          }
+        })
+      }
+    })
+    
+    console.log('处理后的服务器数据:', availableServers.value)
+    // 调试信息：显示每个服务器的 device_id
+    availableServers.value.forEach(server => {
+      console.log(`服务器 ${server.bmc.hostname} 信息:`, {
+        device_id: server.id,
+        device_ip: server.device.ip,
+        总网卡数: getTotalNicCount(server),
+        MV200网卡数: getMv200NicCount(server),
+        可配置网卡数: getConfigurableNicCount(server)
+      })
+    })
+    
+  } catch (error) {
+    ElMessage.error('加载服务器列表失败')
   }
 }
 
 onMounted(() => {
   loadBranchAndTag()
   loadExecuteHistory()
+  loadCombinations()
 })
 </script>
 
@@ -1402,10 +2089,38 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
+/* 管理布局样式 */
+.management-layout {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.left-management,
+.right-management {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.left-management {
+  min-width: 0;
+}
+
+.right-management {
+  min-width: 0;
+}
+
+/* 目录配置样式 */
 .directory-config {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  height: fit-content;
 }
 
 .dir-input-group {
@@ -1441,6 +2156,69 @@ onMounted(() => {
   align-self: flex-start;
 }
 
+/* 用例集合管理区域 */
+.combinations-section {
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  height: fit-content;
+}
+
+.combinations-control {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.combination-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.combination-buttons {
+  display: flex;
+  width: 100px;
+  gap: 8px;
+}
+
+.combination-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.case-count {
+  margin-left: 8px;
+}
+
+.create-time {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 8px;
+}
+
+.case-preview {
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.preview-tag {
+  margin: 2px;
+}
+
+.more-cases {
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+  padding: 4px;
+}
+
 /* 测试用例选择区域样式 */
 .test-cases-selection {
   margin-top: 20px;
@@ -1462,6 +2240,12 @@ onMounted(() => {
   margin: 0;
   font-size: 16px;
   color: #1f2937;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .selection-container {
@@ -1532,6 +2316,16 @@ onMounted(() => {
 .tree-container::-webkit-scrollbar {
   height: 12px;
   width: 12px;
+}
+
+.tree-container:empty::before {
+  content: "请先扫描测试用例或加载用例集合";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #c0c4cc;
+  font-style: italic;
 }
 
 .tree-container::-webkit-scrollbar-track {
@@ -1694,6 +2488,23 @@ onMounted(() => {
   }
 }
 
+.server-dialog {
+  :deep(.el-dialog__header) {
+    padding: 20px 20px 0;
+    margin-right: 0;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 0 20px 20px;
+  }
+}
+
 .dialog-content {
   display: flex;
   flex-direction: column;
@@ -1744,17 +2555,207 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* 移除滑动指示器相关样式 */
-.scroll-indicator {
-  display: none;
+.server-nic-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.scroll-track {
-  display: none;
+.interfaces-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12px;
+  font-size: 14px;
 }
 
-.scroll-thumb {
-  display: none;
+/* 服务器选择对话框样式 */
+.server-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.server-selection {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.server-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.server-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.server-item:last-child {
+  border-bottom: none;
+}
+
+.server-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+.server-name {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.server-ip {
+  font-family: 'Monaco', 'Consolas', monospace;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.no-servers {
+  padding: 20px;
+  text-align: center;
+}
+
+.nic-configuration {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.nic-config-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.server-nics {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.server-nics:last-child {
+  margin-bottom: 0;
+}
+
+.server-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.server-header h4 {
+  margin: 0;
+  color: #1f2937;
+}
+
+.nics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nic-item {
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.nic-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.nic-type {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.nic-details {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.nic-ip-config {
+  margin-top: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.nic-interfaces-config {
+  margin-top: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.nic-interface {
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 12px;
+}
+
+.nic-interface:last-child {
+  margin-bottom: 0;
+}
+
+.interface-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.interface-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.iface-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.bdf {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ip-inputs {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.no-interfaces,
+.no-configurable-nics {
+  margin-top: 12px;
+}
+
+.mv200-note {
+  margin-top: 8px;
+  text-align: center;
 }
 
 /* 响应式设计 */
@@ -1765,6 +2766,40 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .management-layout {
+    flex-direction: column;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .action-buttons .el-button {
+    width: 100%;
+  }
+
+  .server-nic-stats {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .interface-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .ip-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .ip-inputs .el-input {
+    width: 100% !important;
+    margin-right: 0 !important;
+  }
+
   .current-version {
     flex-direction: column;
     align-items: flex-start;
@@ -1820,6 +2855,25 @@ onMounted(() => {
   
   .tree-container {
     overflow: auto !important;
+  }
+
+  .ip-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ip-inputs .el-input {
+    width: 100% !important;
+    margin-right: 0 !important;
+  }
+
+  .combination-selection {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .combination-buttons {
+    flex-wrap: wrap;
   }
 }
 

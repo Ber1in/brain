@@ -277,6 +277,13 @@ class SQLiteDocumentDB:
             "id": "",
             "name": "",
             "color": ""
+        },
+        "test_cases": {
+            "id": "",
+            "name": "",
+            "created_at": "",
+            "user": "",
+            "cases": []
         }
     }
 

@@ -1,7 +1,10 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from datetime import datetime
 import os
+from typing import List
+from uuid import uuid4
 import gitlab
 import git
 import logging
@@ -10,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
 from brain.api.v2.schemas import qa_schemas
+from brain.json_db import SQLiteDocumentDB
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
@@ -17,6 +21,11 @@ LOG = logging.getLogger(__name__)
 GITLAB_URL = 'https://git-sha.yunsilicon.com'
 PRIVATE_TOKEN = 'qZb5uFi8JfxLNmXnvtWW'
 PROJECT_PATH = 'yunsilicon-software/qa_auto'
+db = SQLiteDocumentDB()
+SERVER_COLLECTION = "servers"
+TESTCASE_COLLECTION = "test_cases"
+BMC_USER = "ipmiadmin"
+BMC_PASS = "ymxl@2022"
 
 
 @router.get("/qa_auto/branchs-tags", response_model=qa_schemas.BranchAndTagResponse)
@@ -29,12 +38,12 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     project = gl.projects.get(PROJECT_PATH)
 
     # list branches
-    LOG.info(f"Listing branches")
+    LOG.info("Listing branches")
     for branch in project.branches.list(all=True):
         branchs.append(branch.name)
 
     # list tags
-    LOG.info(f"Listing tags")
+    LOG.info("Listing tags")
     for tag in project.tags.list(all=True):
         tags.append(tag.name)
 
@@ -131,7 +140,32 @@ def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenti
 
 
 @router.post("/qa_auto/execute-cases", response_model=qa_schemas.ExecuteResponse)
-def execute_cases(data: qa_schemas.CasesResponse, user=Depends(authenticate_user)):
+def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_user)):
+
+    for server in data.servers:
+        server_info = db.find_one(SERVER_COLLECTION, {"id": server.device_id})
+        client_info = {
+            "host": server_info["device"]["ip"],
+            "username": server_info["device"]["username"],
+            "password": server_info["device"]["password"],
+            "keyfile": "/root/.ssh/id_rsa",
+            "ipmi": {
+                "ip": server_info["bmc"]["ip"],
+                "username": BMC_USER,
+                "password": BMC_PASS
+            }
+        }
+        for nic in server.nics:
+            nic_info = {
+                "ifname": nic.iface,
+                "bdf": nic.bdf
+            }
+            if nic.get("ipv4"):
+                nic_info["ipv4"]
+            if nic.get("ipv6"):
+                nic_info["ipv6"]
+            client_info["nics"] = nic_info
+
     return {"url": "https://test.com", "time": ""}
 
 
@@ -143,3 +177,64 @@ def execute_history(user=Depends(authenticate_user)):
                       {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
                        "current": "aidpu_for_mr_11111111111111111111111111222222",
                        "commit": "f6b7c96447942157219b3a3095a54ec51211b975"}]}
+
+
+@router.get("/qa_auto/custom-combinations", 
+            response_model=List[qa_schemas.CaseCombinationsResponse])
+def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
+    """There are many user-defined sets of test cases, and the current interface
+    is used to query these combinations."""
+
+    LOG.info("Fetching all custom test case combinations")
+    all_combinations = db.find(TESTCASE_COLLECTION, {"user": user})
+
+    LOG.info(f"Fetched {len(all_combinations)} combinations")
+    return all_combinations
+
+
+@router.post("/qa_auto/custom-combinations", status_code=204)
+def save_custom_combinations_of_test_cases(
+        data: qa_schemas.CaseCombinationsRequest, user=Depends(authenticate_user)):
+    """
+    Save a new user-defined combination of test cases.
+
+    This endpoint receives a combination definition, generates metadata such as
+    creation timestamp and a unique ID, and persists it into the database.
+    """
+
+    data_dict = data.dict()
+    LOG.info(f"Saving a new custom test case combination: {data_dict}")
+
+    data_dict["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    data_dict["id"] = str(uuid4())
+    data_dict["user"] = user
+
+    db.insert(TESTCASE_COLLECTION, data_dict)
+
+    LOG.info(f"Custom combination saved with id={data_dict['id']}")
+
+
+@router.delete("/qa_auto/custom-combinations/{combination_id}", status_code=204)
+def delete_custom_combination(combination_id: str):
+    """
+    Delete a user-defined combination of test cases by its ID.
+
+    This endpoint removes a previously saved test case combination from the
+    database. If the specified ID does not exist, a 404 error is raised.
+    """
+
+    LOG.info(f"Request to delete custom test case combination: id={combination_id}")
+
+    try:
+        record = db.find_one(TESTCASE_COLLECTION, {"id": combination_id})
+    except Exception:
+        LOG.warning("Custom combination not found: id=%s", combination_id)
+        raise HTTPException(status_code=404, detail="Combination not found")
+
+    try:
+        db.delete(TESTCASE_COLLECTION, {"id": combination_id})
+        LOG.info(
+            f"Custom combination deleted successfully: id={combination_id}, name={record['name']}")
+    except Exception as e:
+        LOG.error("Failed to delete combination id=%s, error=%s", combination_id, e)
+        raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")

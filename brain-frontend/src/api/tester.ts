@@ -1,5 +1,15 @@
 import apiClient from './client'
-import type { CasesResponse, DirNeedCollectRequest, BranchAndTagResponse, CheckoutRequest, ExecuteResponse, ExecuteListResponse } from '@/types/api'
+import type { 
+  CasesResponse, 
+  DirNeedCollectRequest, 
+  BranchAndTagResponse, 
+  CheckoutRequest, 
+  ExecuteResponse, 
+  ExecuteListResponse, 
+  ExecuteRequest,
+  CaseCombinationsResponse,
+  CaseCombinationRequest
+} from '@/types/api'
 
 export const testApi = {
   getBranchAndTag(): Promise<BranchAndTagResponse> {
@@ -17,11 +27,23 @@ export const testApi = {
     })
   },
   
-  executeTestCasesWithResponse(request: CasesResponse): Promise<ExecuteResponse> {
+  executeTestCasesWithResponse(request: ExecuteRequest): Promise<ExecuteResponse> {
     return apiClient.post('/api/qa_auto/execute-cases', request)
   },
 
   getExecuteHistory(): Promise<ExecuteListResponse> {
     return apiClient.get('/api/qa_auto/execute-history')
-  }
+  },
+
+  getCustomCombinations(): Promise<CaseCombinationsResponse[]> {
+    return apiClient.get('/api/qa_auto/custom-combinations')
+  },
+
+  saveCustomCombination(request: CaseCombinationRequest): Promise<void> {
+    return apiClient.post('/api/qa_auto/custom-combinations', request)
+  },
+  
+  deleteCustomCombination(combinationId: string): Promise<void> {
+    return apiClient.delete(`/api/qa_auto/custom-combinations/${combinationId}`)
+  },
 }
