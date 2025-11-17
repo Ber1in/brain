@@ -1,8 +1,11 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from fastapi import Depends
+from typing import Dict, List
 from datetime import datetime
 import os
+from pathlib import Path
 from typing import List
 from uuid import uuid4
 import gitlab
@@ -28,6 +31,11 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 
 
+def get_user_repo_dir(user: str) -> str:
+    """Return the repo directory for the given user."""
+    return f"/tmp/{user}/qa_auto"
+
+
 @router.get("/qa_auto/branchs-tags", response_model=qa_schemas.BranchAndTagResponse)
 def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
@@ -47,7 +55,7 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     for tag in project.tags.list(all=True):
         tags.append(tag.name)
 
-    user_repo_dir = f"/tmp/{user}/qa_auto"
+    user_repo_dir = get_user_repo_dir(user)
     LOG.info(f"[{user}] Local repo dir = {user_repo_dir}")
 
     try:
@@ -93,7 +101,7 @@ def switch_branch_or_tag(data: qa_schemas.CheckoutRequest, user=Depends(authenti
     LOG.info(f"[{user}] Switching to branch={data.branch}, tag={data.tag}")
 
     try:
-        repo_path = f"/tmp/{user}/qa_auto"
+        repo_path = get_user_repo_dir(user)
         repo = git.Repo(repo_path)
 
         repo.git.fetch("--all", "--tags")
@@ -134,7 +142,7 @@ def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenti
 
     commands = collect_tests_with_detailed_report(
         data.dirs,
-        f"/tmp/{user}/qa_auto"
+        get_user_repo_dir(user)
     )
     return {"cases": commands}
 
@@ -238,3 +246,53 @@ def delete_custom_combination(combination_id: str):
     except Exception as e:
         LOG.error("Failed to delete combination id=%s, error=%s", combination_id, e)
         raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")
+
+
+IGNORE_DIRS = {"__pycache__", ".pytest_cache", ".git", ".idea"}
+
+
+@router.get("/qa_auto/directory-tree")
+def get_directory_tree(user=Depends(authenticate_user)):
+    """Get the directory tree of the test code repository (recursive scan, directory-only).
+    Node 'name' contains only the current directory name.
+    Returned 'path' strips the user repo prefix.
+    """
+
+    user_repo_dir = get_user_repo_dir(user)
+    base_path = Path(user_repo_dir)
+    products_path = base_path / "products"
+
+    prefix_len = len(str(base_path)) + 1
+
+    def strip_prefix(path: Path) -> str:
+        p = str(path)
+        return p[prefix_len:] if p.startswith(str(base_path)) else p
+
+    def build_node(p: Path) -> Dict:
+        node = {
+            "name": p.name,
+            "path": strip_prefix(p),
+            "type": "directory",
+            "children": []
+        }
+        try:
+            for item in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name)):
+                if not item.is_dir():
+                    continue
+
+                # Skip ignored directories
+                if item.name in IGNORE_DIRS:
+                    continue
+
+                node["children"].append(build_node(item))
+
+        except PermissionError:
+            pass
+
+        return node
+
+    tree = []
+    if products_path.exists() and products_path.is_dir():
+        tree.append(build_node(products_path))
+
+    return {"tree": tree}

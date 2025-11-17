@@ -93,12 +93,6 @@
                     </el-option>
                   </el-option-group>
                 </el-select>
-                <div class="selection-info" v-if="selectedBranch">
-                  <el-tag type="success">
-                    <el-icon><Check /></el-icon>
-                    已选择分支: {{ selectedBranch }}
-                  </el-tag>
-                </div>
               </div>
 
               <!-- 标签选择 -->
@@ -150,8 +144,14 @@
                 :disabled="!canCheckout"
               >
                 <el-icon><Switch /></el-icon>
-                更新代码
+                拉取最新代码
               </el-button>
+            </div>
+            <div class="selection-info" v-if="selectedBranch">
+              <el-tag type="success">
+                <el-icon><Check /></el-icon>
+                已选择分支: {{ selectedBranch }}
+              </el-tag>
             </div>
           </div>
         </div>
@@ -237,48 +237,33 @@
           <!-- 左侧：目录配置 -->
           <div class="left-management">
             <div class="directory-config">
-              <div class="dir-input-group">
-                <el-input 
-                  v-model="newDirectory" 
-                  placeholder="输入测试用例目录路径，如: products/api_coverage"
-                  @keyup.enter="addDirectory"
-                  style="width: 100%"
+              <div class="dir-controls">
+                <el-button 
+                  @click="showDirectoryPicker = true" 
+                  type="primary" 
+                  class="select-dir-btn"
                 >
-                  <template #append>
-                    <el-button @click="addDirectory" :disabled="!newDirectory.trim()">
-                      <el-icon><Plus /></el-icon>
-                      添加
-                    </el-button>
-                  </template>
-                </el-input>
+                  <el-icon><FolderOpened /></el-icon>
+                  选择目录并扫描用例
+                </el-button>
               </div>
 
-              <div class="dir-list" v-if="directories.length > 0">
-                <div class="dir-list-title">待扫描目录:</div>
-                <div class="dir-tags">
+              <div class="dir-list">
+                <div class="dir-list-title">已扫描目录:</div>
+                <div class="dir-tags" v-if="directories.length > 0">
                   <el-tag
                     v-for="(dir, index) in directories"
                     :key="index"
-                    closable
-                    @close="removeDirectory(index)"
                     type="info"
                     class="dir-tag"
                   >
                     {{ dir }}
                   </el-tag>
                 </div>
+                <div class="no-directories" v-else>
+                  <span class="no-dirs-text">未进行用例扫描</span>
+                </div>
               </div>
-
-              <el-button 
-                type="success" 
-                @click="handleCollectTestCases" 
-                :loading="collectLoading"
-                :disabled="directories.length === 0"
-                class="collect-btn"
-              >
-                <el-icon><Search /></el-icon>
-                扫描测试用例
-              </el-button>
             </div>
           </div>
 
@@ -528,6 +513,94 @@
         </div>
       </div>
     </el-card>
+
+    <!-- 目录选择器对话框 -->
+    <el-dialog
+      v-model="showDirectoryPicker"
+      title="选择目录并扫描用例"
+      width="600px"
+      class="directory-picker-dialog"
+    >
+      <div class="directory-picker">
+        <div class="picker-header">
+          <el-input
+            v-model="directorySearch"
+            placeholder="搜索目录..."
+            clearable
+            style="width: 300px"
+            :prefix-icon="Search"
+          />
+          <el-button @click="refreshDirectoryTree" :loading="directoryLoading">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+        
+        <div class="directory-tree">
+          <el-tree
+            ref="directoryTreeRef"
+            :data="directoryTree"
+            :props="directoryProps"
+            node-key="path"
+            :default-expand-all="false"
+            :expand-on-click-node="false"
+            :filter-node-method="filterDirectoryNode"
+            @node-click="handleDirectoryClick"
+            @check-change="handleDirectoryCheckChange"
+            show-checkbox
+            v-loading="directoryLoading"
+            highlight-current
+            style="margin-top: 16px;"
+          >
+            <template #default="{ node, data }">
+              <div class="directory-node">
+                <el-icon class="directory-icon">
+                  <Folder v-if="data.type === 'directory'" />
+                  <Document v-else />
+                </el-icon>
+                <span class="directory-name">{{ node.label }}</span>
+              </div>
+            </template>
+          </el-tree>
+        </div>
+        
+        <div class="current-selection" v-if="selectedDirectories.length > 0">
+          <el-alert
+            :title="`已选择 ${selectedDirectories.length} 个目录`"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+          <div class="selected-dirs-list">
+            <el-tag
+              v-for="(dir, index) in selectedDirectories"
+              :key="index"
+              closable
+              @close="removeSelectedDirectory(dir)"
+              type="success"
+              class="selected-dir-tag"
+            >
+              {{ dir }}
+            </el-tag>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="cancelDirectorySelection">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="confirmDirectorySelection"
+          :disabled="selectedDirectories.length === 0"
+          :loading="collectLoading"
+        >
+          <template #loading>
+            <el-icon class="is-loading"><Loading /></el-icon>
+          </template>
+          确认并扫描 ({{ selectedDirectories.length }})
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 切换代码版本确认对话框 -->
     <el-dialog
@@ -881,10 +954,10 @@ const currentTag = ref('')
 const latestCommit = ref('')
 const branchSearchText = ref('')
 const tagSearchText = ref('')
-const newDirectory = ref('')
+const selectedDirectories = ref<string[]>([])
 const leftFilterText = ref('')
 const rightFilterText = ref('')
-const directories = ref<string[]>(['products/api_coverage'])
+const directories = ref<string[]>([])
 
 // 测试用例相关数据
 const collectedCases = ref<string[]>([]) // 所有收集到的用例
@@ -921,6 +994,152 @@ const checkoutDialogVisible = ref(false)
 const treeLoading = ref(false)
 const executeHistory = ref<ExecuteResponse[]>([])
 const historyLoading = ref(false)
+
+// 新增响应式数据
+const showDirectoryPicker = ref(false)
+const directoryTree = ref<any[]>([])
+const directoryLoading = ref(false)
+const directorySearch = ref('')
+const selectedDirectory = ref('')
+const directoryTreeRef = ref<InstanceType<typeof ElTree>>()
+
+// 目录树配置
+const directoryProps = {
+  children: 'children',
+  label: 'name'
+}
+
+// 监听搜索条件变化
+watch(directorySearch, (val) => {
+  if (directoryTreeRef.value) {
+    directoryTreeRef.value.filter(val)
+  }
+})
+
+// 过滤目录节点
+const filterDirectoryNode = (value: string, data: any) => {
+  if (!value) return true
+  return data.name.toLowerCase().includes(value.toLowerCase())
+}
+
+// 刷新目录树
+const refreshDirectoryTree = async () => {
+  try {
+    directoryLoading.value = true
+    // 这里调用后端API获取目录结构
+    const response = await testApi.getDirectoryTree()
+    directoryTree.value = response.tree
+    
+  } catch (error) {
+    ElMessage.error('加载目录结构失败')
+  } finally {
+    directoryLoading.value = false
+  }
+}
+
+// 处理目录点击
+const handleDirectoryClick = (data: any) => {
+  if (data.type === 'directory' && directoryTreeRef.value) {
+    const node = directoryTreeRef.value.getNode(data.path)
+    if (node) {
+      const isChecked = directoryTreeRef.value.getCheckedNodes().includes(data)
+      directoryTreeRef.value.setChecked(node, !isChecked, false)
+    }
+  }
+}
+
+// 处理目录勾选变化
+const handleDirectoryCheckChange = (data: any, checked: boolean) => {
+  if (data.type === 'directory' && checked) {
+    if (!selectedDirectories.value.includes(data.path)) {
+      selectedDirectories.value.push(data.path)
+    }
+  } else if (data.type === 'directory' && !checked) {
+    const index = selectedDirectories.value.indexOf(data.path)
+    if (index > -1) {
+      selectedDirectories.value.splice(index, 1)
+    }
+  }
+}
+
+// 移除已选目录
+const removeSelectedDirectory = (dir: string) => {
+  const index = selectedDirectories.value.indexOf(dir)
+  if (index > -1) {
+    selectedDirectories.value.splice(index, 1)
+  }
+  
+  // 同时更新目录树的勾选状态
+  if (directoryTreeRef.value) {
+    directoryTreeRef.value.setChecked(dir, false)
+  }
+  
+  // 同时从已扫描目录中移除
+  const dirIndex = directories.value.indexOf(dir)
+  if (dirIndex > -1) {
+    directories.value.splice(dirIndex, 1)
+  }
+}
+
+// 确认目录选择并直接扫描测试用例
+const confirmDirectorySelection = async () => {
+  if (selectedDirectories.value.length > 0) {
+    try {
+      collectLoading.value = true
+      
+      // 清空之前的目录，避免重复
+      directories.value = []
+      
+      // 添加新目录
+      selectedDirectories.value.forEach(dir => {
+        if (!directories.value.includes(dir)) {
+          directories.value.push(dir)
+        }
+      })
+      
+      // 直接开始扫描测试用例
+      await handleCollectTestCases()
+      
+      // 关闭对话框
+      showDirectoryPicker.value = false
+      
+    } catch (error) {
+      ElMessage.error('扫描测试用例失败')
+    } finally {
+      collectLoading.value = false
+    }
+  }
+}
+
+// 取消目录选择
+const cancelDirectorySelection = () => {
+  // 不清空 selectedDirectories，这样下次打开时还能恢复
+  showDirectoryPicker.value = false
+}
+
+// 监听对话框打开，重置状态
+watch(showDirectoryPicker, (val) => {
+  if (val) {
+    refreshDirectoryTree()
+    // 在下一次DOM更新后恢复之前勾选的目录
+    nextTick(() => {
+      restoreCheckedDirectories()
+    })
+  } else {
+    // 对话框关闭时清空临时选择
+    selectedDirectories.value = []
+  }
+})
+
+const restoreCheckedDirectories = () => {
+  if (directoryTreeRef.value && directories.value.length > 0) {
+    // 设置勾选状态
+    directoryTreeRef.value.setCheckedKeys(directories.value)
+    
+    // 更新选中的目录列表
+    selectedDirectories.value = [...directories.value]
+  }
+}
 
 // 计算属性
 const canCheckout = computed(() => {
@@ -1105,18 +1324,6 @@ const handleCheckoutConfirm = async () => {
   } finally {
     checkoutLoading.value = false
   }
-}
-
-const addDirectory = () => {
-  const dir = newDirectory.value.trim()
-  if (dir && !directories.value.includes(dir)) {
-    directories.value.push(dir)
-    newDirectory.value = ''
-  }
-}
-
-const removeDirectory = (index: number) => {
-  directories.value.splice(index, 1)
 }
 
 const loadBranchAndTag = async () => {
@@ -1924,6 +2131,64 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.directory-picker-dialog {
+  :deep(.el-dialog__body) {
+    padding: 20px;
+  }
+}
+
+.directory-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.directory-tree {
+  height: 400px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.directory-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.directory-icon {
+  color: #409eff;
+}
+
+.directory-name {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.current-selection {
+  margin-top: 12px;
+}
+
+.selected-dirs-list {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selected-dir-tag {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+}
+
 /* 页面布局样式 */
 .qa-platform {
   padding: 20px;
@@ -2123,7 +2388,7 @@ onMounted(() => {
   height: fit-content;
 }
 
-.dir-input-group {
+.dir-controls {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -2150,6 +2415,23 @@ onMounted(() => {
 .dir-tag {
   font-family: 'Monaco', 'Consolas', monospace;
   font-size: 12px;
+}
+
+.no-directories {
+  padding: 8px 0;
+  color: #c0c4cc;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+}
+
+.no-dirs-text {
+  display: inline-block;
+  padding: 4px 8px;
+}
+
+.select-dir-btn {
+  width: 100%;
+  margin-bottom: 12px;
 }
 
 .collect-btn {
@@ -2244,8 +2526,8 @@ onMounted(() => {
 
 .action-buttons {
   display: flex;
-  gap: 12px;
-  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .selection-container {
@@ -2828,7 +3110,7 @@ onMounted(() => {
     align-items: flex-start;
   }
 
-  .dir-input-group {
+  .dir-controls {
     flex-direction: column;
     align-items: flex-start;
   }

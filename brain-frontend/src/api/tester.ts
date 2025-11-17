@@ -46,4 +46,8 @@ export const testApi = {
   deleteCustomCombination(combinationId: string): Promise<void> {
     return apiClient.delete(`/api/qa_auto/custom-combinations/${combinationId}`)
   },
+
+  getDirectoryTree(): Promise<{ tree: any[] }> {
+    return apiClient.get('/api/qa_auto/directory-tree')
+  },
 }
