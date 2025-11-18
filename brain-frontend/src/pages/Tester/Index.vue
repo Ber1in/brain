@@ -1441,6 +1441,8 @@ const handleCheckoutConfirm = async () => {
     
     checkoutDialogVisible.value = false
     
+    await loadBranchAndTag()
+    
     if (checkoutMode.value === 'branch') {
       currentBranch.value = selectedBranch.value
       currentTag.value = ''
