@@ -1,12 +1,10 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from fastapi import Depends
 from typing import Dict, List
 from datetime import datetime
 import os
 from pathlib import Path
-from typing import List
 from uuid import uuid4
 import gitlab
 import git
@@ -27,6 +25,7 @@ PROJECT_PATH = 'yunsilicon-software/qa_auto'
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 TESTCASE_COLLECTION = "test_cases"
+TESTHISTORY_COLLECTION = "test_history"
 BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 
@@ -34,6 +33,24 @@ BMC_PASS = "ymxl@2022"
 def get_user_repo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
     return f"/tmp/{user}/qa_auto"
+
+
+def get_current_code_and_commit(user):
+    user_repo_dir = get_user_repo_dir(user)
+    repo = git.Repo(user_repo_dir)
+
+    if repo.head.is_detached:
+        LOG.info(f"[{user}]Repo is in detached HEAD")
+        current_commit = repo.head.commit.hexsha
+        matched_tag = next(
+            (t.name for t in repo.tags if t.commit == repo.head.commit), None
+        )
+        current = matched_tag or current_commit
+    else:
+        current = repo.active_branch.name
+
+    latest_commit = repo.head.commit.hexsha
+    return current, latest_commit 
 
 
 @router.get("/qa_auto/branchs-tags", response_model=qa_schemas.BranchAndTagResponse)
@@ -68,19 +85,7 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
         else:
             LOG.info(f"[{user}] Repo exists, skip cloning")
 
-        repo = git.Repo(user_repo_dir)
-
-        if repo.head.is_detached:
-            LOG.info(f"[{user}] Repo is in detached HEAD")
-            current_commit = repo.head.commit.hexsha
-            matched_tag = next(
-                (t.name for t in repo.tags if t.commit == repo.head.commit), None
-            )
-            current = matched_tag or current_commit
-        else:
-            current = repo.active_branch.name
-
-        latest_commit = repo.head.commit.hexsha
+        current, latest_commit = get_current_code_and_commit(user)
         LOG.info(f"[{user}] current={current}, latest={latest_commit}")
 
     except Exception as e:
@@ -174,17 +179,64 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
                 nic_info["ipv6"]
             client_info["nics"] = nic_info
 
+    current, latest_commit = get_current_code_and_commit(user)
+    record = {"url": "http://10.0.3.206:8088/docs#/", 
+              "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+              "current": current,
+              "commit": latest_commit}
+    db.insert(TESTCASE_COLLECTION, record)
+    LOG.info("Test case execution records have been logged.")
+
     return {"url": "https://test.com", "time": ""}
 
 
-@router.get("/qa_auto/execute-history", response_model=qa_schemas.ExecuteListResponse)
+@router.get("/qa_auto/execute-history", response_model=List[qa_schemas.ExecuteResponse])
 def execute_history(user=Depends(authenticate_user)):
-    return {"items": [{"url": "http://10.0.3.206:8088/docs#/", "time": "2025/11/13 11:37:17", 
-                       "current": "aidpu_for_mr",
-                       "commit": "4854441363f5604a6d8d271d8e40a84f8a2919a0"},
-                      {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-                       "current": "aidpu_for_mr_11111111111111111111111111222222",
-                       "commit": "f6b7c96447942157219b3a3095a54ec51211b975"}]}
+    return [{"url": "http://10.0.3.206:8088/docs#/", "time": "2025/11/13 11:37:17", 
+             "current": "aidpu_for_mr",
+             "commit": "4854441363f5604a6d8d271d8e40a84f8a2919a0"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
+            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
+             "current": "aidpu_for_mr_11111111111111111111111111222222",
+             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"}]
 
 
 @router.get("/qa_auto/custom-combinations", 

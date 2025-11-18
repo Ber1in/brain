@@ -8,6 +8,7 @@
         <el-menu
           router
           :default-active="$route.path"
+          :default-openeds="['resource-management']"
           class="sidebar-menu"
           background-color="#304156"
           text-color="#bfcbd9"
@@ -48,7 +49,7 @@
             <span>XSC网口管理</span>
           </el-menu-item>
           <el-menu-item index="/tester">
-            <el-icon><Connection /></el-icon>
+            <el-icon><Medal /></el-icon>
             <span>质量保证平台</span>
           </el-menu-item>
 

@@ -179,7 +179,7 @@
               empty-text="暂无执行历史"
               v-loading="historyLoading"
               style="width: 100%"
-              height="300"
+              :max-height="300"
             >
               <el-table-column prop="time" label="执行时间" width="160" sortable />
               <el-table-column prop="current" label="执行分支/标签" width="250">
@@ -279,7 +279,7 @@
                 <div class="combination-selection">
                   <el-select 
                     v-model="selectedCombinationId" 
-                    placeholder="选择已有用例集合" 
+                    placeholder="选择保存的自定义用例集合" 
                     style="width: 100%"
                     @change="handleCombinationChange"
                     clearable
@@ -296,7 +296,7 @@
                         <el-tag size="small" type="info" class="case-count">
                           {{ combination.cases?.length || 0 }} 用例
                         </el-tag>
-                        <span class="create-time">{{ formatTime(combination.created_at) }}</span>
+                        <span class="create-time">{{ combination.created_at }}</span>
                       </div>
                     </el-option>
                   </el-select>
@@ -934,7 +934,6 @@ import type {
   CheckoutRequest, 
   CasesResponse, 
   ExecuteResponse, 
-  ExecuteListResponse,
   ServerDetailResponse,
   ExecuteRequest,
   Server,
@@ -1828,10 +1827,10 @@ const filterTreeData = (treeData: any[], filterText: string): any[] => {
 const loadExecuteHistory = async () => {
   try {
     historyLoading.value = true
-    const response: ExecuteListResponse = await testApi.getExecuteHistory()
-    const history = response.items || []
+    // 直接获取 ExecuteResponse[] 数组
+    const history: ExecuteResponse[] = await testApi.getExecuteHistory()
+    // 按时间倒序排列（最新的在前面）
     executeHistory.value = history.sort((a, b) => {
-      // 按时间倒序排列
       return new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime()
     })
   } catch (error) {
@@ -1842,11 +1841,13 @@ const loadExecuteHistory = async () => {
 }
 
 // 用例集合相关方法
-// 加载用例集合列表
 const loadCombinations = async () => {
   try {
     const response = await testApi.getCustomCombinations()
-    combinations.value = response
+    // 按创建时间从新到旧排序
+    combinations.value = response.sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
   } catch (error) {
     ElMessage.error('加载用例集合失败')
   }
@@ -2235,6 +2236,7 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
+/* 历史记录区域样式 */
 .history-section {
   flex: 1;
   padding: 20px;
@@ -2243,14 +2245,63 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  min-height: 400px; /* 设置最小高度 */
+  max-height: 500px; /* 设置最大高度 */
 }
 
 .history-content {
   flex: 1;
-  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* 重要：允许内容收缩 */
+  overflow: hidden; /* 隐藏内部溢出 */
+}
+
+/* 表格容器样式 */
+:deep(.history-content .el-table) {
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
+
+:deep(.history-content .el-table .el-table__body-wrapper) {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* 自定义滚动条样式 */
+:deep(.history-content .el-table .el-table__body-wrapper::-webkit-scrollbar) {
+  width: 6px;
+}
+
+:deep(.history-content .el-table .el-table__body-wrapper::-webkit-scrollbar-track) {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+:deep(.history-content .el-table .el-table__body-wrapper::-webkit-scrollbar-thumb) {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+:deep(.history-content .el-table .el-table__body-wrapper::-webkit-scrollbar-thumb:hover) {
+  background: #a8a8a8;
+}
+
+/* 确保表格头部固定 */
+:deep(.history-content .el-table .el-table__header-wrapper) {
+  flex-shrink: 0;
+}
+
+/* 空数据状态样式 */
+:deep(.history-content .el-table__empty-block) {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 
 .refresh-btn {
   margin-left: auto;

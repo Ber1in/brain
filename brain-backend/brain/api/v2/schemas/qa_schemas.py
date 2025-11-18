@@ -65,10 +65,6 @@ class ExecuteResponse(BaseModel):
     commit: str = None
 
 
-class ExecuteListResponse(BaseModel):
-    items: List[ExecuteResponse] = None
-
-
 class CaseCombinationsResponse(BaseModel):
     id: str
     name: str

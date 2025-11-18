@@ -319,10 +319,6 @@ export interface ExecuteResponse {
   commit?: string
 }
 
-export interface ExecuteListResponse {
-  items?:Array<ExecuteResponse> | null
-}
-
 export interface BranchAndTagResponse {
   branchs?: string[] | null;
   tags?: string[] | null;

@@ -5,7 +5,6 @@ import type {
   BranchAndTagResponse, 
   CheckoutRequest, 
   ExecuteResponse, 
-  ExecuteListResponse, 
   ExecuteRequest,
   CaseCombinationsResponse,
   CaseCombinationRequest
@@ -31,7 +30,7 @@ export const testApi = {
     return apiClient.post('/api/qa_auto/execute-cases', request)
   },
 
-  getExecuteHistory(): Promise<ExecuteListResponse> {
+  getExecuteHistory(): Promise<ExecuteResponse[]> {
     return apiClient.get('/api/qa_auto/execute-history')
   },
 
