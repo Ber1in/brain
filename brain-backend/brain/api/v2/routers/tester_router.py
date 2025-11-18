@@ -183,11 +183,12 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
     record = {"url": "http://10.0.3.206:8088/docs#/", 
               "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
               "current": current,
-              "commit": latest_commit}
+              "commit": latest_commit,
+              "id": uuid4()}
     db.insert(TESTCASE_COLLECTION, record)
     LOG.info("Test case execution records have been logged.")
 
-    return {"url": "https://test.com", "time": ""}
+    return record
 
 
 @router.get("/qa_auto/execute-history", response_model=List[qa_schemas.ExecuteResponse])

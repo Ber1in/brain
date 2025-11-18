@@ -7,6 +7,8 @@ from typing import Dict, List, Any
 from filelock import FileLock
 from abc import ABC, abstractmethod
 
+TESTHISTORY_COLLECTION = "test_history"
+
 
 class BaseDocumentDB(ABC):
     @abstractmethod

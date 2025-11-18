@@ -50,7 +50,7 @@ class ExecuteNicInfo(BaseModel):
 
 class Server(BaseModel):
     device_id: str
-    nics: List[ExecuteNicInfo] = None
+    nics: List[ExecuteNicInfo] = []
 
 
 class ExecuteRequest(BaseModel):
