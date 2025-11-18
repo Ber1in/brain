@@ -7,7 +7,9 @@ from typing import Dict, List, Any
 from filelock import FileLock
 from abc import ABC, abstractmethod
 
-TESTHISTORY_COLLECTION = "test_history"
+SERVER_COLLECTION = "servers"
+TEST_CASE_COLLECTION = "test_cases"
+TEST_HISTORY_COLLECTION = "test_history"
 
 
 class BaseDocumentDB(ABC):
@@ -250,7 +252,7 @@ class SQLiteDocumentDB:
             "ifname": "",
             "creator": ""
         },
-        "servers": {
+        SERVER_COLLECTION: {
             "bmc": {
                 "ip": "10.0.2.206",
                 "hostname": "string"
@@ -280,12 +282,20 @@ class SQLiteDocumentDB:
             "name": "",
             "color": ""
         },
-        "test_cases": {
+        TEST_CASE_COLLECTION: {
             "id": "",
             "name": "",
             "created_at": "",
             "user": "",
             "cases": []
+        },
+        TEST_HISTORY_COLLECTION: {
+            "id": "",
+            "current": "",
+            "latest_commit": "",
+            "time": "",
+            "url": "",
+            "user": ""
         }
     }
 

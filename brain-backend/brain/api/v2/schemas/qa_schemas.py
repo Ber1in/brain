@@ -62,7 +62,7 @@ class ExecuteResponse(BaseModel):
     url: str = None
     time: str = None
     current: str = None
-    commit: str = None
+    latest_commit: str = None
 
 
 class CaseCombinationsResponse(BaseModel):

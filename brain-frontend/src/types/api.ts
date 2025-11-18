@@ -316,7 +316,7 @@ export interface ExecuteResponse {
   url?: string
   time?: string
   current?: string
-  commit?: string
+  latest_commit?: string
 }
 
 export interface BranchAndTagResponse {

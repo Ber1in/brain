@@ -24,8 +24,8 @@ PRIVATE_TOKEN = 'qZb5uFi8JfxLNmXnvtWW'
 PROJECT_PATH = 'yunsilicon-software/qa_auto'
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
-TESTCASE_COLLECTION = "test_cases"
-TESTHISTORY_COLLECTION = "test_history"
+TEST_CASE_COLLECTION = "test_cases"
+TEST_HISTORY_COLLECTION = "test_history"
 BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 
@@ -183,9 +183,10 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
     record = {"url": "http://10.0.3.206:8088/docs#/", 
               "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
               "current": current,
-              "commit": latest_commit,
-              "id": uuid4()}
-    db.insert(TESTCASE_COLLECTION, record)
+              "latest_commit": latest_commit,
+              "id": str(uuid4()),
+              "user": user}
+    db.insert(TEST_HISTORY_COLLECTION, record)
     LOG.info("Test case execution records have been logged.")
 
     return record
@@ -193,51 +194,8 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
 
 @router.get("/qa_auto/execute-history", response_model=List[qa_schemas.ExecuteResponse])
 def execute_history(user=Depends(authenticate_user)):
-    return [{"url": "http://10.0.3.206:8088/docs#/", "time": "2025/11/13 11:37:17", 
-             "current": "aidpu_for_mr",
-             "commit": "4854441363f5604a6d8d271d8e40a84f8a2919a0"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"},
-            {"url": "http://10.0.3.248:8089/", "time": "2025/11/13 11:35:17", 
-             "current": "aidpu_for_mr_11111111111111111111111111222222",
-             "commit": "f6b7c96447942157219b3a3095a54ec51211b975"}]
+    history = db.find(TEST_HISTORY_COLLECTION, {"user": user})
+    return history
 
 
 @router.get("/qa_auto/custom-combinations", 
@@ -247,7 +205,7 @@ def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
     is used to query these combinations."""
 
     LOG.info("Fetching all custom test case combinations")
-    all_combinations = db.find(TESTCASE_COLLECTION, {"user": user})
+    all_combinations = db.find(TEST_CASE_COLLECTION, {"user": user})
 
     LOG.info(f"Fetched {len(all_combinations)} combinations")
     return all_combinations
@@ -270,7 +228,7 @@ def save_custom_combinations_of_test_cases(
     data_dict["id"] = str(uuid4())
     data_dict["user"] = user
 
-    db.insert(TESTCASE_COLLECTION, data_dict)
+    db.insert(TEST_CASE_COLLECTION, data_dict)
 
     LOG.info(f"Custom combination saved with id={data_dict['id']}")
 
@@ -287,13 +245,13 @@ def delete_custom_combination(combination_id: str):
     LOG.info(f"Request to delete custom test case combination: id={combination_id}")
 
     try:
-        record = db.find_one(TESTCASE_COLLECTION, {"id": combination_id})
+        record = db.find_one(TEST_CASE_COLLECTION, {"id": combination_id})
     except Exception:
         LOG.warning("Custom combination not found: id=%s", combination_id)
         raise HTTPException(status_code=404, detail="Combination not found")
 
     try:
-        db.delete(TESTCASE_COLLECTION, {"id": combination_id})
+        db.delete(TEST_CASE_COLLECTION, {"id": combination_id})
         LOG.info(
             f"Custom combination deleted successfully: id={combination_id}, name={record['name']}")
     except Exception as e:

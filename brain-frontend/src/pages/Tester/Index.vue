@@ -195,11 +195,11 @@
                   <span v-else class="no-data">-</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="commit" label="执行时Commit" width="140">
+              <el-table-column prop="latest_commit" label="执行时Commit" width="140">
                 <template #default="{ row }">
-                  <el-tooltip v-if="row.commit" :content="row.commit" placement="top">
+                  <el-tooltip v-if="row.latest_commit" :content="row.latest_commit" placement="top">
                     <el-tag size="small" type="success" class="commit-tag">
-                      {{ formatCommitHash(row.commit) }}
+                      {{ formatCommitHash(row.latest_commit) }}
                     </el-tag>
                   </el-tooltip>
                   <span v-else class="no-data">-</span>
