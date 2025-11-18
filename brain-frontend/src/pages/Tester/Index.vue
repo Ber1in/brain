@@ -129,12 +129,6 @@
                     </el-option>
                   </el-option-group>
                 </el-select>
-                <div class="selection-info" v-if="selectedTag">
-                  <el-tag type="warning">
-                    <el-icon><Check /></el-icon>
-                    已选择标签: {{ selectedTag }}
-                  </el-tag>
-                </div>
               </div>
 
               <el-button 
@@ -151,6 +145,12 @@
               <el-tag type="success">
                 <el-icon><Check /></el-icon>
                 已选择分支: {{ selectedBranch }}
+              </el-tag>
+            </div>
+            <div class="selection-info" v-if="selectedTag">
+              <el-tag type="warning">
+                <el-icon><Check /></el-icon>
+                已选择标签: {{ selectedTag }}
               </el-tag>
             </div>
           </div>
@@ -548,17 +548,21 @@
             @node-click="handleDirectoryClick"
             @check-change="handleDirectoryCheckChange"
             show-checkbox
+            :check-strictly="true"
             v-loading="directoryLoading"
             highlight-current
             style="margin-top: 16px;"
           >
             <template #default="{ node, data }">
-              <div class="directory-node">
+              <div class="directory-node" :class="{ 'disabled-node': data.disabled }">
                 <el-icon class="directory-icon">
                   <Folder v-if="data.type === 'directory'" />
                   <Document v-else />
                 </el-icon>
                 <span class="directory-name">{{ node.label }}</span>
+                <el-tag v-if="data.disabled" size="small" type="info" class="disabled-tag">
+                  已包含在父目录中
+                </el-tag>
               </div>
             </template>
           </el-tree>
@@ -966,7 +970,7 @@ const leftSelectedCases = ref<string[]>([]) // 左侧选中的用例
 const rightTestCasesTree = ref<any[]>([]) // 右侧树形数据
 
 // 用例集合相关数据
-const combinations = ref<CaseCombinationsResponse[]>([])
+const combinations = ref<CaseCombinationResponse[]>([])
 const selectedCombinationId = ref('')
 const saveCombinationDialogVisible = ref(false)
 const saveCombinationForm = ref<CaseCombinationRequest>({
@@ -1005,7 +1009,8 @@ const directoryTreeRef = ref<InstanceType<typeof ElTree>>()
 // 目录树配置
 const directoryProps = {
   children: 'children',
-  label: 'name'
+  label: 'name',
+  disabled: 'disabled'
 }
 
 // 监听搜索条件变化
@@ -1029,6 +1034,17 @@ const refreshDirectoryTree = async () => {
     const response = await testApi.getDirectoryTree()
     directoryTree.value = response.tree
     
+    // 初始化禁用状态
+    const initializeDisabledState = (nodes: any[]) => {
+      nodes.forEach(node => {
+        node.disabled = false
+        if (node.children) {
+          initializeDisabledState(node.children)
+        }
+      })
+    }
+    initializeDisabledState(directoryTree.value)
+    
   } catch (error) {
     ElMessage.error('加载目录结构失败')
   } finally {
@@ -1038,7 +1054,7 @@ const refreshDirectoryTree = async () => {
 
 // 处理目录点击
 const handleDirectoryClick = (data: any) => {
-  if (data.type === 'directory' && directoryTreeRef.value) {
+  if (data.type === 'directory' && directoryTreeRef.value && !data.disabled) {
     const node = directoryTreeRef.value.getNode(data.path)
     if (node) {
       const isChecked = directoryTreeRef.value.getCheckedNodes().includes(data)
@@ -1049,15 +1065,129 @@ const handleDirectoryClick = (data: any) => {
 
 // 处理目录勾选变化
 const handleDirectoryCheckChange = (data: any, checked: boolean) => {
-  if (data.type === 'directory' && checked) {
-    if (!selectedDirectories.value.includes(data.path)) {
-      selectedDirectories.value.push(data.path)
+  if (data.type === 'directory') {
+    if (checked) {
+      handleParentDirectorySelect(data)
+    } else {
+      handleParentDirectoryDeselect(data)
     }
-  } else if (data.type === 'directory' && !checked) {
-    const index = selectedDirectories.value.indexOf(data.path)
+    
+    // 更新目录树状态
+    updateDirectoryTreeState()
+  }
+}
+
+// 处理父目录选择
+const handleParentDirectorySelect = (selectedDirectory: any) => {
+  // 1. 获取所有子目录路径
+  const childPaths = getAllChildPaths(selectedDirectory)
+  
+  // 2. 移除所有子目录（避免重复扫描）
+  removeChildDirectories(childPaths)
+  
+  // 3. 添加父目录到选中列表
+  if (!selectedDirectories.value.includes(selectedDirectory.path)) {
+    selectedDirectories.value.push(selectedDirectory.path)
+  }
+  
+  if (childPaths.length > 0) {
+    ElMessage.info(`已选择父目录 ${selectedDirectory.path}，自动移除了 ${childPaths.length} 个子目录`)
+  }
+}
+
+// 处理父目录取消选择
+const handleParentDirectoryDeselect = (deselectedDirectory: any) => {
+  // 从选中列表中移除
+  const index = selectedDirectories.value.indexOf(deselectedDirectory.path)
+  if (index > -1) {
+    selectedDirectories.value.splice(index, 1)
+  }
+}
+
+// 获取目录的所有子目录路径
+const getAllChildPaths = (node: any): string[] => {
+  const paths: string[] = []
+  
+  const collectPaths = (currentNode: any) => {
+    if (currentNode.children && currentNode.children.length > 0) {
+      currentNode.children.forEach((child: any) => {
+        if (child.type === 'directory') {
+          paths.push(child.path)
+          collectPaths(child)
+        }
+      })
+    }
+  }
+  
+  collectPaths(node)
+  return paths
+}
+
+// 移除子目录
+const removeChildDirectories = (childPaths: string[]) => {
+  let removedCount = 0
+  
+  childPaths.forEach(childPath => {
+    const index = selectedDirectories.value.indexOf(childPath)
     if (index > -1) {
       selectedDirectories.value.splice(index, 1)
+      removedCount++
+      
+      // 同时更新目录树的勾选状态
+      if (directoryTreeRef.value) {
+        const node = directoryTreeRef.value.getNode(childPath)
+        if (node) {
+          directoryTreeRef.value.setChecked(node, false, false)
+        }
+      }
     }
+  })
+  
+  return removedCount
+}
+
+// 更新目录树状态
+const updateDirectoryTreeState = () => {
+  // 首先重置所有目录的禁用状态
+  const resetDisabledState = (nodes: any[]) => {
+    nodes.forEach(node => {
+      if (node.type === 'directory') {
+        node.disabled = false
+        if (node.children) {
+          resetDisabledState(node.children)
+        }
+      }
+    })
+  }
+  
+  resetDisabledState(directoryTree.value)
+  
+  // 为每个选中的父目录禁用其子目录
+  selectedDirectories.value.forEach(selectedPath => {
+    const findAndDisableChildren = (nodes: any[]) => {
+      nodes.forEach(node => {
+        if (node.path === selectedPath) {
+          // 禁用所有子目录
+          disableChildren(node)
+        } else if (node.children) {
+          findAndDisableChildren(node.children)
+        }
+      })
+    }
+    findAndDisableChildren(directoryTree.value)
+  })
+}
+
+// 禁用所有子目录
+const disableChildren = (node: any) => {
+  if (node.children && node.children.length > 0) {
+    node.children.forEach((child: any) => {
+      if (child.type === 'directory') {
+        child.disabled = true
+        // 递归禁用孙子目录
+        disableChildren(child)
+      }
+    })
   }
 }
 
@@ -1070,7 +1200,10 @@ const removeSelectedDirectory = (dir: string) => {
   
   // 同时更新目录树的勾选状态
   if (directoryTreeRef.value) {
-    directoryTreeRef.value.setChecked(dir, false)
+    const node = directoryTreeRef.value.getNode(dir)
+    if (node) {
+      directoryTreeRef.value.setChecked(node, false)
+    }
   }
   
   // 同时从已扫描目录中移除
@@ -1078,6 +1211,9 @@ const removeSelectedDirectory = (dir: string) => {
   if (dirIndex > -1) {
     directories.value.splice(dirIndex, 1)
   }
+  
+  // 更新目录树状态
+  updateDirectoryTreeState()
 }
 
 // 确认目录选择并直接扫描测试用例
@@ -1137,6 +1273,9 @@ const restoreCheckedDirectories = () => {
     
     // 更新选中的目录列表
     selectedDirectories.value = [...directories.value]
+    
+    // 更新目录树状态
+    updateDirectoryTreeState()
   }
 }
 
@@ -2192,6 +2331,31 @@ onMounted(() => {
 .directory-name {
   font-size: 14px;
   color: #1f2937;
+}
+
+/* 禁用节点的样式 */
+.disabled-node {
+  opacity: 0.6;
+  cursor: not-allowed !important;
+}
+
+.disabled-node .directory-name {
+  color: #c0c4cc !important;
+}
+
+.disabled-tag {
+  margin-left: 8px;
+  font-size: 10px;
+}
+
+/* 确保禁用节点不可点击 */
+:deep(.el-tree-node.is-disabled .el-tree-node__content) {
+  cursor: not-allowed !important;
+  background-color: #f5f7fa !important;
+}
+
+:deep(.el-tree-node.is-disabled .el-tree-node__content:hover) {
+  background-color: #f5f7fa !important;
 }
 
 .current-selection {
