@@ -19,15 +19,16 @@ from brain.json_db import SQLiteDocumentDB
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
 
+IGNORE_DIRS = {"__pycache__", ".pytest_cache", ".git", ".idea"}
 GITLAB_URL = 'https://git-sha.yunsilicon.com'
 PRIVATE_TOKEN = 'qZb5uFi8JfxLNmXnvtWW'
 PROJECT_PATH = 'yunsilicon-software/qa_auto'
-db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 TEST_CASE_COLLECTION = "test_cases"
 TEST_HISTORY_COLLECTION = "test_history"
 BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
+db = SQLiteDocumentDB()
 
 
 def get_user_repo_dir(user: str) -> str:
@@ -194,7 +195,12 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
 
 @router.get("/qa_auto/execute-history", response_model=List[qa_schemas.ExecuteResponse])
 def execute_history(user=Depends(authenticate_user)):
+    """Retrieve execution history for the authenticated user."""
+
+    LOG.info(f"Fetching execution history for user={user}")
     history = db.find(TEST_HISTORY_COLLECTION, {"user": user})
+
+    LOG.info(f"Fetched {len(history)} execution history records for user={user}")
     return history
 
 
@@ -204,7 +210,7 @@ def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
     """There are many user-defined sets of test cases, and the current interface
     is used to query these combinations."""
 
-    LOG.info("Fetching all custom test case combinations")
+    LOG.info(f"Fetching all custom test case combinations for user={user}")
     all_combinations = db.find(TEST_CASE_COLLECTION, {"user": user})
 
     LOG.info(f"Fetched {len(all_combinations)} combinations")
@@ -259,9 +265,6 @@ def delete_custom_combination(combination_id: str):
         raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")
 
 
-IGNORE_DIRS = {"__pycache__", ".pytest_cache", ".git", ".idea"}
-
-
 @router.get("/qa_auto/directory-tree")
 def get_directory_tree(user=Depends(authenticate_user)):
     """Get the directory tree of the test code repository (recursive scan, directory-only).
@@ -273,6 +276,8 @@ def get_directory_tree(user=Depends(authenticate_user)):
     base_path = Path(user_repo_dir)
     products_path = base_path / "products"
 
+    LOG.info(f"Building directory tree for user={user} at base_path={products_path}")
+
     prefix_len = len(str(base_path)) + 1
 
     def strip_prefix(path: Path) -> str:
@@ -280,6 +285,8 @@ def get_directory_tree(user=Depends(authenticate_user)):
         return p[prefix_len:] if p.startswith(str(base_path)) else p
 
     def build_node(p: Path) -> Dict:
+        LOG.debug(f"Scanning directory: {p}")
+
         node = {
             "name": p.name,
             "path": strip_prefix(p),
@@ -291,19 +298,23 @@ def get_directory_tree(user=Depends(authenticate_user)):
                 if not item.is_dir():
                     continue
 
-                # Skip ignored directories
                 if item.name in IGNORE_DIRS:
+                    LOG.debug(f"Skipping ignored directory: {item}")
                     continue
 
                 node["children"].append(build_node(item))
 
         except PermissionError:
-            pass
+            LOG.warning(f"Permission denied while scanning: {p}")
 
         return node
 
     tree = []
     if products_path.exists() and products_path.is_dir():
         tree.append(build_node(products_path))
+    else:
+        LOG.warning(f"Products directory does not exist for user={user}: {products_path}")
+
+    LOG.info(f"Directory tree built for user={user}, total root nodes={len(tree)}")
 
     return {"tree": tree}
