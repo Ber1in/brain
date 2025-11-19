@@ -295,7 +295,9 @@ class SQLiteDocumentDB:
             "latest_commit": "",
             "time": "",
             "url": "",
-            "user": ""
+            "user": "",
+            "topo": "",
+            "log": ""
         }
     }
 

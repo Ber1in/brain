@@ -8,11 +8,12 @@ import os
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 
 from brain import app
 from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
-from brain.middleware import RequestIdLogFilter, RequestIdMiddleware
+from brain.middleware import RequestIdLogFilter, RequestIdMiddleware, QAAutoFileAccessMiddleware
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.task_scheduler import init_server_warning, task_scheduler
 
@@ -115,3 +116,7 @@ async def startup_event():
 
     except Exception as e:
         logger.error(f"Error while restoring device timers: {str(e)}")
+
+
+app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
+app.mount("/qa-auto-files", StaticFiles(directory="/tmp"), name="qa-auto-files")

@@ -9,7 +9,8 @@ from uuid import uuid4
 import gitlab
 import git
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+import yaml
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
@@ -33,7 +34,23 @@ db = SQLiteDocumentDB()
 
 def get_user_repo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
-    return f"/tmp/{user}/qa_auto"
+    user_repo_dir = f"/tmp/{user}/qa_auto"
+    os.makedirs(os.path.dirname(user_repo_dir), exist_ok=True)
+    return user_repo_dir
+
+
+def get_user_log_dir(user: str) -> str:
+    """Return the repo directory for the given user."""
+    logs_dir = f"/tmp/{user}/logs"
+    os.makedirs(logs_dir, exist_ok=True)
+    return logs_dir
+
+
+def get_user_topo_dir(user: str) -> str:
+    """Return the repo directory for the given user."""
+    topo_dir = f"/tmp/{user}/topo"
+    os.makedirs(topo_dir, exist_ok=True)
+    return topo_dir
 
 
 def get_current_code_and_commit(user):
@@ -79,7 +96,6 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     try:
         if not os.path.exists(user_repo_dir):
             LOG.info(f"[{user}] Repo does not exist, cloning...")
-            os.makedirs(os.path.dirname(user_repo_dir), exist_ok=True)
             clone_url = (f"https://oauth2:{PRIVATE_TOKEN}@"
                          f"git-sha.yunsilicon.com/{PROJECT_PATH}.git")
             git.Repo.clone_from(clone_url, user_repo_dir)
@@ -156,6 +172,14 @@ def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenti
 @router.post("/qa_auto/execute-cases", response_model=qa_schemas.ExecuteResponse)
 def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_user)):
 
+    def normalize_nic_type(t: str) -> str:
+        t = t or ""
+        if t == "metaScale-200 OCP3.0":
+            return "ms200-ocp3.0"
+        return t.split("-")[0].lower()
+
+    clients = []
+
     for server in data.servers:
         server_info = db.find_one(SERVER_COLLECTION, {"id": server.device_id})
         client_info = {
@@ -169,19 +193,47 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
                 "password": BMC_PASS
             }
         }
+
+        nics = []
         for nic in server.nics:
             nic_info = {
                 "ifname": nic.iface,
-                "bdf": nic.bdf
+                "bdf": nic.bdf,
+                "type": normalize_nic_type(nic.type)
             }
-            client_info["nics"] = nic_info
+            nics.append(nic_info)
+        if nics:
+            client_info["nics"] = nics
+        clients.append(client_info)
+
+    env_info = {"yaml_version": "v1", "clients": clients}
+
+    start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    dt = start_time.replace("-", "").replace(" ", "_").replace(":", "")
+    env_topo_filename = dt + ".yaml"
+    log_filename = dt + ".log"
+
+    env_topo_path = os.path.join(get_user_topo_dir(user), env_topo_filename)
+    log_path = os.path.join(get_user_log_dir(user), log_filename)
+
+    try:
+        with open(env_topo_path, "w") as f:
+            yaml.safe_dump(env_info, f, default_flow_style=False, allow_unicode=True)
+        LOG.info(f"env info has been saved to YAML: {env_topo_path}")
+    except Exception as e:
+        LOG.error("Failed to save YAML: %s", str(e))
+        raise HTTPException(status_code=500, detail="Failed to save YAML")
+
+    # pytest -s -v    xxx/xxx/xx.py::xxxx:xxx      --env_config xxxx.yaml  --alluredir= xxx/xxxx/xxxx
 
     current, latest_commit = get_current_code_and_commit(user)
-    record = {"url": "http://10.0.3.206:8088/docs#/", 
-              "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    record = {"url": f"/qa-auto-files/{user}/logs/tmp_report.html", 
+              "time": start_time,
               "current": current,
               "latest_commit": latest_commit,
               "id": str(uuid4()),
+              "topo": f"/qa-auto-files/{user}/topo/{env_topo_filename}",
+              "log": f"/qa-auto-files/{user}/logs/{log_filename}",
               "user": user}
     db.insert(TEST_HISTORY_COLLECTION, record)
     LOG.info("Test case execution records have been logged.")

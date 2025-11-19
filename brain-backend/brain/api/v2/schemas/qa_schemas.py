@@ -55,6 +55,10 @@ class ExecuteResponse(BaseModel):
     time: str = None
     current: str = None
     latest_commit: str = None
+    id: str
+    topo: str
+    log: str
+    user: str
 
 
 class CaseCombinationsResponse(BaseModel):

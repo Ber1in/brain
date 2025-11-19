@@ -179,12 +179,12 @@
               empty-text="暂无执行历史"
               v-loading="historyLoading"
               style="width: 100%"
-              :max-height="300"
+              :max-height="400"
             >
-              <el-table-column prop="time" label="执行时间" width="160" sortable />
-              <el-table-column prop="current" label="执行分支/标签" width="250">
+              <el-table-column prop="time" label="执行时间" width="170" sortable />
+              <el-table-column prop="current" label="执行分支/标签" width="200">
                 <template #default="{ row }">
-                  <el-tooltip v-if="row.current && row.current.length > 30" :content="row.current" placement="top">
+                  <el-tooltip v-if="row.current && row.current.length > 20" :content="row.current" placement="top">
                     <el-tag size="small" type="info" class="current-tag">
                       {{ formatBranchTag(row.current) }}
                     </el-tag>
@@ -205,7 +205,41 @@
                   <span v-else class="no-data">-</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="url" label="执行结果" width="140">
+              <!-- 新增拓扑列 -->
+              <el-table-column prop="topo" label="拓扑信息" width="100">
+                <template #default="{ row }">
+                  <el-link 
+                    v-if="row.topo" 
+                    :href="generateFileUrl(row.topo)" 
+                    target="_blank" 
+                    type="primary"
+                    :underline="false"
+                    class="topo-link"
+                  >
+                    <el-icon><View /></el-icon>
+                    查看拓扑
+                  </el-link>
+                  <span v-else class="no-data">-</span>
+                </template>
+              </el-table-column>
+              <!-- 新增日志列 -->
+              <el-table-column prop="log" label="执行日志" width="100">
+                <template #default="{ row }">
+                  <el-link 
+                    v-if="row.log" 
+                    :href="row.log" 
+                    target="_blank" 
+                    type="success"
+                    :underline="false"
+                    class="log-link"
+                  >
+                    <el-icon><Document /></el-icon>
+                    查看日志
+                  </el-link>
+                  <span v-else class="no-data">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="url" label="测试报告" width="100">
                 <template #default="{ row }">
                   <el-link 
                     v-if="row.url" 
@@ -213,9 +247,10 @@
                     target="_blank" 
                     type="primary"
                     :underline="false"
+                    class="report-link"
                   >
                     <el-icon><Link /></el-icon>
-                    查看测试报告
+                    查看报告
                   </el-link>
                   <span v-else class="no-data">-</span>
                 </template>
@@ -891,6 +926,33 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 拓扑详情对话框 -->
+    <el-dialog
+      v-model="topoDialogVisible"
+      title="拓扑信息"
+      width="800px"
+      class="topo-dialog"
+    >
+      <div class="topo-content">
+        <el-alert
+          title="拓扑信息 (YAML格式)"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px"
+        />
+        <div class="yaml-container">
+          <pre class="yaml-content">{{ formattedTopo }}</pre>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="topoDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="copyTopoToClipboard">
+          复制YAML
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -919,7 +981,8 @@ import {
   Connection,
   FolderOpened,
   FolderAdd,
-  Lightning
+  Lightning,
+  View
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
@@ -952,6 +1015,8 @@ const selectedDirectories = ref<string[]>([])
 const leftFilterText = ref('')
 const rightFilterText = ref('')
 const directories = ref<string[]>([])
+const topoDialogVisible = ref(false)
+const currentTopo = ref<any>({})
 
 // 测试用例相关数据
 const collectedCases = ref<string[]>([]) // 所有收集到的用例
@@ -996,6 +1061,104 @@ const directoryLoading = ref(false)
 const directorySearch = ref('')
 const selectedDirectory = ref('')
 const directoryTreeRef = ref<InstanceType<typeof ElTree>>()
+
+
+const authStore = useAuthStore()
+
+const generateFileUrl = (filePath: string): string => {
+  const token = authStore.accessToken
+  
+  if (!token) {
+    ElMessage.warning('请先登录以访问文件')
+    return filePath
+  }
+  
+  // 如果路径已经是完整URL，直接返回
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    const separator = filePath.includes('?') ? '&' : '?'
+    return `${filePath}${separator}token=${encodeURIComponent(token)}`
+  }
+  
+  // 确保路径以 / 开头
+  const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`
+  
+  // 使用固定的后端文件服务地址（8088端口）
+  const baseUrl = `${window.location.protocol}//${window.location.hostname}:8088`
+  const fullUrl = `${baseUrl}${normalizedPath}`
+  
+  const separator = fullUrl.includes('?') ? '&' : '?'
+  const result = `${fullUrl}${separator}token=${encodeURIComponent(token)}`
+  return result
+}
+
+// 格式化拓扑信息为YAML
+const formattedTopo = computed(() => {
+  if (!currentTopo.value || Object.keys(currentTopo.value).length === 0) {
+    return '# 无拓扑信息'
+  }
+  
+  try {
+    return convertToYaml(currentTopo.value)
+  } catch (error) {
+    console.error('格式化拓扑信息失败:', error)
+    return '# 拓扑信息格式错误\n' + JSON.stringify(currentTopo.value, null, 2)
+  }
+})
+
+// 显示拓扑详情
+const showTopoDetail = (topo: any) => {
+  currentTopo.value = topo
+  topoDialogVisible.value = true
+}
+
+// 将对象转换为YAML格式
+const convertToYaml = (obj: any, indent = 0): string => {
+  const indentStr = '  '.repeat(indent)
+  let yaml = ''
+  
+  if (typeof obj !== 'object' || obj === null) {
+    return `${indentStr}${obj}`
+  }
+  
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) {
+      return `${indentStr}[]`
+    }
+    obj.forEach(item => {
+      if (typeof item === 'object' && item !== null) {
+        yaml += `${indentStr}-\n${convertToYaml(item, indent + 1)}\n`
+      } else {
+        yaml += `${indentStr}- ${item}\n`
+      }
+    })
+    return yaml
+  }
+  
+  Object.keys(obj).forEach(key => {
+    const value = obj[key]
+    if (typeof value === 'object' && value !== null) {
+      if (Array.isArray(value)) {
+        yaml += `${indentStr}${key}:\n${convertToYaml(value, indent + 1)}`
+      } else {
+        yaml += `${indentStr}${key}:\n${convertToYaml(value, indent + 1)}`
+      }
+    } else {
+      yaml += `${indentStr}${key}: ${value}\n`
+    }
+  })
+  
+  return yaml
+}
+
+// 复制YAML到剪贴板
+const copyTopoToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(formattedTopo.value)
+    ElMessage.success('拓扑信息已复制到剪贴板')
+  } catch (error) {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
 
 // 目录树配置
 const directoryProps = {
@@ -2332,8 +2495,7 @@ const handleExecuteConfirm = async () => {
 const loadAvailableServers = async () => {
   try {
     const servers = await deviceApi.getAll()
-    const authStore = useAuthStore()
-    const currentUser = authStore.username
+    const currentUser = authStore.username  // 直接使用上面定义的 authStore
     
     // 过滤出当前用户占用的服务器
     availableServers.value = servers.filter(server => 
@@ -2370,7 +2532,6 @@ onMounted(() => {
   loadCombinations()
 })
 </script>
-
 <style scoped>
 .directory-picker-dialog {
   :deep(.el-dialog__body) {
@@ -2414,7 +2575,6 @@ onMounted(() => {
   color: #1f2937;
 }
 
-/* 禁用节点的样式 */
 .disabled-node {
   opacity: 0.6;
   cursor: not-allowed !important;
@@ -2429,7 +2589,6 @@ onMounted(() => {
   font-size: 10px;
 }
 
-/* 确保禁用节点不可点击 */
 :deep(.el-tree-node.is-disabled .el-tree-node__content) {
   cursor: not-allowed !important;
   background-color: #f5f7fa !important;
@@ -2455,7 +2614,6 @@ onMounted(() => {
   font-size: 12px;
 }
 
-/* 页面布局样式 */
 .qa-platform {
   padding: 20px;
 }
@@ -2466,7 +2624,6 @@ onMounted(() => {
   align-items: center;
 }
 
-/* 顶部区域样式 */
 .top-section {
   display: flex;
   gap: 20px;
@@ -2474,35 +2631,77 @@ onMounted(() => {
 }
 
 .version-section {
-  flex: 1;
+  flex: 2;  /* 2份宽度 */
   padding: 20px;
   background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
 }
 
-/* 历史记录区域样式 */
 .history-section {
-  flex: 1;
+  flex: 3;  /* 3份宽度 */
   padding: 20px;
   background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  min-height: 400px; /* 设置最小高度 */
-  max-height: 500px; /* 设置最大高度 */
+  min-height: 400px;
+  max-height: 500px;
 }
 
 .history-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* 重要：允许内容收缩 */
-  overflow: hidden; /* 隐藏内部溢出 */
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* 表格容器样式 */
+.history-content :deep(.el-table .el-table__cell) {
+  padding: 8px 4px;
+}
+
+/* 链接样式 */
+.report-link,
+.log-link {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topo-btn {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 拓扑对话框样式 */
+.topo-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+.yaml-container {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  max-height: 500px;
+  overflow: auto;
+}
+
+.yaml-content {
+  margin: 0;
+  padding: 16px;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #2d3748;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 :deep(.history-content .el-table) {
   flex: 1;
   display: flex;
@@ -2515,7 +2714,6 @@ onMounted(() => {
   scrollbar-width: thin;
 }
 
-/* 自定义滚动条样式 */
 :deep(.history-content .el-table .el-table__body-wrapper::-webkit-scrollbar) {
   width: 6px;
 }
@@ -2534,12 +2732,10 @@ onMounted(() => {
   background: #a8a8a8;
 }
 
-/* 确保表格头部固定 */
 :deep(.history-content .el-table .el-table__header-wrapper) {
   flex-shrink: 0;
 }
 
-/* 空数据状态样式 */
 :deep(.history-content .el-table__empty-block) {
   min-height: 200px;
   display: flex;
@@ -2547,12 +2743,10 @@ onMounted(() => {
   justify-content: center;
 }
 
-
 .refresh-btn {
   margin-left: auto;
 }
 
-/* 区域标题样式 */
 .section-title {
   display: flex;
   align-items: center;
@@ -2567,7 +2761,6 @@ onMounted(() => {
   color: #409eff;
 }
 
-/* 当前版本样式 */
 .current-version {
   margin-bottom: 16px;
 }
@@ -2614,7 +2807,6 @@ onMounted(() => {
   margin-left: 4px;
 }
 
-/* 版本控制样式 */
 .version-control {
   display: flex;
   flex-direction: column;
@@ -2648,7 +2840,6 @@ onMounted(() => {
   margin-left: auto;
 }
 
-/* 下拉选项样式 */
 .branch-option,
 .tag-option {
   display: flex;
@@ -2661,7 +2852,6 @@ onMounted(() => {
   margin-left: 8px;
 }
 
-/* 测试用例收集区域 */
 .collect-section {
   margin-bottom: 30px;
   padding: 20px;
@@ -2670,7 +2860,6 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
-/* 管理布局样式 */
 .management-layout {
   display: flex;
   gap: 20px;
@@ -2692,7 +2881,6 @@ onMounted(() => {
   min-width: 0;
 }
 
-/* 目录配置样式 */
 .directory-config {
   display: flex;
   flex-direction: column;
@@ -2750,11 +2938,6 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
-.collect-btn {
-  align-self: flex-start;
-}
-
-/* 用例集合管理区域 */
 .combinations-section {
   padding: 16px;
   background: white;
@@ -2817,7 +3000,6 @@ onMounted(() => {
   padding: 4px;
 }
 
-/* 测试用例选择区域样式 */
 .test-cases-selection {
   margin-top: 20px;
   border: 1px solid #e2e8f0;
@@ -2853,7 +3035,6 @@ onMounted(() => {
   min-height: 0;
 }
 
-/* 左右面板样式 */
 .left-panel,
 .right-panel {
   flex: 1;
@@ -2890,7 +3071,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* 树容器包装器 */
 .tree-container-wrapper {
   flex: 1;
   display: flex;
@@ -2910,7 +3090,6 @@ onMounted(() => {
   -ms-overflow-style: auto;
 }
 
-/* 自定义滚动条样式 - 确保可见 */
 .tree-container::-webkit-scrollbar {
   height: 12px;
   width: 12px;
@@ -2946,7 +3125,6 @@ onMounted(() => {
   background: #f1f1f1;
 }
 
-/* 传输按钮样式 */
 .transfer-buttons {
   display: flex;
   flex-direction: column;
@@ -2966,7 +3144,6 @@ onMounted(() => {
   margin: 0;
 }
 
-/* 树节点样式 */
 :deep(.el-tree) {
   min-width: max-content;
   width: 100%;
@@ -3042,7 +3219,6 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* 历史记录表格样式 */
 .no-data {
   color: #c0c4cc;
   font-style: italic;
@@ -3070,7 +3246,6 @@ onMounted(() => {
   gap: 4px;
 }
 
-/* 对话框样式 */
 .checkout-dialog {
   :deep(.el-dialog__header) {
     padding: 20px 20px 0;
@@ -3087,21 +3262,31 @@ onMounted(() => {
 }
 
 .server-dialog {
+  :deep(.el-dialog) {
+    height: 80vh !important;
+    max-height: 80vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
   :deep(.el-dialog__header) {
-    padding: 20px 20px 0;
-    margin-right: 0;
+    padding: 20px 20px 0 !important;
+    margin-right: 0 !important;
+    flex-shrink: 0 !important;
   }
 
   :deep(.el-dialog__body) {
-    padding: 20px;
-    max-height: calc(80vh - 140px); /* 动态计算高度，为页脚留出空间 */
-    overflow-y: auto;
+    padding: 20px !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
+    min-height: 0 !important;
   }
 
   :deep(.el-dialog__footer) {
-    padding: 16px 20px;
-    border-top: 1px solid #e2e8f0;
-    background: #f8fafc;
+    padding: 16px 20px !important;
+    border-top: 1px solid #e2e8f0 !important;
+    background: #f8fafc !important;
+    flex-shrink: 0 !important;
   }
 }
 
@@ -3157,67 +3342,31 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.server-nic-stats {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.interfaces-title {
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 12px;
-  font-size: 14px;
-}
-
-/* 服务器选择对话框样式 */
 .server-dialog-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.server-selection {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  background: #f8fafc;
-}
-
-.server-list {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.server-item {
-  padding: 8px 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.server-item:last-child {
-  border-bottom: none;
-}
-
-/* 服务器和网口选择整合样式 */
 .server-nic-selection {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 16px;
   background: #f8fafc;
-  min-height: 400px; /* 设置最小高度 */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .server-list-with-nics {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-height: none; /* 移除固定高度，让内容自然扩展 */
-  overflow-y: visible; /* 移除滚动，让外层控制 */
-  min-height: 200px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
-/* 确保滚动条样式正确 */
 .server-list-with-nics::-webkit-scrollbar {
   width: 8px;
 }
@@ -3241,7 +3390,6 @@ onMounted(() => {
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  margin-bottom: 8px; /* 添加间距 */
 }
 
 .server-checkbox {
@@ -3274,59 +3422,12 @@ onMounted(() => {
   text-align: center;
 }
 
-.nic-configuration {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  background: #f8fafc;
-}
-
-.nic-config-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-/* 网口选择样式 */
-.nic-selection {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  background: #f8fafc;
-}
-
-.nic-selection-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.server-nics {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-}
-
-.server-nics:last-child {
-  margin-bottom: 0;
-}
-
-.server-header {
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.server-header h4 {
-  margin: 0;
-  color: #1f2937;
-}
-
-/* 网口选择区域样式调整 */
 .nic-selection-area {
   padding: 16px;
   background: #fafbfc;
   border-top: 1px solid #e2e8f0;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .nic-selection-header {
@@ -3346,12 +3447,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 400px; /* 为网卡列表设置最大高度 */
-  overflow-y: auto; /* 网卡列表独立滚动 */
-  padding-right: 4px;
+  max-height: none;
+  overflow-y: visible;
 }
 
-/* 网卡列表滚动条样式 */
 .nics-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -3402,28 +3501,20 @@ onMounted(() => {
   color: #64748b;
 }
 
-.nic-details {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: #64748b;
-}
-
 .nic-select-all {
   margin-right: 8px;
 }
 
 .nic-interfaces-selection {
   margin-top: 8px;
-  padding: 12px;
+  padding: 8px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
-  max-height: none; /* 移除最大高度限制 */
-  overflow-y: visible; /* 移除垂直滚动 */
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-/* 网口列表滚动条样式 */
 .nic-interfaces-selection::-webkit-scrollbar {
   width: 4px;
 }
@@ -3438,7 +3529,6 @@ onMounted(() => {
   border-radius: 2px;
 }
 
-/* 选择统计样式 */
 .selection-stats {
   display: flex;
   gap: 8px;
@@ -3459,21 +3549,10 @@ onMounted(() => {
   align-items: center;
 }
 
-.interfaces-header {
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.select-all-text {
-  font-weight: 600;
-  color: #1f2937;
-}
-
 .interfaces-list {
   display: flex;
-  flex-wrap: wrap; /* 允许换行 */
-  gap: 12px; /* 网口之间的间距 */
+  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
 }
 
@@ -3482,21 +3561,8 @@ onMounted(() => {
   background: #f8fafc;
   border-radius: 4px;
   border: 1px solid #e2e8f0;
-  min-width: 120px; /* 设置最小宽度 */
-  flex-shrink: 0; /* 防止收缩 */
-}
-
-.nic-interface:last-child {
-  margin-bottom: 0;
-}
-
-.interface-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  min-width: 120px;
+  flex-shrink: 0;
 }
 
 .interface-info {
@@ -3504,23 +3570,22 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
   margin-left: 8px;
-  text-align: center; /* 居中对齐 */
+  text-align: center;
 }
 
 .iface-name {
   font-weight: 600;
   color: #1f2937;
-  font-size: 12px; /* 稍微调小字体 */
-  white-space: nowrap; /* 防止文字换行 */
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .bdf {
   font-family: 'Monaco', 'Consolas', monospace;
-  font-size: 10px; /* 稍微调小字体 */
+  font-size: 10px;
   color: #64748b;
 }
 
-/* 复选框样式调整 */
 :deep(.nic-interface .el-checkbox) {
   display: flex;
   align-items: center;
@@ -3532,31 +3597,18 @@ onMounted(() => {
   flex: 1;
 }
 
-
-.ip-inputs {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
 .no-testable-nics {
   padding: 16px;
 }
 
-.no-servers {
-  padding: 40px 0;
-  text-align: center;
-}
-
-.mv200-note {
-  margin-top: 8px;
-  text-align: center;
-}
-
-/* 响应式设计 */
 @media (max-width: 1200px) {
   .top-section {
     flex-direction: column;
+  }
+  
+  .version-section,
+  .history-section {
+    flex: 1;
   }
 }
 
@@ -3570,11 +3622,11 @@ onMounted(() => {
   }
 
   .interfaces-list {
-    gap: 8px; /* 移动端减小间距 */
+    gap: 8px;
   }
 
   .nic-interface {
-    min-width: 100px; /* 移动端减小最小宽度 */
+    min-width: 100px;
     padding: 6px 8px;
   }
 
@@ -3587,11 +3639,21 @@ onMounted(() => {
   }
 
   .server-dialog {
-    :deep(.el-dialog__body) {
-      max-height: calc(70vh - 160px); /* 移动端调整高度 */
+    :deep(.el-dialog) {
+      height: 90vh !important;
+      width: 95% !important;
+      margin-top: 5vh !important;
     }
   }
+
+  .nic-selection-area {
+    max-height: 300px;
+  }
   
+  .nic-interfaces-selection {
+    max-height: 150px;
+  }
+
   .dialog-footer {
     flex-direction: column;
     align-items: stretch;
@@ -3619,27 +3681,6 @@ onMounted(() => {
   
   .action-buttons .el-button {
     width: 100%;
-  }
-
-  .server-nic-stats {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .interface-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .ip-inputs {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .ip-inputs .el-input {
-    width: 100% !important;
-    margin-right: 0 !important;
   }
 
   .current-version {
@@ -3699,16 +3740,6 @@ onMounted(() => {
     overflow: auto !important;
   }
 
-  .ip-inputs {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .ip-inputs .el-input {
-    width: 100% !important;
-    margin-right: 0 !important;
-  }
-
   .combination-selection {
     flex-direction: column;
     align-items: flex-start;
@@ -3719,7 +3750,6 @@ onMounted(() => {
   }
 }
 
-/* 确保表格滚动条正常工作 */
 :deep(.el-table__body-wrapper) {
   scrollbar-width: thin;
   -ms-overflow-style: auto;

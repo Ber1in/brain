@@ -313,10 +313,14 @@ export interface CheckoutRequest {
 }
 
 export interface ExecuteResponse {
-  url?: string
-  time?: string
-  current?: string
-  latest_commit?: string
+  url?: string;
+  time?: string;
+  current?: string;
+  latest_commit?: string;
+  id: string;
+  topo: string;
+  log: string;
+  user: string;
 }
 
 export interface BranchAndTagResponse {
