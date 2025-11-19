@@ -714,162 +714,143 @@
     <!-- 服务器选择对话框 -->
     <el-dialog
       v-model="serverDialogVisible"
-      title="选择执行服务器"
-      width="800px"
+      title="选择执行服务器和网口"
+      width="900px"
       class="server-dialog"
       :close-on-click-modal="false"
     >
       <div class="server-dialog-content">
-        <el-alert
-          title="请选择用于执行测试用例的服务器，并为非MV200网卡配置IP地址"
-          type="info"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 20px;"
-        />
-
-        <!-- 服务器选择 -->
-        <div class="server-selection">
+        <!-- 服务器和网口选择整合在一起 -->
+        <div class="server-nic-selection">
           <div class="section-title">
             <el-icon><Monitor /></el-icon>
-            <span>选择服务器</span>
+            <span>选择服务器和网口</span>
           </div>
-          <div class="server-list">
-            <el-checkbox-group v-model="selectedServers">
-              <div 
-                v-for="server in availableServers" 
-                :key="server.id"
-                class="server-item"
-              >
-                <el-checkbox :label="server.id">
+          
+          <!-- 服务器数量统计 -->
+          <div class="selection-stats" v-if="sortedAvailableServers.length > 0">
+            <el-tag type="info">
+              共 {{ sortedAvailableServers.length }} 台服务器
+            </el-tag>
+            <el-tag type="success">
+              已选择 {{ selectedServers.length }} 台
+            </el-tag>
+          </div>
+          
+          <div class="server-list-with-nics">
+            <div 
+              v-for="server in sortedAvailableServers" 
+              :key="server.id"
+              class="server-item-with-nics"
+            >
+              <div class="server-checkbox">
+                <el-checkbox 
+                  v-model="selectedServers" 
+                  :label="server.id"
+                  @change="handleServerSelectionChange(server)"
+                >
                   <div class="server-info">
                     <span class="server-name">{{ server.bmc.hostname }}</span>
                     <span class="server-ip">{{ server.device.ip }}</span>
-                    <el-tag v-if="server.user" size="small" type="success">
-                      占用人: {{ server.user }}
+                    <!-- 总网卡数 -->
+                    <el-tag size="small" type="info">
+                      共 {{ getTotalNicCount(server) }} 网卡
+                    </el-tag>
+                    <!-- 根据实际网卡类型显示 -->
+                    <el-tag 
+                      v-for="(count, type) in getNicTypeCounts(server)" 
+                      :key="type"
+                      size="small" 
+                    >
+                      {{ count }} {{ type }}
                     </el-tag>
                   </div>
                 </el-checkbox>
               </div>
-            </el-checkbox-group>
-            <div v-if="availableServers.length === 0" class="no-servers">
-              <el-empty description="暂无可用服务器，请先占用服务器" />
-            </div>
-          </div>
-        </div>
-
-        <!-- 网卡配置 -->
-        <div class="nic-configuration" v-if="selectedServers.length > 0">
-          <div class="section-title">
-            <el-icon><Connection /></el-icon>
-            <span>网卡IP配置 (可选)</span>
-            <el-tag type="info" size="small">仅需为非MV200网卡配置IP</el-tag>
-          </div>
-          <div class="nic-config-list">
-            <div 
-              v-for="server in selectedServersWithNics" 
-              :key="server.id"
-              class="server-nics"
-            >
-              <div class="server-header">
-                <h4>{{ server.bmc.hostname }} ({{ server.device.ip }})</h4>
-                <div class="server-nic-stats">
-                  <el-tag size="small" type="info">
-                    总共 {{ getTotalNicCount(server) }} 张网卡
-                  </el-tag>
-                  <el-tag v-if="getMv200NicCount(server) > 0" size="small" type="success">
-                    已忽略 {{ getMv200NicCount(server) }} 张MV200网卡
-                  </el-tag>
-                  <el-tag size="small" type="warning">
-                    可配置 {{ getConfigurableNicCount(server) }} 张网卡
-                  </el-tag>
-                </div>
-              </div>
               
-              <!-- 修改网卡列表部分 -->
-              <div class="nics-list">
-                <!-- 显示可配置的非MV200网卡 -->
-                <div 
-                  v-for="nic in getConfigurableNics(server)" 
-                  :key="nic?.sn || nic?.type"
-                  class="nic-item"
-                >
-                  <div class="nic-info">
-                    <div class="nic-type">
-                      {{ nic.type || '未知类型' }}
-                      <el-tag v-if="nic.nic_info" size="small" type="primary" style="margin-left: 8px;">
-                        {{ nic.nic_info.length }} 个网口
-                      </el-tag>
-                    </div>
-                    <div class="nic-details">
-                      <span class="nic-sn">SN: {{ nic.sn || '未知SN' }}</span>
-                    </div>
-                  </div>
-                  
-                  <!-- 网口配置区域 - 每个网口单独配置 -->
-                  <div class="nic-interfaces-config" v-if="nic.nic_info && nic.nic_info.length > 0">
-                    <div 
-                      v-for="(nicInfo, index) in nic.nic_info" 
-                      :key="index"
-                      class="nic-interface"
-                    >
-                      <div class="interface-header">
-                        <div class="interface-info">
-                          <span class="iface-name">{{ nicInfo.iface || `网口${index + 1}` }}</span>
-                          <span class="bdf">{{ nicInfo.bdf || '未知BDF' }}</span>
-                        </div>
-                        <el-switch
-                          v-model="nicInfo.enableConfig"
-                          @change="handleInterfaceConfigChange(nicInfo)"
-                          active-text="配置IP"
-                          inactive-text="不配置"
-                        />
-                      </div>
-                      
-                      <!-- IP配置区域，只在启用配置时显示 -->
-                      <div class="ip-inputs" v-if="nicInfo.enableConfig">
-                        <el-input
-                          v-model="nicInfo.ipv4"
-                          placeholder="IPv4地址"
-                          style="width: 200px; margin-right: 10px;"
-                        />
-                        <el-input
-                          v-model="nicInfo.ipv6"
-                          placeholder="IPv6地址"
-                          style="width: 200px;"
-                        />
-                        <el-alert
-                          v-if="!nicInfo.ipv4 && !nicInfo.ipv6"
-                          title="请至少配置一个IP地址（IPv4或IPv6）"
-                          type="warning"
-                          :closable="false"
-                          show-icon
-                          style="margin-top: 8px; width: 420px;"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div v-else class="no-interfaces">
-                    <el-alert
-                      title="此网卡没有可配置的网口"
-                      type="info"
-                      :closable="false"
-                      show-icon
-                    />
-                  </div>
+              <!-- 网口选择区域 - 紧跟在服务器后面 -->
+              <div 
+                class="nic-selection-area" 
+                v-if="selectedServers.includes(server.id) && getTestableNicCount(server) > 0"
+              >
+                <div class="nic-selection-header">
+                  <el-icon><Connection /></el-icon>
+                  <span>网口选择 - 已选择 {{ getSelectedInterfaceCount(server) }} 个网口</span>
                 </div>
                 
-                <!-- 显示没有可配置网卡的情况 -->
-                <div v-if="getConfigurableNicCount(server) === 0" class="no-configurable-nics">
-                  <el-alert
-                    title="此服务器没有需要配置IP的网卡（所有网卡均为MV200类型或无可配置网口）"
-                    type="info"
-                    :closable="false"
-                    show-icon
-                  />
+                <div class="nics-list">
+                  <!-- 显示可测试的非MV200网卡 -->
+                  <div 
+                    v-for="nic in getTestableNics(server)" 
+                    :key="nic?.sn || nic?.type"
+                    class="nic-item"
+                  >
+                    <div class="nic-header">
+                      <div class="nic-info">
+                        <span class="nic-type">{{ nic.type || '未知类型' }}</span>
+                        <span class="nic-sn">SN: {{ nic.sn || '未知SN' }}</span>
+                        <el-tag v-if="nic.nic_info" size="small" type="primary">
+                          {{ nic.nic_info.length }} 个网口
+                        </el-tag>
+                        <el-tag 
+                          v-if="getSelectedInterfaceCountForNic(nic) > 0" 
+                          size="small" 
+                          type="success"
+                        >
+                          已选 {{ getSelectedInterfaceCountForNic(nic) }} 个
+                        </el-tag>
+                      </div>
+                      <div class="nic-select-all">
+                        <el-checkbox
+                          :indeterminate="isNicPartiallySelected(nic)"
+                          v-model="nic.allInterfacesSelected"
+                          @change="handleNicAllInterfacesChange(nic)"
+                        >
+                          全选此网卡
+                        </el-checkbox>
+                      </div>
+                    </div>
+                    
+                    <!-- 网口选择区域 -->
+                    <div class="nic-interfaces-selection" v-if="nic.nic_info && nic.nic_info.length > 0">
+                      <div class="interfaces-list">
+                        <div 
+                          v-for="(nicInfo, index) in nic.nic_info" 
+                          :key="index"
+                          class="nic-interface"
+                        >
+                          <el-checkbox
+                            v-model="nicInfo.selected"
+                            @change="handleInterfaceSelectionChange(nic)"
+                          >
+                            <div class="interface-info">
+                              <span class="iface-name">{{ nicInfo.iface || `网口${index + 1}` }}</span>
+                              <span class="bdf">{{ nicInfo.bdf || '未知BDF' }}</span>
+                            </div>
+                          </el-checkbox>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              <!-- 没有可测试网卡的情况 -->
+              <div 
+                class="no-testable-nics" 
+                v-if="selectedServers.includes(server.id) && getTestableNicCount(server) === 0"
+              >
+                <el-alert
+                  :title="`服务器 ${server.bmc.hostname} 没有可测试的网卡（所有网卡均为MV200类型或无可测试网口）`"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
+              </div>
+            </div>
+            
+            <div v-if="sortedAvailableServers.length === 0" class="no-servers">
+              <el-empty description="暂无可用服务器，请先占用服务器" />
             </div>
           </div>
         </div>
@@ -877,26 +858,36 @@
       
       <template #footer>
         <div class="dialog-footer">
-          <el-button 
-            @click="serverDialogVisible = false" 
-            size="large"
-            class="cancel-btn"
-          >
-            取消
-          </el-button>
-          <el-button 
-            type="primary" 
-            @click="handleExecuteConfirm" 
-            :loading="executeLoading"
-            :disabled="!canExecute"
-            size="large"
-            class="confirm-btn"
-          >
-            <template #loading>
-              <el-icon class="is-loading"><Loading /></el-icon>
-            </template>
-            开始执行
-          </el-button>
+          <div class="footer-stats">
+            <el-tag type="primary">
+              已选择 {{ selectedServers.length }} 台服务器
+            </el-tag>
+            <el-tag type="success">
+              已选择 {{ getTotalSelectedInterfaces() }} 个网口
+            </el-tag>
+          </div>
+          <div class="footer-buttons">
+            <el-button 
+              @click="serverDialogVisible = false" 
+              size="large"
+              class="cancel-btn"
+            >
+              取消
+            </el-button>
+            <el-button 
+              type="primary" 
+              @click="handleExecuteConfirm" 
+              :loading="executeLoading"
+              :disabled="!canExecute"
+              size="large"
+              class="confirm-btn"
+            >
+              <template #loading>
+                <el-icon class="is-loading"><Loading /></el-icon>
+              </template>
+              开始执行 ({{ getTotalSelectedInterfaces() }})
+            </el-button>
+          </div>
         </div>
       </template>
     </el-dialog>
@@ -1370,29 +1361,120 @@ const currentCombination = computed(() => {
   return combinations.value.find(c => c.id === selectedCombinationId.value)
 })
 
-// 修改 canExecute 计算属性，按网口级别检查
-const canExecute = computed(() => {
-  if (selectedServers.value.length === 0) return false
-  
-  // 检查所有启用了配置的网口是否都正确配置了IP
-  for (const server of selectedServersWithNics.value) {
-    for (const nic of server.nics || []) {
-      // 跳过MV200网卡
-      if (isMv200Nic(nic.type)) continue
-      
-      if (nic.nic_info) {
-        for (const nicInfo of nic.nic_info) {
-          // 如果启用了配置但未配置任何IP，则不能执行
-          if (nicInfo.enableConfig && !nicInfo.ipv4 && !nicInfo.ipv6) {
-            return false
-          }
-        }
+// 计算属性：按IP地址从小到大排序的服务器列表
+const sortedAvailableServers = computed(() => {
+  return [...availableServers.value].sort((a, b) => {
+    const ipA = a.device.ip.split('.').map(Number)
+    const ipB = b.device.ip.split('.').map(Number)
+    
+    // 逐段比较IP地址
+    for (let i = 0; i < 4; i++) {
+      if (ipA[i] !== ipB[i]) {
+        return ipA[i] - ipB[i]
       }
     }
-  }
-  
-  return true
+    return 0
+  })
 })
+
+// 处理服务器选择变化
+const handleServerSelectionChange = (server: ServerDetailResponse) => {
+  // 当取消选择服务器时，取消选择该服务器的所有网口
+  if (!selectedServers.value.includes(server.id!)) {
+    if (server.nics) {
+      server.nics.forEach(nic => {
+        nic.allInterfacesSelected = false
+        if (nic.nic_info) {
+          nic.nic_info.forEach(nicInfo => {
+            nicInfo.selected = false
+          })
+        }
+      })
+    }
+  }
+}
+
+// 获取服务器已选择的网口数量
+const getSelectedInterfaceCount = (server: ServerDetailResponse): number => {
+  let count = 0
+  if (server.nics) {
+    server.nics.forEach(nic => {
+      if (nic.nic_info) {
+        nic.nic_info.forEach(nicInfo => {
+          if (nicInfo.selected) {
+            count++
+          }
+        })
+      }
+    })
+  }
+  return count
+}
+
+// 获取单张网卡已选择的网口数量
+const getSelectedInterfaceCountForNic = (nic: any): number => {
+  if (!nic.nic_info) return 0
+  return nic.nic_info.filter((info: any) => info.selected).length
+}
+
+// 获取总共选择的网口数量
+const getTotalSelectedInterfaces = (): number => {
+  let total = 0
+  selectedServersWithNics.value.forEach(server => {
+    total += getSelectedInterfaceCount(server)
+  })
+  return total
+}
+
+// 在 canExecute 计算属性中使用新的统计方法
+const canExecute = computed(() => {
+  return selectedServers.value.length > 0 && getTotalSelectedInterfaces() > 0
+})
+
+// 获取可测试网卡数量
+const getTestableNicCount = (server: ServerDetailResponse): number => {
+  return getTestableNics(server).length
+}
+
+// 获取可测试的网卡（非MV200且有网口信息）
+const getTestableNics = (server: ServerDetailResponse): any[] => {
+  if (!server.nics) return []
+  
+  return server.nics.filter(nic => {
+    // 跳过MV200网卡
+    if (isMv200Nic(nic.type)) return false
+    // 只显示有网口信息的网卡
+    return nic.nic_info && nic.nic_info.length > 0
+  })
+}
+
+// 检查网卡是否部分选中
+const isNicPartiallySelected = (nic: any): boolean => {
+  if (!nic.nic_info || nic.nic_info.length === 0) return false
+  
+  const selectedCount = nic.nic_info.filter((info: any) => info.selected).length
+  return selectedCount > 0 && selectedCount < nic.nic_info.length
+}
+
+// 处理网卡全选/全不选
+const handleNicAllInterfacesChange = (nic: any) => {
+  if (nic.nic_info) {
+    nic.nic_info.forEach((info: any) => {
+      info.selected = nic.allInterfacesSelected
+    })
+  }
+}
+
+// 处理单个网口选择变化
+const handleInterfaceSelectionChange = (nic: any) => {
+  if (nic.nic_info) {
+    const selectedCount = nic.nic_info.filter((info: any) => info.selected).length
+    const totalCount = nic.nic_info.length
+    
+    // 更新全选状态
+    nic.allInterfacesSelected = selectedCount === totalCount
+  }
+}
 
 // 方法
 const handleModeChange = () => {
@@ -2002,6 +2084,22 @@ const handleCombinationChange = (combinationId: string) => {
   }
 }
 
+// 获取网卡类型统计（基于实际的 nic.type）
+const getNicTypeCounts = (server: ServerDetailResponse): Record<string, number> => {
+  const typeCounts: Record<string, number> = {}
+  
+  if (server.nics) {
+    server.nics.forEach(nic => {
+      const type = (nic.type && nic.type.includes('metaScale-200') && nic.type.includes('OCP3.0')) 
+        ? 'metaScale-200 OCP3.0'
+        : (nic.type || '未知类型')
+      typeCounts[type] = (typeCounts[type] || 0) + 1
+    })
+  }
+  
+  return typeCounts
+}
+
 // 保存当前集合
 const saveCurrentCombination = () => {
   if (rightTestCases.value.length === 0) {
@@ -2160,9 +2258,9 @@ const handleExecuteConfirm = async () => {
     // 构建请求数据
     const selectedCases = rightTestCases.value.map(item => item.fullPath)
     
-    // 构建服务器配置 - 按网口级别配置，使用 device_id
+    // 构建服务器配置 - 按网口级别选择，使用 device_id
     const servers: Server[] = selectedServersWithNics.value.map(server => {
-      const configuredNics: CaseNicInfo[] = []
+      const selectedNics: CaseNicInfo[] = []
       
       if (server.nics) {
         server.nics.forEach(nic => {
@@ -2172,21 +2270,14 @@ const handleExecuteConfirm = async () => {
           // 处理非MV200网卡的每个网口
           if (nic.nic_info) {
             nic.nic_info.forEach(nicInfo => {
-              // 只有当启用了配置且配置了至少一个IP时才添加到请求中
-              if (nicInfo.enableConfig && (nicInfo.ipv4 || nicInfo.ipv6)) {
+              // 只添加被选中的网口
+              if (nicInfo.selected) {
                 const caseNicInfo: CaseNicInfo = {
                   iface: nicInfo.iface,
-                  bdf: nicInfo.bdf
+                  bdf: nicInfo.bdf,
+                  type: nic.type
                 }
-                
-                if (nicInfo.ipv4) {
-                  caseNicInfo.ipv4 = nicInfo.ipv4
-                }
-                if (nicInfo.ipv6) {
-                  caseNicInfo.ipv6 = nicInfo.ipv6
-                }
-                
-                configuredNics.push(caseNicInfo)
+                selectedNics.push(caseNicInfo)
               }
             })
           }
@@ -2194,8 +2285,8 @@ const handleExecuteConfirm = async () => {
       }
       
       return {
-        device_id: server.id!, // 使用 device_id 而不是 device_ip
-        nics: configuredNics.length > 0 ? configuredNics : undefined
+        device_id: server.id!, // 使用 device_id
+        nics: selectedNics.length > 0 ? selectedNics : undefined
       }
     })
     
@@ -2204,7 +2295,7 @@ const handleExecuteConfirm = async () => {
       servers: servers.length > 0 ? servers : undefined
     }
     
-    console.log('执行请求数据:', request) // 调试用
+    console.log('执行请求数据:', request)
     
     // 调用执行接口
     const loadingMessage = ElMessage.success('开始运行测试用例...')
@@ -2249,35 +2340,23 @@ const loadAvailableServers = async () => {
       server.user === currentUser && server.time && server.time > 0
     )
     
-    // 为每个网卡的每个网口初始化配置属性
+    // 为每个网卡的每个网口初始化选择属性
     availableServers.value.forEach(server => {
       if (server.nics) {
         server.nics.forEach(nic => {
+          // 初始化全选状态
+          nic.allInterfacesSelected = false
+          
           if (nic.nic_info) {
             nic.nic_info.forEach(nicInfo => {
-              // 初始化 enableConfig 为 false
-              if (nicInfo.enableConfig === undefined) {
-                nicInfo.enableConfig = false
+              // 初始化 selected 为 false
+              if (nicInfo.selected === undefined) {
+                nicInfo.selected = false
               }
-              // 确保 ipv4 和 ipv6 字段存在
-              if (!nicInfo.ipv4) nicInfo.ipv4 = ''
-              if (!nicInfo.ipv6) nicInfo.ipv6 = ''
             })
           }
         })
       }
-    })
-    
-    console.log('处理后的服务器数据:', availableServers.value)
-    // 调试信息：显示每个服务器的 device_id
-    availableServers.value.forEach(server => {
-      console.log(`服务器 ${server.bmc.hostname} 信息:`, {
-        device_id: server.id,
-        device_ip: server.device.ip,
-        总网卡数: getTotalNicCount(server),
-        MV200网卡数: getMv200NicCount(server),
-        可配置网卡数: getConfigurableNicCount(server)
-      })
     })
     
   } catch (error) {
@@ -3015,12 +3094,14 @@ onMounted(() => {
 
   :deep(.el-dialog__body) {
     padding: 20px;
-    max-height: 70vh;
+    max-height: calc(80vh - 140px); /* 动态计算高度，为页脚留出空间 */
     overflow-y: auto;
   }
 
   :deep(.el-dialog__footer) {
-    padding: 0 20px 20px;
+    padding: 16px 20px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
   }
 }
 
@@ -3061,8 +3142,10 @@ onMounted(() => {
 
 .dialog-footer {
   display: flex;
-  gap: 12px;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
 }
 
 .cancel-btn {
@@ -3116,6 +3199,57 @@ onMounted(() => {
   border-bottom: none;
 }
 
+/* 服务器和网口选择整合样式 */
+.server-nic-selection {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+  min-height: 400px; /* 设置最小高度 */
+}
+
+.server-list-with-nics {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: none; /* 移除固定高度，让内容自然扩展 */
+  overflow-y: visible; /* 移除滚动，让外层控制 */
+  min-height: 200px;
+}
+
+/* 确保滚动条样式正确 */
+.server-list-with-nics::-webkit-scrollbar {
+  width: 8px;
+}
+
+.server-list-with-nics::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.server-list-with-nics::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.server-list-with-nics::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.server-item-with-nics {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 8px; /* 添加间距 */
+}
+
+.server-checkbox {
+  padding: 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
 .server-info {
   display: flex;
   align-items: center;
@@ -3126,6 +3260,7 @@ onMounted(() => {
 .server-name {
   font-weight: 600;
   color: #1f2937;
+  font-size: 14px;
 }
 
 .server-ip {
@@ -3147,6 +3282,19 @@ onMounted(() => {
 }
 
 .nic-config-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* 网口选择样式 */
+.nic-selection {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.nic-selection-list {
   max-height: 400px;
   overflow-y: auto;
 }
@@ -3174,10 +3322,52 @@ onMounted(() => {
   color: #1f2937;
 }
 
+/* 网口选择区域样式调整 */
+.nic-selection-area {
+  padding: 16px;
+  background: #fafbfc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.nic-selection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.nic-selection-header .el-icon {
+  color: #409eff;
+}
+
 .nics-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 400px; /* 为网卡列表设置最大高度 */
+  overflow-y: auto; /* 网卡列表独立滚动 */
+  padding-right: 4px;
+}
+
+/* 网卡列表滚动条样式 */
+.nics-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nics-list::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 3px;
+}
+
+.nics-list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.nics-list::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .nic-item {
@@ -3187,16 +3377,29 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
-.nic-info {
+.nic-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
 }
 
+.nic-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .nic-type {
   font-weight: 600;
   color: #1f2937;
+  font-size: 14px;
+}
+
+.nic-sn {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .nic-details {
@@ -3206,28 +3409,81 @@ onMounted(() => {
   color: #64748b;
 }
 
-.nic-ip-config {
-  margin-top: 12px;
-  padding: 12px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
+.nic-select-all {
+  margin-right: 8px;
 }
 
-.nic-interfaces-config {
-  margin-top: 12px;
+.nic-interfaces-selection {
+  margin-top: 8px;
   padding: 12px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
+  max-height: none; /* 移除最大高度限制 */
+  overflow-y: visible; /* 移除垂直滚动 */
+}
+
+/* 网口列表滚动条样式 */
+.nic-interfaces-selection::-webkit-scrollbar {
+  width: 4px;
+}
+
+.nic-interfaces-selection::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 2px;
+}
+
+.nic-interfaces-selection::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+/* 选择统计样式 */
+.selection-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.footer-stats {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.interfaces-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.select-all-text {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.interfaces-list {
+  display: flex;
+  flex-wrap: wrap; /* 允许换行 */
+  gap: 12px; /* 网口之间的间距 */
+  align-items: center;
 }
 
 .nic-interface {
-  padding: 12px;
+  padding: 8px 12px;
   background: #f8fafc;
   border-radius: 4px;
   border: 1px solid #e2e8f0;
-  margin-bottom: 12px;
+  min-width: 120px; /* 设置最小宽度 */
+  flex-shrink: 0; /* 防止收缩 */
 }
 
 .nic-interface:last-child {
@@ -3246,20 +3502,36 @@ onMounted(() => {
 .interface-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  margin-left: 8px;
+  text-align: center; /* 居中对齐 */
 }
 
 .iface-name {
   font-weight: 600;
   color: #1f2937;
-  font-size: 14px;
+  font-size: 12px; /* 稍微调小字体 */
+  white-space: nowrap; /* 防止文字换行 */
 }
 
 .bdf {
   font-family: 'Monaco', 'Consolas', monospace;
-  font-size: 12px;
+  font-size: 10px; /* 稍微调小字体 */
   color: #64748b;
 }
+
+/* 复选框样式调整 */
+:deep(.nic-interface .el-checkbox) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+:deep(.nic-interface .el-checkbox__label) {
+  padding-left: 4px;
+  flex: 1;
+}
+
 
 .ip-inputs {
   display: flex;
@@ -3267,9 +3539,13 @@ onMounted(() => {
   gap: 8px;
 }
 
-.no-interfaces,
-.no-configurable-nics {
-  margin-top: 12px;
+.no-testable-nics {
+  padding: 16px;
+}
+
+.no-servers {
+  padding: 40px 0;
+  text-align: center;
 }
 
 .mv200-note {
@@ -3285,6 +3561,53 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .server-list-with-nics {
+    max-height: 400px;
+  }
+  
+  .nics-list {
+    max-height: 300px;
+  }
+
+  .interfaces-list {
+    gap: 8px; /* 移动端减小间距 */
+  }
+
+  .nic-interface {
+    min-width: 100px; /* 移动端减小最小宽度 */
+    padding: 6px 8px;
+  }
+
+  .iface-name {
+    font-size: 11px;
+  }
+  
+  .bdf {
+    font-size: 9px;
+  }
+
+  .server-dialog {
+    :deep(.el-dialog__body) {
+      max-height: calc(70vh - 160px); /* 移动端调整高度 */
+    }
+  }
+  
+  .dialog-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .footer-stats {
+    justify-content: center;
+    order: 2;
+  }
+  
+  .footer-buttons {
+    justify-content: space-between;
+    order: 1;
+  }
+
   .management-layout {
     flex-direction: column;
   }

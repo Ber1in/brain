@@ -36,16 +36,8 @@ class CasesResponse(BaseModel):
 
 class ExecuteNicInfo(BaseModel):
     iface: str
-    ipv4: str = None
-    ipv6: str = None
     bdf: str
-
-    @root_validator
-    def check_ip(cls, values):
-        ipv4, ipv6 = values.get("ipv4"), values.get("ipv6")
-        if not ipv4 and not ipv6:
-            raise ValueError("Either ipv4 or ipv6 must be provided.")
-        return values
+    type: str
 
 
 class Server(BaseModel):

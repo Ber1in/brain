@@ -174,10 +174,6 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
                 "ifname": nic.iface,
                 "bdf": nic.bdf
             }
-            if nic.get("ipv4"):
-                nic_info["ipv4"]
-            if nic.get("ipv6"):
-                nic_info["ipv6"]
             client_info["nics"] = nic_info
 
     current, latest_commit = get_current_code_and_commit(user)

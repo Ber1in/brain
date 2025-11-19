@@ -335,10 +335,9 @@ export interface CasesResponse {
 }
 
 export interface CaseNicInfo {
-  iface: string;
-  ipv4?: string;
-  ipv6?: string;
-  bdf: string;
+  iface: string
+  bdf: string
+  type?: string
 }
 
 export interface Server {
