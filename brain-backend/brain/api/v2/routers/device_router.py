@@ -11,7 +11,8 @@ from brain.api.v2.schemas import device_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute
 from brain.utils import tools
-from brain.utils.task_scheduler import init_server_warning, task_scheduler, init_warning, occupy_warning # noqa
+from brain.utils.task_scheduler import init_server_warning, task_scheduler
+from brain.utils.task_scheduler import init_warning, occupy_warning, send_release_notification
 
 
 LOG = logging.getLogger(__name__)
@@ -217,13 +218,15 @@ async def update_device(
                     LOG.error(f"Failed to schedule auto cleanup for device {device_id}")
 
             else:
+                old_user = server.get("user")
                 server["user"] = ""
 
                 await init_warning(ip, ssh_user, ssh_pass)
 
                 task_id = f"device_cleanup_{device_id}"
                 success = await task_scheduler.cancel_task(task_id)
-
+                # if old_user:
+                #     await send_release_notification(old_user, server["device"]["ip"])
                 if success:
                     LOG.info(f"Successfully cancelled auto cleanup for device {device_id}")
                 else:

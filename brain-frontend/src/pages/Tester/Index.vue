@@ -206,7 +206,7 @@
                 </template>
               </el-table-column>
               <!-- 新增拓扑列 -->
-              <el-table-column prop="topo" label="拓扑信息" width="100">
+              <el-table-column prop="topo" label="拓扑信息" width="105">
                 <template #default="{ row }">
                   <el-link 
                     v-if="row.topo" 

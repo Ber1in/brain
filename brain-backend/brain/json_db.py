@@ -375,15 +375,23 @@ class SQLiteDocumentDB:
         self._ensure_table(collection)
         sql = f"SELECT * FROM {collection}"
         params = []
+
         if filter_dict:
             conds = []
             for k, v in filter_dict.items():
+                # json_extract 特殊处理
                 if k.startswith("json_extract("):
                     conds.append(f"{k} = ?")
                 else:
-                    conds.append(f"{k} = ?")
+                    # 支持操作符，默认 =
+                    if " " in k:
+                        col, op = k.split(" ", 1)
+                        conds.append(f"{col} {op} ?")
+                    else:
+                        conds.append(f"{k} = ?")
                 params.append(self._serialize_field(v))
             sql += " WHERE " + " AND ".join(conds)
+
         with self.lock:
             cur = self._conn.execute(sql, params)
             rows = [

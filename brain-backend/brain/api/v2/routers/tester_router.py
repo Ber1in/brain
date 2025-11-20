@@ -53,6 +53,13 @@ def get_user_topo_dir(user: str) -> str:
     return topo_dir
 
 
+def get_user_result_dir(user: str) -> str:
+    """Return the repo directory for the given user."""
+    result_dir = f"/tmp/{user}/results"
+    os.makedirs(result_dir, exist_ok=True)
+    return result_dir
+
+
 def get_current_code_and_commit(user):
     user_repo_dir = get_user_repo_dir(user)
     repo = git.Repo(user_repo_dir)
@@ -227,7 +234,7 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
     # pytest -s -v    xxx/xxx/xx.py::xxxx:xxx      --env_config xxxx.yaml  --alluredir= xxx/xxxx/xxxx
 
     current, latest_commit = get_current_code_and_commit(user)
-    record = {"url": f"/qa-auto-files/{user}/logs/tmp_report.html", 
+    record = {"url": f"/qa-auto-files/{user}/results/tmp_report.html", 
               "time": start_time,
               "current": current,
               "latest_commit": latest_commit,

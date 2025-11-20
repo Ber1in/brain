@@ -1,6 +1,8 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from email.mime.text import MIMEText
+import smtplib
 import asyncio
 from datetime import datetime
 import logging
@@ -11,6 +13,10 @@ from brain.utils.ssh_client import ssh_execute
 
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
+SMTP_HOST = "smtp.feishu.cn"
+SMTP_PORT = 465
+SMTP_USER = "wubl@yunsilicon.com"
+SMTP_PASS = "199610wad14S.."
 
 LOG = logging.getLogger(__name__)
 
@@ -152,6 +158,33 @@ class GenericTaskScheduler:
 task_scheduler = GenericTaskScheduler()
 
 
+async def send_release_notification(to_email, server_ip):
+    subject = "Server Released Notification"
+    body = (
+        "Hello,\n\n"
+        "The server you were using has been released.\n"
+        "Server IP: {}\n\n"
+        "If this was not expected, please contact the administrator.\n\n"
+        "Best regards,\n"
+        "System Notification Service"
+    ).format(server_ip)
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = SMTP_USER
+    msg["To"] = f"{to_email}@yunsilicon.com"
+
+    try:
+        # use SSL (465)
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        return True
+    except Exception as e:
+        print("Error sending email:", str(e))
+        return False
+
+
 async def init_warning(ip, user, pwd):
     init_command = '''
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
@@ -207,6 +240,7 @@ async def init_server_warning(device_id: str):
             LOG.error(f"Device not found for cleanup: {device_id}")
             return
 
+        old_user = server.get("user")
         # Execute cleanup command
         ip = server["device"]["ip"]
         ssh_user = server["device"].get("username", "")
@@ -221,6 +255,8 @@ async def init_server_warning(device_id: str):
         db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
         LOG.info(f"Automatically cleaned up warning messages for device: {device_id}")
+        # if old_user:
+        #     await send_release_notification(old_user, server["device"]["ip"])
 
     except Exception as e:
         LOG.error(f"Error in init_server_warning for {device_id}: {str(e)}")

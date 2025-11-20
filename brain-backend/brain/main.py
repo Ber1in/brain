@@ -84,7 +84,7 @@ async def startup_event():
     """Restore pending scheduled tasks at startup"""
     try:
         # Find all occupied devices
-        occupied_servers = db.find(SERVER_COLLECTION, {"time": {"$gt": 0}})
+        occupied_servers = db.find(SERVER_COLLECTION, {"time >": 0})
         logger.info(f"Found {len(occupied_servers)} occupied devices to restore timers")
 
         for server in occupied_servers:
@@ -111,7 +111,7 @@ async def startup_event():
                     logger.error(f"Failed to restore timer for device {server['id']}")
             else:
                 # If the time has already expired, clean up immediately
-                logger.info(f"Device {server['id']} occupancy expired, cleaning up...")
+                logger.info(f"Device {server['device']['ip']} occupancy expired, cleaning up...")
                 await init_server_warning(server["id"])
 
     except Exception as e:
