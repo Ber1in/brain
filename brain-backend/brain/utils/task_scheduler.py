@@ -254,12 +254,12 @@ async def init_server_warning(device_id: str):
         server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-        LOG.info(f"Automatically cleaned up warning messages for device: {device_id}")
+        LOG.info(f"Automatically cleaned up warning messages for device: {ip}")
         # if old_user:
-        #     await send_release_notification(old_user, server["device"]["ip"])
+        #     await send_release_notification(old_user, ip)
 
     except Exception as e:
-        LOG.error(f"Error in init_server_warning for {device_id}: {str(e)}")
+        LOG.error(f"Error in init_server_warning for {ip}: {str(e)}")
         raise
 
 

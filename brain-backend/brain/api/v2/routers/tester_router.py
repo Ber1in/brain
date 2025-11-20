@@ -10,7 +10,7 @@ import gitlab
 import git
 import logging
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
@@ -65,7 +65,7 @@ def get_current_code_and_commit(user):
     repo = git.Repo(user_repo_dir)
 
     if repo.head.is_detached:
-        LOG.info(f"[{user}]Repo is in detached HEAD")
+        LOG.info(f"Repo is in detached HEAD")
         current_commit = repo.head.commit.hexsha
         matched_tag = next(
             (t.name for t in repo.tags if t.commit == repo.head.commit), None
@@ -81,39 +81,36 @@ def get_current_code_and_commit(user):
 @router.get("/qa_auto/branchs-tags", response_model=qa_schemas.BranchAndTagResponse)
 def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
-    LOG.info(f"[{user}] GitLab authentication started")
+    LOG.info(f"Query branch and tag information for {user}")
     gl.auth()
 
     branchs, tags = [], []
     project = gl.projects.get(PROJECT_PATH)
 
     # list branches
-    LOG.info("Listing branches")
     for branch in project.branches.list(all=True):
         branchs.append(branch.name)
 
     # list tags
-    LOG.info("Listing tags")
     for tag in project.tags.list(all=True):
         tags.append(tag.name)
 
     user_repo_dir = get_user_repo_dir(user)
-    LOG.info(f"[{user}] Local repo dir = {user_repo_dir}")
 
     try:
         if not os.path.exists(user_repo_dir):
-            LOG.info(f"[{user}] Repo does not exist, cloning...")
-            clone_url = (f"https://oauth2:{PRIVATE_TOKEN}@"
-                         f"git-sha.yunsilicon.com/{PROJECT_PATH}.git")
+            LOG.info(f"Repo does not exist, cloning...")
+            clone_url = (
+                f"https://oauth2:{PRIVATE_TOKEN}@git-sha.yunsilicon.com/{PROJECT_PATH}.git")
             git.Repo.clone_from(clone_url, user_repo_dir)
         else:
-            LOG.info(f"[{user}] Repo exists, skip cloning")
+            LOG.debug(f"Repo exists, skip cloning")
 
         current, latest_commit = get_current_code_and_commit(user)
-        LOG.info(f"[{user}] current={current}, latest={latest_commit}")
+        LOG.info(f"current={current}, latest={latest_commit}")
 
     except Exception as e:
-        LOG.error(f"[{user}] Failed to read repo: {e}")
+        LOG.error(f"Failed to read repo for {user}: {e}")
         current = None
         latest_commit = None
 
@@ -127,47 +124,47 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
 
 @router.post("/qa_auto/switch", status_code=204)
 def switch_branch_or_tag(data: qa_schemas.CheckoutRequest, user=Depends(authenticate_user)):
-    LOG.info(f"[{user}] Switching to branch={data.branch}, tag={data.tag}")
+    LOG.info(f"{user} witching to branch={data.branch} tag={data.tag}")
 
     try:
         repo_path = get_user_repo_dir(user)
         repo = git.Repo(repo_path)
 
         repo.git.fetch("--all", "--tags")
-        LOG.info(f"[{user}] Fetch completed")
+        LOG.info(f"Fetch completed")
 
         if data.branch:
             branch = data.branch
-            LOG.info(f"[{user}] Switching to branch {branch}")
+            LOG.info(f"Switching to branch {branch}")
 
             if branch not in [h.name for h in repo.heads]:
-                LOG.info(f"[{user}] Branch {branch} not found, creating")
+                LOG.info(f"Branch {branch} not found, creating")
                 repo.git.checkout("-b", branch, f"origin/{branch}")
             else:
                 repo.git.checkout(branch)
 
             repo.git.pull()
-            LOG.info(f"[{user}] Branch {branch} updated")
+            LOG.info(f"Branch {branch} updated")
 
         elif data.tag:
             tag = data.tag
-            LOG.info(f"[{user}] Switching to tag {tag}")
+            LOG.info(f"Switching to tag {tag}")
 
             if tag not in [t.name for t in repo.tags]:
-                LOG.warning(f"[{user}] Tag {tag} not found")
+                LOG.warning(f"Tag {tag} not found")
                 raise HTTPException(status_code=404, detail=f"Tag '{tag}' not found")
 
             repo.git.checkout(f"tags/{tag}")
-            LOG.info(f"[{user}] Switched to tag {tag}")
+            LOG.info(f"Switched to tag {tag}")
 
     except Exception as e:
-        LOG.error(f"[{user}] Switch failed: {e}")
+        LOG.error(f"Switch failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to switch: {e}")
 
 
 @router.post("/qa_auto/commands", response_model=qa_schemas.CasesResponse)
 def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenticate_user)):
-    LOG.info(f"[{user}] Collecting tests from: {data.dirs}")
+    LOG.info(f"{user} collecting tests from: {data.dirs}")
 
     commands = collect_tests_with_detailed_report(
         data.dirs,

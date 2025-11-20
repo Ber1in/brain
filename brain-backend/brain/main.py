@@ -92,9 +92,10 @@ async def startup_event():
             elapsed_time = datetime.now().timestamp() - server["start"]
             remaining_time = server["time"] - elapsed_time
 
+            ip: str = server['device']['ip']
             if remaining_time > 0:
                 # Restore scheduled task
-                task_id = f"device_cleanup_{server['id']}"
+                task_id = f"device_cleanup_{ip.replace('.', '_')}"
                 success = await task_scheduler.schedule_task(
                     task_id=task_id,
                     delay_seconds=int(remaining_time),
@@ -104,14 +105,14 @@ async def startup_event():
 
                 if success:
                     logger.info(
-                        f"Restored timer for device {server['id']}, "
+                        f"Restored timer for device {ip}, "
                         f"remaining: {remaining_time:.0f}s"
                     )
                 else:
-                    logger.error(f"Failed to restore timer for device {server['id']}")
+                    logger.error(f"Failed to restore timer for device {ip}")
             else:
                 # If the time has already expired, clean up immediately
-                logger.info(f"Device {server['device']['ip']} occupancy expired, cleaning up...")
+                logger.info(f"Device {ip} occupancy expired, cleaning up...")
                 await init_server_warning(server["id"])
 
     except Exception as e:
