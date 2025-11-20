@@ -65,7 +65,6 @@ def get_current_code_and_commit(user):
     repo = git.Repo(user_repo_dir)
 
     if repo.head.is_detached:
-        LOG.info(f"Repo is in detached HEAD")
         current_commit = repo.head.commit.hexsha
         matched_tag = next(
             (t.name for t in repo.tags if t.commit == repo.head.commit), None
@@ -107,7 +106,7 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
             LOG.debug(f"Repo exists, skip cloning")
 
         current, latest_commit = get_current_code_and_commit(user)
-        LOG.info(f"current={current}, latest={latest_commit}")
+        LOG.info(f"current={current} latest={latest_commit}")
 
     except Exception as e:
         LOG.error(f"Failed to read repo for {user}: {e}")

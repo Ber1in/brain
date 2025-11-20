@@ -782,23 +782,46 @@
                 <el-checkbox 
                   v-model="selectedServers" 
                   :label="server.id"
+                  :disabled="serverUpdatingStatus[server.id!] !== false"
                   @change="handleServerSelectionChange(server)"
                 >
                   <div class="server-info">
                     <span class="server-name">{{ server.bmc.hostname }}</span>
                     <span class="server-ip">{{ server.device.ip }}</span>
-                    <!-- 总网卡数 -->
-                    <el-tag size="small" type="info">
-                      共 {{ getTotalNicCount(server) }} 网卡
-                    </el-tag>
-                    <!-- 根据实际网卡类型显示 -->
+                    
+                    <!-- 更新状态显示 -->
                     <el-tag 
-                      v-for="(count, type) in getNicTypeCounts(server)" 
-                      :key="type"
-                      size="small" 
+                      v-if="serverUpdatingStatus[server.id!] === true" 
+                      type="warning" 
+                      size="small"
                     >
-                      {{ count }} {{ type }}
+                      <el-icon><Loading /></el-icon>
+                      更新硬件信息中
                     </el-tag>
+                    
+                    <!-- 更新失败状态 -->
+                    <el-tag 
+                      v-else-if="serverUpdatingStatus[server.id!] === 'failed'" 
+                      type="danger" 
+                      size="small"
+                    >
+                      <el-icon><CircleClose /></el-icon>
+                      硬件信息获取失败
+                    </el-tag>
+                    
+                    <!-- 更新成功才显示网卡信息 -->
+                    <template v-else-if="serverUpdatingStatus[server.id!] === false">
+                      <el-tag size="small" type="info">
+                        共 {{ getTotalNicCount(server) }} 网卡
+                      </el-tag>
+                      <el-tag 
+                        v-for="(count, type) in getNicTypeCounts(server)" 
+                        :key="type"
+                        size="small" 
+                      >
+                        {{ count }} {{ type }}
+                      </el-tag>
+                    </template>
                   </div>
                 </el-checkbox>
               </div>
@@ -806,7 +829,7 @@
               <!-- 网口选择区域 - 紧跟在服务器后面 -->
               <div 
                 class="nic-selection-area" 
-                v-if="selectedServers.includes(server.id) && getTestableNicCount(server) > 0"
+                v-if="selectedServers.includes(server.id) && serverUpdatingStatus[server.id!] === false && getTestableNicCount(server) > 0"
               >
                 <div class="nic-selection-header">
                   <el-icon><Connection /></el-icon>
@@ -873,7 +896,7 @@
               <!-- 没有可测试网卡的情况 -->
               <div 
                 class="no-testable-nics" 
-                v-if="selectedServers.includes(server.id) && getTestableNicCount(server) === 0"
+                v-if="selectedServers.includes(server.id) && serverUpdatingStatus[server.id!] === false && getTestableNicCount(server) === 0"
               >
                 <el-alert
                   :title="`服务器 ${server.bmc.hostname} 没有可测试的网卡（所有网卡均为MV200类型或无可测试网口）`"
@@ -982,7 +1005,8 @@ import {
   FolderOpened,
   FolderAdd,
   Lightning,
-  View
+  View,
+  CircleClose
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
@@ -1039,6 +1063,7 @@ const availableServers = ref<ServerDetailResponse[]>([])
 const selectedServers = ref<string[]>([])
 const serverDialogVisible = ref(false)
 const executeLoading = ref(false)
+const serverUpdatingStatus = ref<Record<string, boolean>>({})
 
 const leftTreeRef = ref<InstanceType<typeof ElTree>>()
 const rightTreeRef = ref<InstanceType<typeof ElTree>>()
@@ -1061,7 +1086,6 @@ const directoryLoading = ref(false)
 const directorySearch = ref('')
 const selectedDirectory = ref('')
 const directoryTreeRef = ref<InstanceType<typeof ElTree>>()
-
 
 const authStore = useAuthStore()
 
@@ -2386,7 +2410,7 @@ const deleteCombination = async () => {
   }
 }
 
-// 修改 handleRunSelected 方法，打开服务器选择对话框
+// 修改 handleRunSelected 方法
 const handleRunSelected = async () => {
   if (rightTestCases.value.length === 0) {
     ElMessage.warning('请先添加测试用例')
@@ -2394,7 +2418,24 @@ const handleRunSelected = async () => {
   }
   
   try {
-    // 加载可用服务器
+    // 立即打开服务器选择对话框
+    serverDialogVisible.value = true
+    
+    // 重置选择
+    selectedServers.value = []
+    
+    // 加载并更新服务器信息
+    await loadAndUpdateServers()
+    
+  } catch (error) {
+    ElMessage.error('加载服务器列表失败')
+  }
+}
+
+// 新增：加载并更新服务器信息
+const loadAndUpdateServers = async () => {
+  try {
+    // 首先加载已占用的服务器
     await loadAvailableServers()
     
     if (availableServers.value.length === 0) {
@@ -2402,11 +2443,96 @@ const handleRunSelected = async () => {
       return
     }
     
-    // 重置选择
-    selectedServers.value = []
+    // 更新所有服务器的硬件信息
+    await updateAllServersHardwareInfo()
     
-    // 打开服务器选择对话框
-    serverDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error('加载服务器列表失败')
+  }
+}
+
+// 修改更新状态为三种：true(更新中)、false(更新成功)、'failed'(更新失败)
+const updateAllServersHardwareInfo = async () => {
+  // 重置更新状态
+  serverUpdatingStatus.value = {}
+  
+  // 设置所有服务器为更新中状态
+  availableServers.value.forEach(server => {
+    if (server.id) {
+      serverUpdatingStatus.value[server.id] = true
+    }
+  })
+  
+  // 并行更新所有服务器的硬件信息
+  const updatePromises = availableServers.value.map(async (server) => {
+    if (!server.id) return server
+    
+    try {
+      // 调用更新接口获取最新硬件信息
+      const updatedServer = await deviceApi.update(server.id, { auto: true })
+      
+      // 更新服务器信息
+      Object.assign(server, updatedServer)
+      
+      // 确保网卡信息正确初始化
+      if (server.nics) {
+        server.nics.forEach(nic => {
+          nic.allInterfacesSelected = false
+          if (nic.nic_info) {
+            nic.nic_info.forEach(nicInfo => {
+              if (nicInfo.selected === undefined) {
+                nicInfo.selected = false
+              }
+            })
+          }
+        })
+      }
+      
+      // 更新成功
+      serverUpdatingStatus.value[server.id] = false
+      
+      return server
+    } catch (error) {
+      console.error(`更新服务器 ${server.bmc.hostname} 硬件信息失败:`, error)
+      // 更新失败，保持禁用状态
+      serverUpdatingStatus.value[server.id] = 'failed'
+      return server
+    }
+  })
+  
+  // 等待所有更新完成
+  await Promise.all(updatePromises)
+}
+
+// 修改 loadAvailableServers 方法
+const loadAvailableServers = async () => {
+  try {
+    const servers = await deviceApi.getAll()
+    const currentUser = authStore.username
+    
+    // 过滤出当前用户占用的服务器
+    availableServers.value = servers.filter(server => 
+      server.user === currentUser && server.time && server.time > 0
+    )
+    
+    // 为每个网卡的每个网口初始化选择属性
+    availableServers.value.forEach(server => {
+      if (server.nics) {
+        server.nics.forEach(nic => {
+          // 初始化全选状态
+          nic.allInterfacesSelected = false
+          
+          if (nic.nic_info) {
+            nic.nic_info.forEach(nicInfo => {
+              // 初始化 selected 为 false
+              if (nicInfo.selected === undefined) {
+                nicInfo.selected = false
+              }
+            })
+          }
+        })
+      }
+    })
     
   } catch (error) {
     ElMessage.error('加载服务器列表失败')
@@ -2492,47 +2618,15 @@ const handleExecuteConfirm = async () => {
   }
 }
 
-const loadAvailableServers = async () => {
-  try {
-    const servers = await deviceApi.getAll()
-    const currentUser = authStore.username  // 直接使用上面定义的 authStore
-    
-    // 过滤出当前用户占用的服务器
-    availableServers.value = servers.filter(server => 
-      server.user === currentUser && server.time && server.time > 0
-    )
-    
-    // 为每个网卡的每个网口初始化选择属性
-    availableServers.value.forEach(server => {
-      if (server.nics) {
-        server.nics.forEach(nic => {
-          // 初始化全选状态
-          nic.allInterfacesSelected = false
-          
-          if (nic.nic_info) {
-            nic.nic_info.forEach(nicInfo => {
-              // 初始化 selected 为 false
-              if (nicInfo.selected === undefined) {
-                nicInfo.selected = false
-              }
-            })
-          }
-        })
-      }
-    })
-    
-  } catch (error) {
-    ElMessage.error('加载服务器列表失败')
-  }
-}
-
 onMounted(() => {
   loadBranchAndTag()
   loadExecuteHistory()
   loadCombinations()
 })
 </script>
+
 <style scoped>
+/* 所有样式保持不变 */
 .directory-picker-dialog {
   :deep(.el-dialog__body) {
     padding: 20px;
