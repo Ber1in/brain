@@ -51,7 +51,7 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
             detail="Server with this IP address already exists"
         )
 
-    device, nics = tools.update_automatic(
+    device, nics = await tools.update_automatic_async(
         str(server_data.ip_address), MV200_OS_USER, MV200_OS_PASSWORD
     )
 
@@ -236,7 +236,7 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
     if update_dict.pop("auto"):
         LOG.info(f"Automatic updating mv200: {server_id}")
 
-        device, nics = tools.update_automatic(
+        device, nics = await tools.update_automatic_async(
             update_data.ip_address,
             MV200_OS_USER,
             MV200_OS_PASSWORD

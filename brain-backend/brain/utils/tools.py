@@ -9,7 +9,7 @@ import subprocess
 from typing import Dict, List
 from fastapi import HTTPException
 
-from brain.utils.ssh_client import ssh_execute
+from brain.utils.ssh_client import ssh_execute, ssh_execute_async
 
 LOG = logging.getLogger(__name__)
 BMC_USER = "ipmiadmin"
@@ -209,32 +209,33 @@ def ipmi_power_action(bmcip: str, action: str):
         raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
 
 
-def update_automatic(ip, user, password):
-    server_sn = ssh_execute(ip, "cat /sys/class/dmi/id/product_serial", user, password)
-    server_vendor = ssh_execute(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
-    server_product = ssh_execute(ip, "cat /sys/class/dmi/id/product_name", user, password)
+async def update_automatic_async(ip, user, password):
+    server_sn = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_serial", user, password)
+    server_vendor = await ssh_execute_async(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
+    server_product = await ssh_execute_async(
+        ip, "cat /sys/class/dmi/id/product_name", user, password)
 
     cpu_cmd = (
         "lscpu | awk -F\":\" "
         "'/Architecture:|Vendor ID:|Model name:/ "
         "{gsub(/^[ \\t]+/, \"\", $2); print $2}'"
     )
-    cpu_infos = ssh_execute(ip, cpu_cmd, user, password).strip().split("\n")
+    cpu_infos = (await ssh_execute_async(ip, cpu_cmd, user, password)).strip().split("\n")
 
     # PCI VPD
     pci_cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} "
                "/Vital Product Data/ {print; for(i=0;i<5;i++){getline; print}}'")
-    pci_res = ssh_execute(ip, pci_cmd, user, password)
+    pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     nics = parse_nics_info(pci_res)
 
-    mac_res = ssh_execute(ip, "yuncli mac -r", user, password)
+    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password)
     macs = parse_bdf_mac(mac_res)
 
     # Remote iface map
     map_cmd = ("for i in /sys/class/net/*/address; do "
                "echo \"$(basename $(dirname $i)) $(cat $i)\"; "
                "done")
-    out = ssh_execute(ip, map_cmd, user, password)
+    out = await ssh_execute_async(ip, map_cmd, user, password)
 
     remote_map = {}
     for raw in out.splitlines():
@@ -268,10 +269,12 @@ def update_automatic(ip, user, password):
     # Primary route interface
     route_cmd = ("ip route get 10.0.3.248 | head -1 | "
                  "awk '{for(i=1;i<=NF;i++) if($i==\"dev\") print $(i+1)}'")
-    iface_name = ssh_execute(ip, route_cmd, user, password)
+    iface_name = await ssh_execute_async(ip, route_cmd, user, password)
 
-    iface_mac = ssh_execute(ip, f"cat /sys/class/net/{iface_name}/address", user, password).strip()
-    gateway = ssh_execute(ip, "ip route | awk '/default/ {print $3}'", user, password).strip()
+    iface_mac = (await ssh_execute_async(
+        ip, f"cat /sys/class/net/{iface_name}/address", user, password)).strip()
+    gateway = (await ssh_execute_async(
+        ip, "ip route | awk '/default/ {print $3}'", user, password)).strip()
 
     device_info = {
         "sn": server_sn,

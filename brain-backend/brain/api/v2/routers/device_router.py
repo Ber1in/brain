@@ -9,7 +9,7 @@ import logging
 from brain.auth import authenticate_user
 from brain.api.v2.schemas import device_schemas
 from brain.json_db import SQLiteDocumentDB
-from brain.utils.ssh_client import ssh_execute
+from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import tools
 from brain.utils.task_scheduler import init_server_warning, task_scheduler
 from brain.utils.task_scheduler import init_warning, occupy_warning, send_release_notification
@@ -45,7 +45,7 @@ async def create_device(data: device_schemas.ServerRequest):
             detail=f"Server with name {data.bmc.hostname} already exists"
         )
 
-    device, nics = tools.update_automatic(
+    device, nics = await tools.update_automatic_async(
         str(data.device.ip), data.device.username, data.device.password
     )
     LOG.info(f"Auto discovery completed, SN: {device['sn']}, NICs: {len(nics)}")
@@ -101,8 +101,8 @@ async def delete_device(device_id: str):
 
     try:
         clean_command = "sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile"
-        ssh_execute(server["device"]["ip"], clean_command, server["device"]
-                    ["username"], server["device"]["password"])
+        await ssh_execute_async(server["device"]["ip"], clean_command, server["device"]
+                                ["username"], server["device"]["password"])
         task_id = f"device_cleanup_{device_id}"
         success = await task_scheduler.cancel_task(task_id)
 
@@ -165,7 +165,7 @@ async def update_device(
     if data.auto:
         LOG.info(f"Automatic updating device: {device_id}")
 
-        device, nics = tools.update_automatic(
+        device, nics = await tools.update_automatic_async(
             server["device"]["ip"],
             server["device"].get("username", ""),
             server["device"].get("password", "")
@@ -299,21 +299,21 @@ async def set_boot_entry(
             status_code=400, detail="No saved OS credentials found for this server")
 
     LOG.info(f"Setting next boot entry {boot_id} on server {server_id} ({server['device']['ip']})")
-    ssh_execute(server['device']['ip'],
-                f"efibootmgr -n {boot_id}", credentials_user, credentials_pwd)
+    await ssh_execute_async(server['device']['ip'],
+                            f"efibootmgr -n {boot_id}", credentials_user, credentials_pwd)
 
     if set_default:
         LOG.info(f"Setting default boot entry {boot_id} on server"
                  f" {server_id} ({server['device']['ip']})")
-        out = ssh_execute(server['device']['ip'], "efibootmgr | grep BootOrder",
-                          credentials_user, credentials_pwd)
+        out = await ssh_execute_async(server['device']['ip'], "efibootmgr | grep BootOrder",
+                                      credentials_user, credentials_pwd)
         boot_order_line = out.strip().split(":")[-1].strip()
         boot_list = boot_order_line.split(",")
         if boot_id in boot_list:
             boot_list.remove(boot_id)
         new_order = ",".join([boot_id] + boot_list)
-        ssh_execute(server['device']['ip'], f"efibootmgr -o {new_order}",
-                    credentials_user, credentials_pwd)
+        await ssh_execute_async(server['device']['ip'], f"efibootmgr -o {new_order}",
+                                credentials_user, credentials_pwd)
         LOG.info(f"Default boot entry set to {boot_id} with order {new_order}")
 
     return {"message": (f"BootNext set to {boot_id} on {server['device']['ip']}"

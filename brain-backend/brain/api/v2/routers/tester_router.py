@@ -98,12 +98,12 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
 
     try:
         if not os.path.exists(user_repo_dir):
-            LOG.info(f"Repo does not exist, cloning...")
+            LOG.info("Repo does not exist, cloning...")
             clone_url = (
                 f"https://oauth2:{PRIVATE_TOKEN}@git-sha.yunsilicon.com/{PROJECT_PATH}.git")
             git.Repo.clone_from(clone_url, user_repo_dir)
         else:
-            LOG.debug(f"Repo exists, skip cloning")
+            LOG.debug("Repo exists, skip cloning")
 
         current, latest_commit = get_current_code_and_commit(user)
         LOG.info(f"current={current} latest={latest_commit}")
@@ -130,7 +130,7 @@ def switch_branch_or_tag(data: qa_schemas.CheckoutRequest, user=Depends(authenti
         repo = git.Repo(repo_path)
 
         repo.git.fetch("--all", "--tags")
-        LOG.info(f"Fetch completed")
+        LOG.info("Fetch completed")
 
         if data.branch:
             branch = data.branch
