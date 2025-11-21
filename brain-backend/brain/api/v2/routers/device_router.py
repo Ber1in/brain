@@ -2,6 +2,7 @@
 # All rights reserved.
 
 from datetime import datetime
+import re
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 import logging
@@ -50,7 +51,10 @@ async def create_device(data: device_schemas.ServerRequest):
     )
     LOG.info(f"Auto discovery completed, SN: {device['sn']}, NICs: {len(nics)}")
 
-    bmc_ip = '.'.join((lambda p: p[:-2] + ['2'] + p[-1:])(str(data.device.ip).split('.')))
+    impi_info = await ssh_execute_async(str(data.device.ip), "ipmitool lan print 1",
+                                        data.device.username, data.device.password)
+    match = re.search(r"IP Address\s*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)", impi_info)
+    bmc_ip = match.group(1) if match else None
 
     device.update({
         "ip": str(data.device.ip),
