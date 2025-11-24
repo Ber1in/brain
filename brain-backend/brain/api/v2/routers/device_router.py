@@ -194,6 +194,11 @@ async def update_device(
         if data.notes is not None:
             server["notes"] = data.notes
 
+        recipients = server.get("recipients", [])
+        if data.focus:
+            server["recipients"] = list(set(recipients + [user]))
+        else:
+            server["recipients"] = [r for r in recipients if r != user]
         if data.time is not None:
             server["time"] = data.time
             server["start"] = datetime.now().timestamp()

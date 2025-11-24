@@ -268,6 +268,7 @@ export interface ServerDetailResponse {
   created_at?: string
   updated_at?: string
   id?: string
+  recipients?: string[]
 }
 
 export interface ServerRequest {
@@ -286,6 +287,7 @@ export interface ServerUpdateRequest {
   tags?: string[]
   notes?: string
   time?: string
+  focus: boolean
 }
 
 export interface ServerCredentials {

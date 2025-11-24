@@ -122,7 +122,7 @@
         </el-table-column>
         <el-table-column 
           label="标签"
-          min-width="225"
+          min-width="215"
         >
           <template #default="{ row }">
             <div v-if="row.tags && row.tags.length > 0" class="tags-container">
@@ -164,7 +164,7 @@
           prop="notes" 
           label="备注"
           show-overflow-tooltip
-          min-width="300"
+          min-width="280"
         >
           <template #default="{ row }">
             <span v-if="row.notes">{{ row.notes }}</span>
@@ -175,7 +175,7 @@
           prop="user" 
           label="当前占用人"
           sortable
-          width="120"
+          width="110"
         >
           <template #default="{ row }">
             <el-tag v-if="isDeviceOccupied(row)" type="success" size="small">{{ row.user }}</el-tag>
@@ -186,11 +186,37 @@
           label="占用截至时间"
           sortable
           :sort-method="timeSortMethod"
-          width="180"
+          width="150"
         >
           <template #default="{ row }">
             <span v-if="isDeviceOccupied(row) && row.time">{{ getEndTimeDisplay(row) }}</span>
             <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
+        <!-- 关注列 -->
+        <el-table-column label="关注" width="80" align="center">
+          <template #header>
+            <span>关注</span>
+            <el-tooltip 
+              effect="dark" 
+              content="关注服务器，将会接收到服务器释放的提醒邮件"
+              placement="top"
+            >
+              <el-icon style="margin-left: 4px; cursor: help;">
+                <QuestionFilled />
+              </el-icon>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-button 
+              :type="isFollowing(row) ? 'danger' : 'default'" 
+              :icon="isFollowing(row) ? 'Check' : 'Star'"
+              @click="handleFollow(row)"
+              :loading="followLoading[row.id!]"
+              size="small"
+              circle
+              class="follow-heart-btn"
+            />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -687,7 +713,9 @@ import {
   Refresh,
   RefreshRight,
   ArrowDown,
-  Warning
+  Warning,
+  Check,
+  Star
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { tagApi } from '@/api/tag'
@@ -738,6 +766,58 @@ const powerDialogVisible = ref(false)
 const powerLoading = ref(false)
 const powerType = ref<'cycle' | 'reset'>('cycle')
 const isBatchPowerOperation = ref(false)
+
+// 关注相关
+const followLoading = ref<Record<string, boolean>>({})
+
+// 检查当前用户是否已关注某台服务器
+const isFollowing = (device: ServerDetailResponse) => {
+  const recipients = device.recipients || []
+  return recipients.includes(currentUser.value)
+}
+
+// 关注/取消关注服务器
+const handleFollow = async (device: ServerDetailResponse) => {
+  try {
+    followLoading.value[device.id!] = true
+    
+    const updateData = {
+      auto: false,
+      focus: !isFollowing(device), // true表示关注，false表示取消关注
+      device: {
+        ip: device.device.ip,
+        username: device.device.username,
+        password: '' // 密码不更新
+      },
+      bmc: {
+        hostname: device.bmc.hostname,
+        ip: device.bmc.ip
+      },
+      tags: device.tags || [],
+      notes: device.notes || '',
+      os_types: device.os_types || []
+    }
+    
+    await deviceApi.update(device.id!, updateData)
+    
+    if (!isFollowing(device)) {
+      // 关注成功
+      ElMessage.success(`关注成功，将会接收该服务器的占用释放提醒邮件`)
+    } else {
+      // 取消关注成功
+      ElMessage.success('取消关注, 不再接收该服务器的占用释放提醒邮件')
+    }
+    
+    // 重新加载数据以更新关注状态
+    await loadData()
+    
+  } catch (error: any) {
+    const action = isFollowing(device) ? '取消关注' : '关注'
+    ElMessage.error(`${action}失败: ${error.response?.data?.detail || '请求失败'}`)
+  } finally {
+    followLoading.value[device.id!] = false
+  }
+}
 
 class NicColorManager {
   private colorMap: Map<string, string> = new Map()
@@ -2008,6 +2088,43 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 关注心形按钮样式 */
+.follow-heart-btn {
+  width: 32px;
+  height: 32px;
+  transition: all 0.3s ease;
+  border: none !important;
+  background: transparent !important;
+}
+
+.follow-heart-btn:hover {
+  transform: scale(1.2);
+  background-color: rgba(64, 158, 255, 0.1) !important;
+}
+
+.follow-heart-btn:deep(.el-icon) {
+  font-size: 18px;
+}
+
+/* 已关注状态 - 红色心形 */
+.follow-heart-btn.el-button--danger {
+  color: #f56c6c !important;
+}
+
+.follow-heart-btn.el-button--danger:hover {
+  color: #f78989 !important;
+  background-color: rgba(245, 108, 108, 0.1) !important;
+}
+
+/* 未关注状态 - 灰色心形 */
+.follow-heart-btn:not(.el-button--danger) {
+  color: #c0c4cc !important;
+}
+
+.follow-heart-btn:not(.el-button--danger):hover {
+  color: #409eff !important;
+}
+
 /* 电源重启对话框样式 */
 .power-dialog-content {
   display: flex;

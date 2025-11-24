@@ -6,6 +6,15 @@
           <h2>服务器详情 - {{ deviceData.bmc?.hostname }}</h2>
           <div class="header-actions">
             <el-button 
+              :type="isFollowing ? 'success' : 'primary'" 
+              :icon="isFollowing ? 'Check' : 'Star'"
+              @click="handleFollow"
+              :loading="followLoading"
+              class="follow-btn"
+            >
+              {{ isFollowing ? '已关注' : '关注' }}
+            </el-button>
+            <el-button 
               type="warning" 
               @click="handleRefresh" 
               :loading="refreshing"
@@ -560,7 +569,9 @@ import {
   Monitor,
   Clock,
   Calendar,
-  Watch
+  Watch,
+  Check,
+  Star
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { mv200Api } from '@/api/mv200'
@@ -609,6 +620,59 @@ const deviceData = ref<ServerDetailResponse>({
   updated_at: '',
   id: ''
 })
+
+// 关注相关
+const followLoading = ref(false)
+
+// 计算当前用户是否已关注
+const isFollowing = computed(() => {
+  const recipients = deviceData.value.recipients || []
+  return recipients.includes(currentUser.value)
+})
+
+// 关注/取消关注服务器
+// 关注/取消关注服务器
+const handleFollow = async () => {
+  try {
+    followLoading.value = true
+    
+    const updateData = {
+      auto: false,
+      focus: !isFollowing.value, // true表示关注，false表示取消关注
+      device: {
+        ip: deviceData.value.device.ip,
+        username: deviceData.value.device.username,
+        password: '' // 密码不更新
+      },
+      bmc: {
+        hostname: deviceData.value.bmc.hostname,
+        ip: deviceData.value.bmc.ip
+      },
+      tags: deviceData.value.tags || [],
+      notes: deviceData.value.notes || '',
+      os_types: deviceData.value.os_types || []
+    }
+    
+    await deviceApi.update(deviceId.value, updateData)
+    
+    if (!isFollowing.value) {
+      // 关注成功
+      ElMessage.success(`关注成功，将会接收到该服务器的占用释放提醒邮件`)
+    } else {
+      // 取消关注成功
+      ElMessage.success('取消关注, 不再接收该服务器的占用释放提醒邮件')
+    }
+    
+    // 重新加载数据以更新关注状态
+    await loadDeviceDetail()
+    
+  } catch (error: any) {
+    const action = isFollowing.value ? '取消关注' : '关注'
+    ElMessage.error(`${action}失败: ${error.response?.data?.detail || '请求失败'}`)
+  } finally {
+    followLoading.value = false
+  }
+}
 
 // 计算是否有服务器信息
 const hasServerInfo = computed(() => {
@@ -1327,6 +1391,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 关注按钮样式 */
+.follow-btn {
+  min-width: 80px;
+}
+
+.follow-btn:deep(.el-icon) {
+  margin-right: 4px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;

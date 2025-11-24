@@ -79,6 +79,7 @@ class ServerDetailResponse(ServerResponse):
     created_at: str = None
     updated_at: str = None
     id: str = None
+    recipients: List[str] = []
 
 
 class ServerUpdateRequest(BaseModel):
@@ -89,3 +90,4 @@ class ServerUpdateRequest(BaseModel):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
     time: Optional[str] = None
+    focus: bool = False
