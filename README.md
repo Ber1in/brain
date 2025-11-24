@@ -1,5 +1,5 @@
-Brain-backend: Brain's backend service, using FastAPI, occupying port 8088.
+Brain-backend: yuntester-platform's backend service, using FastAPI, occupying port 8088.
 
-Brain-frontend: Brain's frontend, using Vue and Element Plus, occupying port 8089.
+Brain-frontend: yuntester-platform's frontend, using Vue and Element Plus, occupying port 8099.
 
-Install: Brain's installation script and other files.
+Install: yuntester-platform's installation script and other files.
