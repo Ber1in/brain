@@ -275,7 +275,8 @@ class SQLiteDocumentDB:
             "time": 0,
             "created_at": "2025-11-04 15:24:12",
             "updated_at": "",
-            "id": "99b62073-21dd-440a-9d2a-5e8f5b538a81"
+            "id": "99b62073-21dd-440a-9d2a-5e8f5b538a81",
+            "recipients": []
         },
         "tags": {
             "id": "",

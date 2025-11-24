@@ -27,6 +27,7 @@ PROJECT_PATH = 'yunsilicon-software/qa_auto'
 SERVER_COLLECTION = "servers"
 TEST_CASE_COLLECTION = "test_cases"
 TEST_HISTORY_COLLECTION = "test_history"
+TEST_DATA_DIR = "/opt/yunTesterData"
 BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
@@ -34,28 +35,28 @@ db = SQLiteDocumentDB()
 
 def get_user_repo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
-    user_repo_dir = f"/tmp/{user}/qa_auto"
+    user_repo_dir = os.path.join(TEST_DATA_DIR, user, "qa_auto")
     os.makedirs(os.path.dirname(user_repo_dir), exist_ok=True)
     return user_repo_dir
 
 
 def get_user_log_dir(user: str) -> str:
     """Return the repo directory for the given user."""
-    logs_dir = f"/tmp/{user}/logs"
+    logs_dir = os.path.join(TEST_DATA_DIR, user, "logs")
     os.makedirs(logs_dir, exist_ok=True)
     return logs_dir
 
 
 def get_user_topo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
-    topo_dir = f"/tmp/{user}/topo"
+    topo_dir = os.path.join(TEST_DATA_DIR, user, "topo")
     os.makedirs(topo_dir, exist_ok=True)
     return topo_dir
 
 
 def get_user_result_dir(user: str) -> str:
     """Return the repo directory for the given user."""
-    result_dir = f"/tmp/{user}/results"
+    result_dir = os.path.join(TEST_DATA_DIR, user, "results")
     os.makedirs(result_dir, exist_ok=True)
     return result_dir
 

@@ -11,9 +11,8 @@ from brain.auth import authenticate_user
 from brain.api.v2.schemas import device_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute_async
-from brain.utils import tools
-from brain.utils.task_scheduler import init_server_warning, task_scheduler
-from brain.utils.task_scheduler import init_warning, occupy_warning, send_release_notification
+from brain.utils import tools, task_scheduler
+from brain.utils.task_scheduler import task_scheduler as scheduler
 
 
 LOG = logging.getLogger(__name__)
@@ -75,13 +74,15 @@ async def create_device(data: device_schemas.ServerRequest):
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "updated_at": "",
         "id": str(uuid4()),
+        "recipients": []
     }
 
     db.insert(SERVER_COLLECTION, result)
     LOG.info(f"Server created, ID: {result['id']}")
 
     try:
-        await init_warning(str(data.device.ip), data.device.username, data.device.password)
+        await task_scheduler.init_warning(
+            str(data.device.ip), data.device.username, data.device.password)
     except Exception:
         LOG.warning("Failed to initialize the server usage warning message.")
 
@@ -107,8 +108,10 @@ async def delete_device(device_id: str):
         clean_command = "sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile"
         await ssh_execute_async(server["device"]["ip"], clean_command, server["device"]
                                 ["username"], server["device"]["password"])
-        task_id = f"device_cleanup_{device_id}"
-        success = await task_scheduler.cancel_task(task_id)
+        warn_task_id = f"device_warn_{server['device']['ip'].replace('.', '_')}"
+        success = await scheduler.cancel_task(warn_task_id)
+        task_id = f"device_cleanup_{server['device']['ip'].replace('.', '_')}"
+        success = await scheduler.cancel_task(task_id)
 
         if success:
             LOG.info(f"Successfully cancelled auto cleanup for device {device_id}")
@@ -121,7 +124,6 @@ async def delete_device(device_id: str):
 
 @router.get("/devices", response_model=list[device_schemas.ServerDetailResponse])
 async def get_all_devices():
-    LOG.info("Fetching all devices")
     devices = db.find(SERVER_COLLECTION, {})
     for i in devices:
         if i["time"]:
@@ -201,40 +203,70 @@ async def update_device(
             time = int(data.time)
             if time > 0:
                 server["user"] = user
+                server["recipients"] = list(
+                    set(server.get("recipients", []) + [user])
+                )
 
                 end_timestamp = server["start"] + time
                 end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
-                await occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
+                await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
 
-                task_id = f"device_cleanup_{device_id}"
-                success = await task_scheduler.schedule_task(
+                warn_delay = max(time - 300, 0)
+
+                if warn_delay > 0:
+                    warn_task_id = f"device_warn_{ip.replace('.', '_')}"
+                    warn_success = await scheduler.schedule_task(
+                        task_id=warn_task_id,
+                        delay_seconds=warn_delay,
+                        task_func=task_scheduler.init_server_warning,
+                        device_id=device_id,
+                    )
+                    if warn_success:
+                        LOG.info(
+                            f"Scheduled warning task {warn_task_id} "
+                            f"(delay={warn_delay}s)"
+                        )
+                    else:
+                        LOG.error(f"Failed to schedule warning task {warn_task_id}")
+
+                task_id = f"device_cleanup_{ip.replace('.', '_')}"
+                success = await scheduler.schedule_task(
                     task_id=task_id,
                     delay_seconds=time,
-                    task_func=init_server_warning,
-                    device_id=device_id
+                    task_func=task_scheduler.init_server_warning,
+                    device_id=device_id,
+                    now=True
                 )
 
                 if success:
-                    LOG.info("Successfully scheduled auto cleanup "
-                             f"for device {device_id} in {time} seconds")
+                    LOG.info(
+                        f"Scheduled cleanup task {warn_task_id} "
+                        f"(delay={time}s)"
+                    )
                 else:
-                    LOG.error(f"Failed to schedule auto cleanup for device {device_id}")
+                    LOG.error(f"Failed to schedule auto cleanup task {task_id}")
 
             else:
-                old_user = server.get("user")
-                server["user"] = ""
 
-                await init_warning(ip, ssh_user, ssh_pass)
+                await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
 
-                task_id = f"device_cleanup_{device_id}"
-                success = await task_scheduler.cancel_task(task_id)
-                # if old_user:
-                #     await send_release_notification(old_user, server["device"]["ip"])
-                if success:
-                    LOG.info(f"Successfully cancelled auto cleanup for device {device_id}")
+                warn_task_id = f"device_warn_{ip.replace('.', '_')}"
+                warn_success = await scheduler.cancel_task(warn_task_id)
+                if warn_success:
+                    LOG.info(f"Cancelled warning task {warn_task_id}")
                 else:
-                    LOG.info(f"No auto cleanup task found for device {device_id}")
+                    LOG.info(f"Failed to cancell warning task {warn_task_id}")
+                task_id = f"device_cleanup_{ip.replace('.', '_')}"
+                success = await scheduler.cancel_task(task_id)
+                if success:
+                    LOG.info(f"Cancelled cleanup task {task_id}")
+                else:
+                    LOG.info(f"Failed to cancell cleanup task {task_id}")
+
+                task_scheduler.send_server_reminder(server, True)
+                task_scheduler.send_feishu_group_message(server, True)
+                server["user"] = ""
 
     server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

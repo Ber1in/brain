@@ -38,7 +38,7 @@ async def create_tags(data: tag_schemas.TagsRequest):
 @router.get("/tags", response_model=tag_schemas.TagsResponse)
 async def get_all_tags():
     all_tags = db.find(TAG_COLLERCTION)
-    LOG.info(f"Fetched all tags: {all_tags}")
+    LOG.info(f"Total tags fetched: {len(all_tags)}")
     return {"tags": all_tags}
 
 
