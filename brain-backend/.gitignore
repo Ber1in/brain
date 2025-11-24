@@ -1,0 +1,16 @@
+*.egg*
+*.pyc
+*.swo
+*.swp
+.DS_Store
+.tox
+.vscode
+.coverage
+*.dev*
+*__pycache__*
+dist
+build
+AUTHORS
+ChangeLog
+htmlcov
+.venv

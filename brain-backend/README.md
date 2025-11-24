@@ -1,0 +1,1 @@
+As a lightweight private cloud management center, it can be used to manage and use bare metal servers with mv200.

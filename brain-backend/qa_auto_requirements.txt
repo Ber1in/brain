@@ -1,0 +1,4 @@
+pytest
+jsonpath
+allure-pytest
+pandas

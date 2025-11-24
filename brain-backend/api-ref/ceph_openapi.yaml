@@ -1,0 +1,1616 @@
+openapi: 3.0.0
+info:
+  description: This is the official Ceph REST API
+  title: Ceph REST API
+  version: v1
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AuthRequest:
+      type: object
+      properties:
+        password:
+          type: string
+        username:
+          type: string
+      required:
+        - username
+        - password
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          description: Authentication Token
+          type: string
+        username:
+          description: Username
+          type: string
+        permissions:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          description: User permissions
+          type: object
+        pwdExpirationDate:
+          description: Password expiration date
+          type: integer
+          format: int64
+        sso:
+          description: Single Sign-On
+          type: boolean
+        pwdUpdateRequired:
+          description: Password update required
+          type: boolean
+      required:
+        - token
+        - username
+        - permissions
+        - sso
+        - pwdUpdateRequired
+    CompressionInner:
+      type: object
+      properties:
+        compression_mode:
+          type: string
+          enum:
+            - aggressive
+            - passive
+            - force
+            - unset
+        compression_algorithm:
+          type: string
+          enum:
+            - zlib
+            - snappy
+            - lz4
+            - zstd
+        compression_min_blob_size:
+          type: integer
+          format: int64
+          default: 0
+        compression_max_blob_size:
+          type: integer
+          format: int64
+          default: 0
+        compression_required_ratio:
+          type: number
+          format: double
+          default: 0
+    QuotasInner:
+      type: object
+      properties:
+        quota_max_bytes:
+          type: integer
+          format: int64
+        quota_max_objects:
+          type: integer
+          format: int64
+    RBDQoSInner:
+      type: object
+      properties:
+        rbd_qos_bps_burst:
+          type: integer
+          format: int64
+        rbd_qos_bps_limit:
+          type: integer
+          format: int64
+        rbd_qos_iops_burst:
+          type: integer
+          format: int64
+        rbd_qos_iops_limit:
+          type: integer
+          format: int64
+        rbd_qos_read_bps_burst:
+          type: integer
+          format: int64
+        rbd_qos_read_bps_limit:
+          type: integer
+          format: int64
+        rbd_qos_read_iops_burst:
+          type: integer
+          format: int64
+        rbd_qos_read_iops_limit:
+          type: integer
+          format: int64
+        rbd_qos_write_bps_burst:
+          type: integer
+          format: int64
+        rbd_qos_write_bps_limit:
+          type: integer
+          format: int64
+        rbd_qos_write_iops_burst:
+          type: integer
+          format: int64
+        rbd_qos_write_iops_limit:
+          type: integer
+          format: int64
+    LastPGMergeMeta:
+      type: object
+      properties:
+        ready_epoch:
+          type: integer
+          format: int64
+          example: 0
+        last_epoch_started:
+          type: integer
+          format: int64
+          example: 0
+        last_epoch_clean:
+          type: integer
+          format: int64
+          example: 0
+        source_pgid:
+          type: string
+          example: "0.0"
+        source_version:
+          type: string
+          example: "0'0"
+        target_version:
+          type: string
+          example: "0'0"
+    HitSetParams:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "none"
+    ReadBalance:
+      type: object
+      properties:
+        score_acting:
+          type: number
+          format: double
+          example: 3
+        score_stable:
+          type: number
+          format: double
+          example: 3
+        optimal_score:
+          type: number
+          format: double
+          example: 1
+        raw_score_acting:
+          type: number
+          format: double
+          example: 3
+        raw_score_stable:
+          type: number
+          format: double
+          example: 3
+        primary_affinity_weighted:
+          type: number
+          format: double
+          example: 1
+        average_primary_affinity:
+          type: number
+          format: double
+          example: 1
+        average_primary_affinity_weighted:
+          type: number
+          format: double
+          example: 1
+    StatEntry:
+      type: object
+      properties:
+        latest:
+          type: number
+          format: double
+        rate:
+          type: number
+          format: double
+        rates:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+    PoolStats:
+      type: object
+      properties:
+        stored:
+          $ref: "#/components/schemas/StatEntry"
+        stored_data:
+          $ref: "#/components/schemas/StatEntry"
+        stored_omap:
+          $ref: "#/components/schemas/StatEntry"
+        objects:
+          $ref: "#/components/schemas/StatEntry"
+        kb_used:
+          $ref: "#/components/schemas/StatEntry"
+        bytes_used:
+          $ref: "#/components/schemas/StatEntry"
+        data_bytes_used:
+          $ref: "#/components/schemas/StatEntry"
+        omap_bytes_used:
+          $ref: "#/components/schemas/StatEntry"
+        percent_used:
+          $ref: "#/components/schemas/StatEntry"
+        max_avail:
+          $ref: "#/components/schemas/StatEntry"
+        quota_objects:
+          $ref: "#/components/schemas/StatEntry"
+        quota_bytes:
+          $ref: "#/components/schemas/StatEntry"
+        dirty:
+          $ref: "#/components/schemas/StatEntry"
+        rd:
+          $ref: "#/components/schemas/StatEntry"
+        rd_bytes:
+          $ref: "#/components/schemas/StatEntry"
+        wr:
+          $ref: "#/components/schemas/StatEntry"
+        wr_bytes:
+          $ref: "#/components/schemas/StatEntry"
+        compress_bytes_used:
+          $ref: "#/components/schemas/StatEntry"
+        compress_under_bytes:
+          $ref: "#/components/schemas/StatEntry"
+        stored_raw:
+          $ref: "#/components/schemas/StatEntry"
+        avail_raw:
+          $ref: "#/components/schemas/StatEntry"
+
+    PoolConfigurationItem:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        source:
+          type: integer
+          format: int64
+
+    Pool:
+      type: object
+      properties:
+        pool:
+          type: integer
+          format: int64
+        pool_name:
+          type: string
+        flags:
+          type: integer
+          format: int64
+        flags_names:
+          type: string
+          description: Comma-separated list of pool flags (e.g., "hashpspool,selfmanaged_snaps")
+        type:
+          type: string
+        size:
+          type: integer
+          format: int64
+        min_size:
+          type: integer
+          format: int64
+        crush_rule:
+          type: string
+        peering_crush_bucket_count:
+          type: integer
+          format: int64
+        peering_crush_bucket_target:
+          type: integer
+          format: int64
+        peering_crush_bucket_barrier:
+          type: integer
+          format: int64
+        peering_crush_bucket_mandatory_member:
+          type: integer
+          format: int64
+        object_hash:
+          type: integer
+          format: int64
+        pg_autoscale_mode:
+          type: string
+        pg_num:
+          type: integer
+          format: int64
+        pg_placement_num:
+          type: integer
+          format: int64
+        pg_placement_num_target:
+          type: integer
+          format: int64
+        pg_num_target:
+          type: integer
+          format: int64
+        pg_num_pending:
+          type: integer
+          format: int64
+        last_pg_merge_meta:
+          $ref: "#/components/schemas/LastPGMergeMeta"
+        auid:
+          type: integer
+          format: int64
+        snap_mode:
+          type: string
+        snap_seq:
+          type: integer
+          format: int64
+        snap_epoch:
+          type: integer
+          format: int64
+        pool_snaps:
+          type: array
+          items:
+            type: string
+        quota_max_bytes:
+          type: integer
+          format: int64
+        quota_max_objects:
+          type: integer
+          format: int64
+        tiers:
+          type: array
+          items:
+            type: string
+        tier_of:
+          type: integer
+          format: int64
+        read_tier:
+          type: integer
+          format: int64
+        write_tier:
+          type: integer
+          format: int64
+        cache_mode:
+          type: string
+        target_max_bytes:
+          type: integer
+          format: int64
+        target_max_objects:
+          type: integer
+          format: int64
+        cache_target_dirty_ratio_micro:
+          type: integer
+          format: int64
+        cache_target_dirty_high_ratio_micro:
+          type: integer
+          format: int64
+        cache_target_full_ratio_micro:
+          type: integer
+          format: int64
+        cache_min_flush_age:
+          type: integer
+          format: int64
+        cache_min_evict_age:
+          type: integer
+          format: int64
+        erasure_code_profile:
+          type: string
+        hit_set_params:
+          $ref: "#/components/schemas/HitSetParams"
+        hit_set_period:
+          type: integer
+          format: int64
+        hit_set_count:
+          type: integer
+          format: int64
+        use_gmt_hitset:
+          type: boolean
+        min_read_recency_for_promote:
+          type: integer
+          format: int64
+        min_write_recency_for_promote:
+          type: integer
+          format: int64
+        hit_set_grade_decay_rate:
+          type: integer
+          format: int64
+        hit_set_search_last_n:
+          type: integer
+          format: int64
+        grade_table:
+          type: array
+          items:
+            type: object # 具体结构需根据实际数据补充
+        stripe_width:
+          type: integer
+          format: int64
+        expected_num_objects:
+          type: integer
+          format: int64
+        fast_read:
+          type: boolean
+        options:
+          type: object
+          additionalProperties:
+            type: object
+        application_metadata:
+          type: array
+          items:
+            type: string
+        read_balance:
+          $ref: "#/components/schemas/ReadBalance"
+        create_time:
+          type: string
+        last_change:
+          type: string
+        last_force_op_resend:
+          type: string
+        last_force_op_resend_prenautilus:
+          type: string
+        last_force_op_resend_preluminous:
+          type: string
+        removed_snaps:
+          type: string
+        configuration:
+          type: array
+          items:
+            $ref: "#/components/schemas/PoolConfigurationItem"
+    PoolGetResponseElement:
+      type: object
+      properties:
+        pool:
+          type: integer
+          format: int64
+          example: 1
+        pool_name:
+          type: string
+          example: ".mgr"
+        flags:
+          type: integer
+          format: int64
+          example: 1
+        flags_names:
+          type: string
+          example: "hashpspool"
+        type:
+          type: string
+          example: "replicated"
+        size:
+          type: integer
+          format: int64
+          example: 3
+        min_size:
+          type: integer
+          format: int64
+          example: 2
+        crush_rule:
+          type: string
+          example: "replicated_rule"
+        peering_crush_bucket_count:
+          type: integer
+          format: int64
+          example: 0
+        peering_crush_bucket_target:
+          type: integer
+          format: int64
+          example: 0
+        peering_crush_bucket_barrier:
+          type: integer
+          format: int64
+          example: 0
+        peering_crush_bucket_mandatory_member:
+          type: integer
+          format: int64
+          example: 2147483647
+        object_hash:
+          type: integer
+          format: int64
+          example: 2
+        pg_autoscale_mode:
+          type: string
+          example: "on"
+        pg_num:
+          type: integer
+          format: int64
+          example: 1
+        pg_placement_num:
+          type: integer
+          format: int64
+          example: 1
+        pg_placement_num_target:
+          type: integer
+          format: int64
+          example: 1
+        pg_num_target:
+          type: integer
+          format: int64
+          example: 1
+        pg_num_pending:
+          type: integer
+          format: int64
+          example: 1
+        last_pg_merge_meta:
+          $ref: "#/components/schemas/LastPGMergeMeta"
+        auid:
+          type: integer
+          format: int64
+          example: 0
+        snap_mode:
+          type: string
+          example: "selfmanaged"
+        snap_seq:
+          type: integer
+          format: int64
+          example: 0
+        snap_epoch:
+          type: integer
+          format: int64
+          example: 0
+        pool_snaps:
+          type: array
+          items: {}
+          example: []
+        quota_max_bytes:
+          type: integer
+          format: int64
+          example: 0
+        quota_max_objects:
+          type: integer
+          format: int64
+          example: 0
+        tiers:
+          type: array
+          items: {}
+          example: []
+        tier_of:
+          type: integer
+          example: -1
+        read_tier:
+          type: integer
+          example: -1
+        write_tier:
+          type: integer
+          example: -1
+        cache_mode:
+          type: string
+          example: "none"
+        target_max_bytes:
+          type: integer
+          format: int64
+          example: 0
+        target_max_objects:
+          type: integer
+          format: int64
+          example: 0
+        cache_target_dirty_ratio_micro:
+          type: integer
+          format: int64
+          example: 400000
+        cache_target_dirty_high_ratio_micro:
+          type: integer
+          format: int64
+          example: 600000
+        cache_target_full_ratio_micro:
+          type: integer
+          format: int64
+          example: 800000
+        cache_min_flush_age:
+          type: integer
+          format: int64
+          example: 0
+        cache_min_evict_age:
+          type: integer
+          format: int64
+          example: 0
+        erasure_code_profile:
+          type: string
+          example: ""
+        hit_set_params:
+          $ref: "#/components/schemas/HitSetParams"
+        hit_set_period:
+          type: integer
+          format: int64
+          example: 0
+        hit_set_count:
+          type: integer
+          format: int64
+          example: 0
+        use_gmt_hitset:
+          type: boolean
+          example: true
+        min_read_recency_for_promote:
+          type: integer
+          format: int64
+          example: 0
+        min_write_recency_for_promote:
+          type: integer
+          format: int64
+          example: 0
+        hit_set_grade_decay_rate:
+          type: integer
+          format: int64
+          example: 0
+        hit_set_search_last_n:
+          type: integer
+          format: int64
+          example: 0
+        grade_table:
+          type: array
+          items: {}
+          example: []
+        stripe_width:
+          type: integer
+          format: int64
+          example: 0
+        expected_num_objects:
+          type: integer
+          format: int64
+          example: 0
+        fast_read:
+          type: boolean
+          example: false
+        options:
+          allOf:
+            - type: object
+              properties:
+                pg_num_max:
+                  type: integer
+                  example: 32
+                pg_num_min:
+                  type: integer
+                  example: 1
+            - $ref: "#/components/schemas/CompressionInner"
+        application_metadata:
+          type: array
+          items:
+            type: string
+          example: ["mgr"]
+        read_balance:
+          $ref: "#/components/schemas/ReadBalance"
+        create_time:
+          type: string
+          example: "2025-03-07T09:08:16.974965+0000"
+        last_change:
+          type: string
+          example: "15"
+        last_force_op_resend:
+          type: string
+          example: "0"
+        last_force_op_resend_prenautilus:
+          type: string
+          example: "0"
+        last_force_op_resend_preluminous:
+          type: string
+          example: "0"
+        removed_snaps:
+          type: string
+          example: "[]"
+        pg_status:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            active+clean: 1
+        stats:
+          $ref: "#/components/schemas/PoolStats"
+      required:
+        - pool
+        - pool_name
+        - flags
+        - flags_names
+        - type
+        - size
+        - min_size
+        - crush_rule
+        - object_hash
+        - pg_autoscale_mode
+        - pg_num
+        - pg_placement_num
+        - pg_placement_num_target
+        - pg_num_target
+        - pg_num_pending
+        - last_pg_merge_meta
+        - auid
+        - snap_mode
+        - snap_seq
+        - snap_epoch
+        - pool_snaps
+        - quota_max_bytes
+        - quota_max_objects
+        - tiers
+        - tier_of
+        - read_tier
+        - write_tier
+        - cache_mode
+        - target_max_bytes
+        - target_max_objects
+        - cache_target_dirty_ratio_micro
+        - cache_target_dirty_high_ratio_micro
+        - cache_target_full_ratio_micro
+        - cache_min_flush_age
+        - cache_min_evict_age
+        - erasure_code_profile
+        - hit_set_params
+        - hit_set_period
+        - hit_set_count
+        - use_gmt_hitset
+        - min_read_recency_for_promote
+        - min_write_recency_for_promote
+        - hit_set_grade_decay_rate
+        - hit_set_search_last_n
+        - grade_table
+        - stripe_width
+        - expected_num_objects
+        - fast_read
+        - options
+        - application_metadata
+        - create_time
+        - last_change
+        - last_force_op_resend
+        - last_force_op_resend_prenautilus
+        - last_force_op_resend_preluminous
+        - removed_snaps
+    PoolGetResponse:
+      type: array
+      items:
+        $ref: "#/components/schemas/PoolGetResponseElement"
+    PoolPostRequest:
+      allOf:
+        - type: object
+          properties:
+            pool:
+              type: string
+            pg_autoscale_mode:
+              default: "on"
+              type: string
+              enum:
+                - on
+                - warn
+                - off
+            pg_num:
+              default: 1
+              type: integer
+            application_metadata:
+              type: array
+              items:
+                type: string
+            flags:
+              type: array
+              items:
+                type: string
+          required:
+            - pool
+            - pg_autoscale_mode
+            - pg_num
+      oneOf:
+        - properties:
+            pool_type:
+              default: "erasure"
+              type: string
+              enum:
+                - replicated
+            erasure_code_profile:
+              default: "default"
+              type: string
+          required:
+            - pool_type
+            - erasure_code_profile
+        - properties:
+            pool_type:
+              default: "replicated"
+              type: string
+              enum:
+                - replicated
+            rule_name:
+              type: string
+              default: "replicated_rule"
+            size:
+              type: integer
+              default: 2
+          required:
+            - pool_type
+            - rule_name
+            - size
+      anyOf:
+        - $ref: "#/components/schemas/QuotasInner"
+        - $ref: "#/components/schemas/CompressionInner"
+    PoolPostResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+    MirrorInner:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            mirror_mode:
+              type: string
+              enum:
+                - snapshot
+            schedule_interval:
+              type: string
+              default: ""
+          required:
+            - mirror_mode
+        - type: object
+          properties:
+            mirror_mode:
+              type: string
+              enum:
+                - journal
+            pool:
+              type: string
+          required:
+            - mirror_mode
+    StripInner:
+      type: object
+      properties:
+        obj_size:
+          type: integer
+          format: int64
+          default: 4194304
+        stripe_unit:
+          type: integer
+          format: int64
+          default: 4194304
+        stripe_count:
+          type: integer
+          format: int64
+          default: 1
+    BlockImagePostRequest:
+      allOf:
+        - type: object
+          properties:
+            configuration:
+              $ref: "#/components/schemas/RBDQoSInner"
+            pool_name:
+              type: string
+            name:
+              type: string
+            size:
+              type: integer
+              format: int64
+            features:
+              type: array
+              items:
+                type: string
+                enum:
+                  - deep-flatten
+                  - exclusive-lock
+                  - fast-diff
+                  - journaling
+                  - layering
+                  - object-map
+                  - operations
+                  - striping
+                  - data-pool
+            namespace:
+              type: string
+              default: null
+            data_pool:
+              type: string
+              default: null
+          required:
+            - name
+            - pool_name
+            - size
+            - configuration
+      anyOf:
+        - $ref: "#/components/schemas/MirrorInner"
+        - $ref: "#/components/schemas/StripInner"
+    ImageSnapshot:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64
+        name:
+          type: string
+        namespace:
+          type: integer
+          format: int64
+        mirror_mode:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        is_protected:
+          type: boolean
+        children:
+          type: array
+          items:
+            type: object # 具体结构需根据实际数据补充
+        disk_usage:
+          type: integer
+          format: int64
+
+    BlockImage:
+      type: object
+      properties:
+        size:
+          type: integer
+          format: int64
+        obj_size:
+          type: integer
+          format: int64
+        num_objs:
+          type: integer
+          format: int64
+        order:
+          type: integer
+          format: int64
+        block_name_prefix:
+          type: string
+        mirror_mode:
+          type: string
+        name:
+          type: string
+        unique_id:
+          type: string
+        id:
+          type: string
+        image_format:
+          type: integer
+          format: int64
+        pool_name:
+          type: string
+        namespace:
+          type: object
+          nullable: true
+        features:
+          type: integer
+          format: int64
+        features_name:
+          type: array
+          items:
+            type: string
+            enum:
+              [deep-flatten, exclusive-lock, fast-diff, layering, object-map]
+        timestamp:
+          type: string
+          format: date-time
+        stripe_count:
+          type: integer
+          format: int64
+        stripe_unit:
+          type: integer
+          format: int64
+        data_pool:
+          type: object
+          nullable: true
+        parent:
+          type: object
+          nullable: true
+        snapshots:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageSnapshot"
+        total_disk_usage:
+          type: integer
+          format: int64
+        disk_usage:
+          type: integer
+          format: int64
+        configuration:
+          type: array
+          items:
+            $ref: "#/components/schemas/PoolConfigurationItem"
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+
+paths:
+  /api/auth:
+    post:
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+      responses:
+        "201":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+          description: Resource created.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      tags:
+        - Auth
+      x-no-auth: true
+  /api/pool:
+    get:
+      security:
+        - BearerAuth: []
+      parameters:
+        - allowEmptyValue: true
+          description: Pool Attributes
+          in: query
+          name: attrs
+          schema:
+            type: string
+        - description: Pool Stats
+          in: query
+          name: stats
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                $ref: "#/components/schemas/PoolGetResponse"
+          description: OK
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      summary: Display Pool List
+      tags:
+        - Pool
+    post:
+      security:
+        - BearerAuth: []
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoolPostRequest"
+      responses:
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                $ref: "#/components/schemas/PoolPostResponse"
+          description: Request Accepted.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      tags:
+        - Pool
+  /api/pool/{pool_name}:
+    delete:
+      parameters:
+        - in: path
+          name: pool_name
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "204":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource deleted.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Pool
+    get:
+      parameters:
+        - in: path
+          name: pool_name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                $ref: "#/components/schemas/Pool"
+          description: OK
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      summary: Display Pool List
+      tags:
+        - Pool
+  /api/block/image:
+    post:
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockImagePostRequest"
+      responses:
+        "201":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource created.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Rbd
+  /api/block/image/{image_spec}:
+    delete:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+          description: >-
+            Image specification composed of `pool_name` and `image_name` joined by `%2F` (URL-encoded `/`).  
+            **Example**: `my_pool%2Fmy_image`
+      responses:
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "204":
+          description: Resource deleted.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Rbd
+    get:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+          description: >-
+            Image specification composed of `pool_name` and `image_name` joined by `%2F` (URL-encoded `/`).  
+            **Example**: `my_pool%2Fmy_image`
+      responses:
+        "200":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                $ref: "#/components/schemas/BlockImage"
+          description: OK
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Rbd
+    put:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                configuration:
+                  type: string
+                features:
+                  type: string
+                name:
+                  type: string
+                size:
+                  type: integer
+              type: object
+      responses:
+        "200":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource updated.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Rbd
+  /api/block/image/{image_spec}/copy:
+    post:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                configuration:
+                  type: string
+                data_pool:
+                  type: string
+                dest_image_name:
+                  type: string
+                dest_namespace:
+                  type: string
+                dest_pool_name:
+                  type: string
+                features:
+                  type: string
+                obj_size:
+                  type: integer
+                snapshot_name:
+                  type: string
+                stripe_count:
+                  type: integer
+                stripe_unit:
+                  type: string
+              required:
+                - dest_pool_name
+                - dest_namespace
+                - dest_image_name
+              type: object
+      responses:
+        "201":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource created.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Rbd
+  /api/block/image/{image_spec}/flatten:
+    post:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource created.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - Rbd
+  /api/block/image/{image_spec}/snap:
+    post:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                mirrorImageSnapshot:
+                  type: boolean
+                snapshot_name:
+                  type: string
+              required:
+                - snapshot_name
+                - mirrorImageSnapshot
+              type: object
+      responses:
+        "201":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource created.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - RbdSnapshot
+  /api/block/image/{image_spec}/snap/{snapshot_name}:
+    delete:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: snapshot_name
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "204":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource deleted.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - RbdSnapshot
+    put:
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: snapshot_name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                is_protected:
+                  type: boolean
+                new_snap_name:
+                  type: string
+              type: object
+      responses:
+        "200":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource updated.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - RbdSnapshot
+  /api/block/image/{image_spec}/snap/{snapshot_name}/clone:
+    post:
+      description: "\n        Clones a snapshot to an image\n        "
+      parameters:
+        - in: path
+          name: image_spec
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: snapshot_name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                child_image_name:
+                  type: string
+                child_namespace:
+                  type: string
+                child_pool_name:
+                  type: string
+                configuration:
+                  type: string
+                data_pool:
+                  type: string
+                features:
+                  type: string
+                metadata:
+                  type: string
+                obj_size:
+                  type: integer
+                  format: int64
+                stripe_count:
+                  type: integer
+                stripe_unit:
+                  type: string
+              required:
+                - child_pool_name
+                - child_image_name
+              type: object
+      responses:
+        "201":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Resource created.
+        "202":
+          content:
+            application/vnd.ceph.api.v1.0+json:
+              schema:
+                type: object
+          description: Operation is still executing. Please check the task queue.
+        "400":
+          description: Operation exception. Please check the response body for details.
+        "401":
+          description: Unauthenticated access. Please login first.
+        "403":
+          description: Unauthorized access. Please check your permissions.
+        "500":
+          description:
+            Unexpected error. Please check the response body for the stack
+            trace.
+      security:
+        - BearerAuth: []
+      tags:
+        - RbdSnapshot
