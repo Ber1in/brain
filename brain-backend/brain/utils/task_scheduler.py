@@ -229,11 +229,11 @@ async def init_server_warning(device_id: str, now=False):
         ssh_user = server["device"].get("username", "")
         ssh_pass = server["device"].get("password", "")
 
-        await init_warning(ip, ssh_user, ssh_pass)
         # Update database state
         send_feishu_group_message(server, now)
         send_server_reminder(server, now)
         if now:
+            await init_warning(ip, ssh_user, ssh_pass)
             server["time"] = 0
             server["user"] = ""
             server["start"] = ""

@@ -12,41 +12,41 @@ import type {
 
 export const testApi = {
   getBranchAndTag(): Promise<BranchAndTagResponse> {
-    return apiClient.get('/api/qa_auto/branchs-tags', { cache: false })
+    return apiClient.get('/api/yuntester/branchs-tags', { cache: false })
   },
 
   switchBranchOrTag(request: CheckoutRequest): Promise<void> {
-    return apiClient.post('/api/qa_auto/switch', request)
+    return apiClient.post('/api/yuntester/switch', request)
   },
 
   collectTestCases(request: DirNeedCollectRequest): Promise<CasesResponse> {
-    return apiClient.post('/api/qa_auto/commands', {
+    return apiClient.post('/api/yuntester/commands', {
       command: 'collect_cases',
       ...request
     })
   },
   
   executeTestCasesWithResponse(request: ExecuteRequest): Promise<ExecuteResponse> {
-    return apiClient.post('/api/qa_auto/execute-cases', request)
+    return apiClient.post('/api/yuntester/execute-cases', request)
   },
 
   getExecuteHistory(): Promise<ExecuteResponse[]> {
-    return apiClient.get('/api/qa_auto/execute-history')
+    return apiClient.get('/api/yuntester/execute-history')
   },
 
   getCustomCombinations(): Promise<CaseCombinationsResponse[]> {
-    return apiClient.get('/api/qa_auto/custom-combinations')
+    return apiClient.get('/api/yuntester/custom-combinations')
   },
 
   saveCustomCombination(request: CaseCombinationRequest): Promise<void> {
-    return apiClient.post('/api/qa_auto/custom-combinations', request)
+    return apiClient.post('/api/yuntester/custom-combinations', request)
   },
   
   deleteCustomCombination(combinationId: string): Promise<void> {
-    return apiClient.delete(`/api/qa_auto/custom-combinations/${combinationId}`)
+    return apiClient.delete(`/api/yuntester/custom-combinations/${combinationId}`)
   },
 
   getDirectoryTree(): Promise<{ tree: any[] }> {
-    return apiClient.get('/api/qa_auto/directory-tree')
+    return apiClient.get('/api/yuntester/directory-tree')
   },
 }

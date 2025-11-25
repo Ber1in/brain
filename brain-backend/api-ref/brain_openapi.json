@@ -317,7 +317,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/BootEntriesResponse"
+                                    "$ref": "#/components/schemas/brain__api__v1__schemas__bare_metal_schemas__BootEntriesResponse"
                                 }
                             }
                         }
@@ -1681,6 +1681,34 @@
             }
         },
         "/api/devices": {
+            "get": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Get All Devices",
+                "operationId": "get_all_devices_api_devices_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/ServerDetailResponse"
+                                    },
+                                    "type": "array",
+                                    "title": "Response Get All Devices Api Devices Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
             "post": {
                 "tags": [
                     "device"
@@ -1725,6 +1753,786 @@
                     }
                 ]
             }
+        },
+        "/api/devices/{device_id}": {
+            "get": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Get Device",
+                "operationId": "get_device_api_devices__device_id__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Device Id"
+                        },
+                        "name": "device_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServerDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Update Device",
+                "operationId": "update_device_api_devices__device_id__put",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Device Id"
+                        },
+                        "name": "device_id",
+                        "in": "path"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ServerUpdateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServerDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Delete Device",
+                "operationId": "delete_device_api_devices__device_id__delete",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Device Id"
+                        },
+                        "name": "device_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/devices/{server_id}/boot-entries": {
+            "get": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Get Boot Entries",
+                "description": "Get all boot entries (name + parent disk), current boot, next boot, and default boot",
+                "operationId": "get_boot_entries_api_devices__server_id__boot_entries_get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/brain__api__v2__schemas__device_schemas__BootEntriesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/devices/{server_id}/set-boot": {
+            "post": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Set Boot Entry",
+                "description": "Set boot entry for bare metal server",
+                "operationId": "set_boot_entry_api_devices__server_id__set_boot_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Boot Id"
+                        },
+                        "name": "boot_id",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "title": "Set Default",
+                            "default": false
+                        },
+                        "name": "set_default",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/devices/{server_id}/power-cycle": {
+            "post": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Power Cycle Server",
+                "description": "Power cycle bare metal server via BMC",
+                "operationId": "power_cycle_server_api_devices__server_id__power_cycle_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/devices/{server_id}/power-reset": {
+            "post": {
+                "tags": [
+                    "device"
+                ],
+                "summary": "Power Reset Server",
+                "description": "Warm reset bare metal server via BMC",
+                "operationId": "power_reset_server_api_devices__server_id__power_reset_post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Server Id"
+                        },
+                        "name": "server_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/tag": {
+            "post": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Create Tags",
+                "operationId": "create_tags_api_tag_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TagsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TagsRequest"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/tags": {
+            "get": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Get All Tags",
+                "operationId": "get_all_tags_api_tags_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TagsResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/tag/{tag_id}": {
+            "delete": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Delete Tag",
+                "operationId": "delete_tag_api_tag__tag_id__delete",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Tag Id"
+                        },
+                        "name": "tag_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/branchs-tags": {
+            "get": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Get Repo Branches And Tags",
+                "operationId": "get_repo_branches_and_tags_api_yuntester_branchs_tags_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BranchAndTagResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/switch": {
+            "post": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Switch Branch Or Tag",
+                "operationId": "switch_branch_or_tag_api_yuntester_switch_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckoutRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/commands": {
+            "post": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Get Test Cases",
+                "operationId": "get_test_cases_api_yuntester_commands_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DirNeedCollectRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CasesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/execute-cases": {
+            "post": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Execute Cases",
+                "operationId": "execute_cases_api_yuntester_execute_cases_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ExecuteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ExecuteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/execute-history": {
+            "get": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Execute History",
+                "description": "Retrieve execution history for the authenticated user.",
+                "operationId": "execute_history_api_yuntester_execute_history_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/ExecuteResponse"
+                                    },
+                                    "type": "array",
+                                    "title": "Response Execute History Api Yuntester Execute History Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/custom-combinations": {
+            "get": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "List Custom Combinations Of Test Cases",
+                "description": "There are many user-defined sets of test cases, and the current interface\nis used to query these combinations.",
+                "operationId": "list_custom_combinations_of_test_cases_api_yuntester_custom_combinations_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/CaseCombinationsResponse"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Custom Combinations Of Test Cases Api Yuntester Custom Combinations Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Save Custom Combinations Of Test Cases",
+                "description": "Save a new user-defined combination of test cases.\n\nThis endpoint receives a combination definition, generates metadata such as\ncreation timestamp and a unique ID, and persists it into the database.",
+                "operationId": "save_custom_combinations_of_test_cases_api_yuntester_custom_combinations_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CaseCombinationsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/custom-combinations/{combination_id}": {
+            "delete": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Delete Custom Combination",
+                "description": "Delete a user-defined combination of test cases by its ID.\n\nThis endpoint removes a previously saved test case combination from the\ndatabase. If the specified ID does not exist, a 404 error is raised.",
+                "operationId": "delete_custom_combination_api_yuntester_custom_combinations__combination_id__delete",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Combination Id"
+                        },
+                        "name": "combination_id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/yuntester/directory-tree": {
+            "get": {
+                "tags": [
+                    "yuntester"
+                ],
+                "summary": "Get Directory Tree",
+                "description": "Get the directory tree of the test code repository (recursive scan, directory-only).\nNode 'name' contains only the current directory name.\nReturned 'path' strips the user repo prefix.",
+                "operationId": "get_directory_tree_api_yuntester_directory_tree_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -1735,16 +2543,16 @@
                         "type": "string",
                         "title": "Type"
                     },
-                    "mac": {
+                    "nic_info": {
                         "items": {
-                            "type": "string"
+                            "$ref": "#/components/schemas/NicInfo"
                         },
                         "type": "array",
-                        "title": "Mac"
+                        "title": "Nic Info"
                     },
-                    "bdf": {
+                    "sn": {
                         "type": "string",
-                        "title": "Bdf"
+                        "title": "Sn"
                     },
                     "soc_ip": {
                         "type": "string",
@@ -1759,10 +2567,6 @@
                         "type": "string",
                         "title": "Firmware Version"
                     },
-                    "nic_sn": {
-                        "type": "string",
-                        "title": "Nic Sn"
-                    },
                     "management_ip": {
                         "type": "string",
                         "title": "Management Ip"
@@ -1771,8 +2575,7 @@
                 "type": "object",
                 "required": [
                     "type",
-                    "mac",
-                    "bdf",
+                    "sn",
                     "soc_ip"
                 ],
                 "title": "AIDPU_Nic"
@@ -1956,34 +2759,114 @@
                 "type": "object",
                 "title": "Body_login_for_access_token_login_post"
             },
-            "BootEntriesResponse": {
+            "BranchAndTagResponse": {
                 "properties": {
-                    "entries": {
-                        "additionalProperties": {
+                    "branchs": {
+                        "items": {
                             "type": "string"
                         },
-                        "type": "object",
-                        "title": "Entries"
+                        "type": "array",
+                        "title": "Branchs"
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Tags"
                     },
                     "current": {
                         "type": "string",
                         "title": "Current"
                     },
-                    "next": {
+                    "latest_commit": {
                         "type": "string",
-                        "title": "Next"
-                    },
-                    "default": {
-                        "type": "string",
-                        "title": "Default"
+                        "title": "Latest Commit"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "entries",
-                    "current"
+                    "current",
+                    "latest_commit"
                 ],
-                "title": "BootEntriesResponse"
+                "title": "BranchAndTagResponse"
+            },
+            "CaseCombinationsRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "cases": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Cases"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "CaseCombinationsRequest"
+            },
+            "CaseCombinationsResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "title": "Created At"
+                    },
+                    "cases": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Cases"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "created_at"
+                ],
+                "title": "CaseCombinationsResponse"
+            },
+            "CasesResponse": {
+                "properties": {
+                    "cases": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Cases"
+                    }
+                },
+                "type": "object",
+                "title": "CasesResponse"
+            },
+            "CheckoutRequest": {
+                "properties": {
+                    "branch": {
+                        "type": "string",
+                        "title": "Branch"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "title": "Tag"
+                    }
+                },
+                "type": "object",
+                "title": "CheckoutRequest"
             },
             "DeviceRequest": {
                 "properties": {
@@ -2021,12 +2904,39 @@
                     },
                     "ip": {
                         "type": "string",
-                        "format": "ipv4",
                         "title": "Ip"
                     },
                     "username": {
                         "type": "string",
                         "title": "Username"
+                    },
+                    "mac": {
+                        "type": "string",
+                        "title": "Mac"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "title": "Gateway"
+                    },
+                    "vendor": {
+                        "type": "string",
+                        "title": "Vendor"
+                    },
+                    "product": {
+                        "type": "string",
+                        "title": "Product"
+                    },
+                    "arch": {
+                        "type": "string",
+                        "title": "Arch"
+                    },
+                    "cpu_vendor": {
+                        "type": "string",
+                        "title": "Cpu Vendor"
+                    },
+                    "cpu_mode": {
+                        "type": "string",
+                        "title": "Cpu Mode"
                     }
                 },
                 "type": "object",
@@ -2035,6 +2945,109 @@
                     "username"
                 ],
                 "title": "DeviceResponse"
+            },
+            "DirNeedCollectRequest": {
+                "properties": {
+                    "dirs": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Dirs"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "dirs"
+                ],
+                "title": "DirNeedCollectRequest"
+            },
+            "ExecuteNicInfo": {
+                "properties": {
+                    "iface": {
+                        "type": "string",
+                        "title": "Iface"
+                    },
+                    "bdf": {
+                        "type": "string",
+                        "title": "Bdf"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "iface",
+                    "bdf",
+                    "type"
+                ],
+                "title": "ExecuteNicInfo"
+            },
+            "ExecuteRequest": {
+                "properties": {
+                    "cases": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Cases"
+                    },
+                    "servers": {
+                        "items": {
+                            "$ref": "#/components/schemas/Server"
+                        },
+                        "type": "array",
+                        "title": "Servers"
+                    }
+                },
+                "type": "object",
+                "title": "ExecuteRequest"
+            },
+            "ExecuteResponse": {
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "title": "Url"
+                    },
+                    "time": {
+                        "type": "string",
+                        "title": "Time"
+                    },
+                    "current": {
+                        "type": "string",
+                        "title": "Current"
+                    },
+                    "latest_commit": {
+                        "type": "string",
+                        "title": "Latest Commit"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "topo": {
+                        "type": "string",
+                        "title": "Topo"
+                    },
+                    "log": {
+                        "type": "string",
+                        "title": "Log"
+                    },
+                    "user": {
+                        "type": "string",
+                        "title": "User"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "topo",
+                    "log",
+                    "user"
+                ],
+                "title": "ExecuteResponse"
             },
             "HTTPValidationError": {
                 "properties": {
@@ -2248,38 +3261,27 @@
                 "properties": {
                     "mv200_id": {
                         "type": "string",
-                        "title": "Mv200 Id",
-                        "description": "Target SoC ID to perform network operation"
+                        "title": "Mv200 Id"
                     },
                     "ip": {
                         "type": "string",
-                        "format": "ip-netmask",
-                        "title": "Ip",
-                        "description": "IP/Netmask (support IPv4/IPv6)",
-                        "example": "127.0.0.1/24"
+                        "title": "Ip"
                     },
                     "vlan_tag": {
                         "type": "integer",
-                        "title": "Vlan Tag",
-                        "description": "VLAN tag for the interface"
+                        "title": "Vlan Tag"
                     },
                     "gateway": {
                         "type": "string",
-                        "title": "Gateway",
-                        "description": "Gateway address for the interface"
+                        "title": "Gateway"
                     },
                     "mtu": {
                         "type": "integer",
-                        "title": "Mtu",
-                        "description": "Optional field, MTU size",
-                        "default": 1500,
-                        "example": 1500
+                        "title": "Mtu"
                     },
                     "mac": {
                         "type": "string",
-                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
-                        "title": "Mac",
-                        "description": "MAC address of the interface (optional)"
+                        "title": "Mac"
                     },
                     "dns": {
                         "items": {
@@ -2291,8 +3293,7 @@
                     },
                     "description": {
                         "type": "string",
-                        "title": "Description",
-                        "description": "Description of the network interface"
+                        "title": "Description"
                     },
                     "id": {
                         "type": "string",
@@ -2302,6 +3303,10 @@
                     "ifname": {
                         "type": "string",
                         "title": "Ifname"
+                    },
+                    "creator": {
+                        "type": "string",
+                        "title": "Creator"
                     }
                 },
                 "type": "object",
@@ -2309,7 +3314,8 @@
                     "mv200_id",
                     "ip",
                     "vlan_tag",
-                    "gateway",
+                    "mtu",
+                    "mac",
                     "id"
                 ],
                 "title": "InterfaceInfo",
@@ -2335,6 +3341,29 @@
                 "title": "InterfaceUpdate",
                 "description": "Schema for updating only the description of an interface"
             },
+            "MCRVersionInfo": {
+                "properties": {
+                    "driver": {
+                        "type": "string",
+                        "title": "Driver"
+                    },
+                    "firmware": {
+                        "type": "string",
+                        "title": "Firmware"
+                    },
+                    "dpuagent": {
+                        "type": "string",
+                        "title": "Dpuagent"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "driver",
+                    "firmware",
+                    "dpuagent"
+                ],
+                "title": "MCRVersionInfo"
+            },
             "MVServer": {
                 "properties": {
                     "id": {
@@ -2354,9 +3383,25 @@
                         "type": "string",
                         "title": "Description"
                     },
-                    "bare_id": {
+                    "mac": {
                         "type": "string",
-                        "title": "Bare Id"
+                        "title": "Mac"
+                    },
+                    "sn": {
+                        "type": "string",
+                        "title": "Sn"
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "format": "ipv4",
+                        "title": "Gateway"
+                    },
+                    "nic_sn": {
+                        "type": "string",
+                        "title": "Nic Sn"
+                    },
+                    "versions": {
+                        "$ref": "#/components/schemas/MCRVersionInfo"
                     },
                     "clouddisk_enable": {
                         "type": "boolean",
@@ -2391,10 +3436,6 @@
                     "description": {
                         "type": "string",
                         "title": "Description"
-                    },
-                    "bare_id": {
-                        "type": "string",
-                        "title": "Bare Id"
                     }
                 },
                 "type": "object",
@@ -2418,9 +3459,10 @@
                         "type": "string",
                         "title": "Description"
                     },
-                    "bare_id": {
-                        "type": "string",
-                        "title": "Bare Id"
+                    "auto": {
+                        "type": "boolean",
+                        "title": "Auto",
+                        "default": false
                     },
                     "clouddisk_enable": {
                         "type": "boolean",
@@ -2443,25 +3485,63 @@
                         "type": "string",
                         "title": "Type"
                     },
-                    "mac": {
+                    "nic_info": {
                         "items": {
-                            "type": "string"
+                            "$ref": "#/components/schemas/NicInfo"
                         },
                         "type": "array",
-                        "title": "Mac"
+                        "title": "Nic Info"
                     },
-                    "bdf": {
+                    "sn": {
                         "type": "string",
-                        "title": "Bdf"
+                        "title": "Sn"
                     }
                 },
                 "type": "object",
                 "required": [
                     "type",
-                    "mac",
-                    "bdf"
+                    "sn"
                 ],
                 "title": "NicBase"
+            },
+            "NicInfo": {
+                "properties": {
+                    "mac": {
+                        "type": "string",
+                        "title": "Mac"
+                    },
+                    "bdf": {
+                        "type": "string",
+                        "title": "Bdf"
+                    },
+                    "iface": {
+                        "type": "string",
+                        "title": "Iface"
+                    }
+                },
+                "type": "object",
+                "title": "NicInfo"
+            },
+            "Server": {
+                "properties": {
+                    "device_id": {
+                        "type": "string",
+                        "title": "Device Id"
+                    },
+                    "nics": {
+                        "items": {
+                            "$ref": "#/components/schemas/ExecuteNicInfo"
+                        },
+                        "type": "array",
+                        "title": "Nics",
+                        "default": []
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "device_id"
+                ],
+                "title": "Server"
             },
             "ServerCredentials": {
                 "properties": {
@@ -2503,19 +3583,13 @@
                         "type": "array",
                         "title": "Nics"
                     },
-                    "os_types": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "title": "Os Types"
-                    },
                     "tags": {
                         "items": {
                             "type": "string"
                         },
                         "type": "array",
-                        "title": "Tags"
+                        "title": "Tags",
+                        "default": []
                     },
                     "notes": {
                         "type": "string",
@@ -2526,7 +3600,7 @@
                         "title": "User"
                     },
                     "time": {
-                        "type": "integer",
+                        "type": "string",
                         "title": "Time"
                     },
                     "created_at": {
@@ -2540,6 +3614,14 @@
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "recipients": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Recipients",
+                        "default": []
                     }
                 },
                 "type": "object",
@@ -2571,19 +3653,13 @@
                         "type": "array",
                         "title": "Nics"
                     },
-                    "os_types": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "title": "Os Types"
-                    },
                     "tags": {
                         "items": {
                             "type": "string"
                         },
                         "type": "array",
-                        "title": "Tags"
+                        "title": "Tags",
+                        "default": []
                     },
                     "notes": {
                         "type": "string",
@@ -2596,6 +3672,57 @@
                     "device"
                 ],
                 "title": "ServerRequest"
+            },
+            "ServerUpdateRequest": {
+                "properties": {
+                    "auto": {
+                        "type": "boolean",
+                        "title": "Auto",
+                        "default": false
+                    },
+                    "device": {
+                        "$ref": "#/components/schemas/DeviceRequest"
+                    },
+                    "bmc": {
+                        "$ref": "#/components/schemas/BMC"
+                    },
+                    "nics": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/components/schemas/NicBase"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/AIDPU_Nic"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Nics"
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Tags"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "title": "Notes"
+                    },
+                    "time": {
+                        "type": "string",
+                        "title": "Time"
+                    },
+                    "focus": {
+                        "type": "boolean",
+                        "title": "Focus",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "title": "ServerUpdateRequest"
             },
             "SystemDisk": {
                 "properties": {
@@ -2745,6 +3872,58 @@
                 ],
                 "title": "SystemUser"
             },
+            "TagResponse": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "color": {
+                        "type": "string",
+                        "title": "Color"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "color",
+                    "id"
+                ],
+                "title": "TagResponse"
+            },
+            "TagsRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "TagsRequest"
+            },
+            "TagsResponse": {
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/TagResponse"
+                        },
+                        "type": "array",
+                        "title": "Tags"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tags"
+                ],
+                "title": "TagsResponse"
+            },
             "TokenResponse": {
                 "properties": {
                     "access_token": {
@@ -2826,6 +4005,64 @@
                     "type"
                 ],
                 "title": "ValidationError"
+            },
+            "brain__api__v1__schemas__bare_metal_schemas__BootEntriesResponse": {
+                "properties": {
+                    "entries": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object",
+                        "title": "Entries"
+                    },
+                    "current": {
+                        "type": "string",
+                        "title": "Current"
+                    },
+                    "next": {
+                        "type": "string",
+                        "title": "Next"
+                    },
+                    "default": {
+                        "type": "string",
+                        "title": "Default"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "entries",
+                    "current"
+                ],
+                "title": "BootEntriesResponse"
+            },
+            "brain__api__v2__schemas__device_schemas__BootEntriesResponse": {
+                "properties": {
+                    "entries": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object",
+                        "title": "Entries"
+                    },
+                    "current": {
+                        "type": "string",
+                        "title": "Current"
+                    },
+                    "next": {
+                        "type": "string",
+                        "title": "Next"
+                    },
+                    "default": {
+                        "type": "string",
+                        "title": "Default"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "entries",
+                    "current"
+                ],
+                "title": "BootEntriesResponse"
             }
         },
         "securitySchemes": {

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
-from brain.api.v2.schemas import qa_schemas
+from brain.api.v2.schemas import yuntester_schemas
 from brain.json_db import SQLiteDocumentDB
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -22,8 +22,8 @@ LOG = logging.getLogger(__name__)
 
 IGNORE_DIRS = {"__pycache__", ".pytest_cache", ".git", ".idea"}
 GITLAB_URL = 'https://git-sha.yunsilicon.com'
-PRIVATE_TOKEN = 'qZb5uFi8JfxLNmXnvtWW'
-PROJECT_PATH = 'yunsilicon-software/qa_auto'
+PRIVATE_TOKEN = 'TaZqU7hppbrNsfFx-w4j'
+PROJECT_PATH = 'yunsilicon-software/yuntester'
 SERVER_COLLECTION = "servers"
 TEST_CASE_COLLECTION = "test_cases"
 TEST_HISTORY_COLLECTION = "test_history"
@@ -35,7 +35,7 @@ db = SQLiteDocumentDB()
 
 def get_user_repo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
-    user_repo_dir = os.path.join(TEST_DATA_DIR, user, "qa_auto")
+    user_repo_dir = os.path.join(TEST_DATA_DIR, user, "yuntester")
     os.makedirs(os.path.dirname(user_repo_dir), exist_ok=True)
     return user_repo_dir
 
@@ -78,7 +78,7 @@ def get_current_code_and_commit(user):
     return current, latest_commit 
 
 
-@router.get("/qa_auto/branchs-tags", response_model=qa_schemas.BranchAndTagResponse)
+@router.get("/yuntester/branchs-tags", response_model=yuntester_schemas.BranchAndTagResponse)
 def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
     LOG.info(f"Query branch and tag information for {user}")
@@ -122,8 +122,8 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     }
 
 
-@router.post("/qa_auto/switch", status_code=204)
-def switch_branch_or_tag(data: qa_schemas.CheckoutRequest, user=Depends(authenticate_user)):
+@router.post("/yuntester/switch", status_code=204)
+def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest, user=Depends(authenticate_user)):
     LOG.info(f"{user} witching to branch={data.branch} tag={data.tag}")
 
     try:
@@ -162,8 +162,8 @@ def switch_branch_or_tag(data: qa_schemas.CheckoutRequest, user=Depends(authenti
         raise HTTPException(status_code=500, detail=f"Failed to switch: {e}")
 
 
-@router.post("/qa_auto/commands", response_model=qa_schemas.CasesResponse)
-def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenticate_user)):
+@router.post("/yuntester/commands", response_model=yuntester_schemas.CasesResponse)
+def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest, user=Depends(authenticate_user)):
     LOG.info(f"{user} collecting tests from: {data.dirs}")
 
     commands = collect_tests_with_detailed_report(
@@ -173,8 +173,8 @@ def get_test_cases(data: qa_schemas.DirNeedCollectRequest, user=Depends(authenti
     return {"cases": commands}
 
 
-@router.post("/qa_auto/execute-cases", response_model=qa_schemas.ExecuteResponse)
-def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_user)):
+@router.post("/yuntester/execute-cases", response_model=yuntester_schemas.ExecuteResponse)
+def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
 
     def normalize_nic_type(t: str) -> str:
         t = t or ""
@@ -245,7 +245,7 @@ def execute_cases(data: qa_schemas.ExecuteRequest, user=Depends(authenticate_use
     return record
 
 
-@router.get("/qa_auto/execute-history", response_model=List[qa_schemas.ExecuteResponse])
+@router.get("/yuntester/execute-history", response_model=List[yuntester_schemas.ExecuteResponse])
 def execute_history(user=Depends(authenticate_user)):
     """Retrieve execution history for the authenticated user."""
 
@@ -256,8 +256,8 @@ def execute_history(user=Depends(authenticate_user)):
     return history
 
 
-@router.get("/qa_auto/custom-combinations", 
-            response_model=List[qa_schemas.CaseCombinationsResponse])
+@router.get("/yuntester/custom-combinations", 
+            response_model=List[yuntester_schemas.CaseCombinationsResponse])
 def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
     """There are many user-defined sets of test cases, and the current interface
     is used to query these combinations."""
@@ -269,9 +269,9 @@ def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
     return all_combinations
 
 
-@router.post("/qa_auto/custom-combinations", status_code=204)
+@router.post("/yuntester/custom-combinations", status_code=204)
 def save_custom_combinations_of_test_cases(
-        data: qa_schemas.CaseCombinationsRequest, user=Depends(authenticate_user)):
+        data: yuntester_schemas.CaseCombinationsRequest, user=Depends(authenticate_user)):
     """
     Save a new user-defined combination of test cases.
 
@@ -291,7 +291,7 @@ def save_custom_combinations_of_test_cases(
     LOG.info(f"Custom combination saved with id={data_dict['id']}")
 
 
-@router.delete("/qa_auto/custom-combinations/{combination_id}", status_code=204)
+@router.delete("/yuntester/custom-combinations/{combination_id}", status_code=204)
 def delete_custom_combination(combination_id: str):
     """
     Delete a user-defined combination of test cases by its ID.
@@ -317,7 +317,7 @@ def delete_custom_combination(combination_id: str):
         raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")
 
 
-@router.get("/qa_auto/directory-tree")
+@router.get("/yuntester/directory-tree")
 def get_directory_tree(user=Depends(authenticate_user)):
     """Get the directory tree of the test code repository (recursive scan, directory-only).
     Node 'name' contains only the current directory name.
