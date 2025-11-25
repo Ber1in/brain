@@ -16,3 +16,4 @@ pyghmi
 python-gitlab
 GitPython
 PyYAML
+asyncssh

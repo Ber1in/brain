@@ -233,7 +233,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Check, Loading } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import { tagApi } from '@/api/tag'
+import { tagApi } from '@/api/common'
 import { mv200Api } from '@/api/mv200'
 import type { ServerDetailResponse, ServerUpdateRequest, AIDPU_Nic, TagResponse, BootEntriesResponse, MVServer } from '@/types/api'
 

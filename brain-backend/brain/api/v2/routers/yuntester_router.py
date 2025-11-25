@@ -20,7 +20,7 @@ from brain.json_db import SQLiteDocumentDB
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
 
-IGNORE_DIRS = {"__pycache__", ".pytest_cache", ".git", ".idea"}
+IGNORE_DIRS = ["__pycache__", ".pytest_cache", ".git", ".idea"]
 GITLAB_URL = 'https://git-sha.yunsilicon.com'
 PRIVATE_TOKEN = 'TaZqU7hppbrNsfFx-w4j'
 PROJECT_PATH = 'yunsilicon-software/yuntester'

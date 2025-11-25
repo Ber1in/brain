@@ -6,10 +6,14 @@ import concurrent.futures
 import paramiko
 import logging
 from paramiko import ssh_exception
+from stat import S_ISDIR
+import asyncssh
 
 from fastapi import HTTPException
 
 LOG = logging.getLogger(__name__)
+
+IGNORE_DIRS = [".", ".."]
 
 
 async def ssh_execute_async(host: str, command: str, user: str, pwd: str) -> str:
@@ -53,3 +57,83 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
     except Exception as e:
         LOG.error(f"SSH execution failed on {host}: {e}")
         raise HTTPException(status_code=500, detail=f"SSH execution failed on {host}: {e}")
+
+
+class AsyncRemoteFS:
+    def __init__(self, host, username, password=None, port=22):
+        self.host = host
+        self.username = username
+        self.password = password
+        self.port = port
+        self._conn = None
+        self._sftp = None
+
+    async def _connect(self):
+        if self._conn:
+            return
+
+        self._conn = await asyncssh.connect(
+            self.host,
+            port=self.port,
+            username=self.username,
+            password=self.password,
+            known_hosts=None,
+        )
+        self._sftp = await self._conn.start_sftp_client()
+
+    async def _is_connected(self):
+        if not self._conn:
+            return False
+
+        try:
+            await self._conn.run("echo ok", check=True, timeout=5)
+            return True
+        except:
+            return False
+
+    async def _ensure_connected(self):
+        if not await self._is_connected():
+            await self._close()
+            await self._connect()
+
+    async def listdir(self, remote_path):
+        """Return items under remote_path (with type: file/directory)."""
+        await self._ensure_connected()
+
+        items = []
+        async for entry in self._sftp.scandir(remote_path):
+            if entry.filename in IGNORE_DIRS:
+                continue
+            items.append({
+                "name": entry.filename,
+                "type": "directory" if S_ISDIR(entry.attrs.permissions) else "file"
+            })
+        return items
+
+    async def download(self, remote_path, local_path):
+        """Download remote file to local."""
+        await self._ensure_connected()
+        await self._sftp.get(remote_path, local_path)
+
+    async def _close(self):
+        if self._sftp:
+            try:
+                self._sftp.exit()
+            except:
+                pass
+            self._sftp = None
+
+        if self._conn:
+            try:
+                self._conn.close()
+                await self._conn.wait_closed()
+            except:
+                pass
+            self._conn = None
+
+    async def __aenter__(self):
+        await self._connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self._close()

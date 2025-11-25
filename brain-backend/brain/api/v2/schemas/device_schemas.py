@@ -6,6 +6,11 @@ from ipaddress import IPv4Address
 from typing import List, Optional, Union, Dict
 
 
+class MCRRequest(BaseModel):
+    path: str
+    update_options: str
+
+
 class BMC(BaseModel):
     ip: IPv4Address = None
     hostname: str

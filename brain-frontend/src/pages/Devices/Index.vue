@@ -261,6 +261,16 @@
                     <el-icon><RefreshRight /></el-icon>
                     <span>热重启</span>
                   </el-dropdown-item>
+
+                  <!-- 新增：更新MCR包 -->
+                  <el-dropdown-item 
+                    command="updateMcr" 
+                    class="dropdown-item update-mcr-item"
+                    @click="handleUpdateMcrDialog(row)"
+                  >
+                    <el-icon><Upload /></el-icon>
+                    <span>更新MCR包</span>
+                  </el-dropdown-item>
                   
                   <!-- 占用服务器按钮 -->
                   <el-dropdown-item 
@@ -687,11 +697,152 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 新增：更新MCR包对话框 -->
+    <el-dialog
+      v-model="updateMcrDialogVisible"
+      title="更新MCR包"
+      width="800px"
+      class="update-mcr-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="update-mcr-content" v-loading="mcrLoading">
+        <div class="dialog-header">
+          <div class="device-info">
+            <el-icon class="server-icon"><Monitor /></el-icon>
+            <div class="info-content">
+              <div class="hostname">{{ currentDevice?.bmc.hostname }}</div>
+              <div class="ip-address">{{ currentDevice?.device.ip }}</div>
+            </div>
+          </div>
+          <div class="current-path">
+            <el-input
+              v-model="currentPathInput"
+              @keyup.enter="handlePathInputEnter"
+              @blur="handlePathInputBlur"
+              class="path-input"
+            />
+          </div>
+        </div>
+
+        <div class="file-browser">
+          <div class="section-title">
+            <div class="title-left">
+              <el-icon><Folder /></el-icon>
+              <span>选择MCR包文件</span>
+              <el-input
+                v-model="fileFilterText"
+                placeholder="筛选文件或文件夹..."
+                clearable
+                style="width: 200px; margin-left: 16px;"
+                size="small"
+                :prefix-icon="Search"
+              />
+              <el-tag v-if="selectedMcrFile" type="success" size="small" style="margin-left: 16px;">
+                已选择: {{ getFileName(selectedMcrFile) }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div class="file-list">
+            <div 
+              v-for="item in filteredFileList" 
+              :key="item.name"
+              class="file-item"
+              :class="{
+                'directory-item': item.type === 'directory',
+                'file-item-selected': item.type === 'file' && selectedMcrFile === getFullPath(item.name),
+                'mcr-file': item.type === 'file' && isMcrFile(item.name)
+              }"
+              @click="handleFileItemClick(item)"
+            >
+              <div class="file-icon">
+                <el-icon v-if="item.type === 'directory'">
+                  <Folder />
+                </el-icon>
+                <el-icon v-else-if="isMcrFile(item.name)" class="mcr-file-icon">
+                  <Document />
+                </el-icon>
+                <el-icon v-else>
+                  <Document />
+                </el-icon>
+              </div>
+              <div class="file-info">
+                <div class="file-name" :class="{ 'mcr-file-name': isMcrFile(item.name) }">
+                  {{ item.name }}
+                  <el-tag v-if="isMcrFile(item.name)" type="warning" size="small" class="mcr-tag">
+                    MCR
+                  </el-tag>
+                </div>
+              </div>
+              <div class="file-action" v-if="item.type === 'directory'">
+                <el-icon><ArrowRight /></el-icon>
+              </div>
+            </div>
+
+            <div v-if="fileList.length === 0" class="empty-files">
+              <el-empty description="该目录为空" />
+            </div>
+          </div>
+  
+          <div v-if="filteredFileList.length === 0" class="empty-files">
+            <el-empty :description="fileFilterText ? '未找到匹配的文件' : '该目录为空'" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <!-- 左侧添加更新选项 -->
+          <div class="update-options-left">
+            <span class="options-label">更新选项：</span>
+            <el-radio-group v-model="updateOption" size="large">
+              <el-radio label="all">全部更新</el-radio>
+              <el-radio label="fw">只更新固件</el-radio>
+              <el-radio label="no-fw">不更新固件</el-radio>
+            </el-radio-group>
+          </div>
+          
+          <!-- 右侧按钮 -->
+          <div class="footer-buttons">
+            <el-button 
+              @click="updateMcrDialogVisible = false" 
+              size="large"
+              class="cancel-btn"
+            >
+              取消
+            </el-button>
+            <el-button 
+              type="primary" 
+              @click="handleResetMcr" 
+              :loading="resetMcrLoading"
+              :disabled="!selectedMcrFile"
+              size="large"
+              class="confirm-btn"
+            >
+              <el-tooltip
+                v-if="!selectedMcrFile"
+                effect="dark"
+                content="请选择MCR包"
+                placement="top"
+              >
+                <span>确认更新</span>
+              </el-tooltip>
+              <span v-else>确认更新</span>
+              
+              <template #loading>
+                <el-icon class="is-loading"><Loading /></el-icon>
+              </template>
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed } from 'vue'
+import { ref, onMounted, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -715,10 +866,14 @@ import {
   ArrowDown,
   Warning,
   Check,
-  Star
+  Star,
+  Upload,
+  Folder,
+  Document,
+  ArrowRight
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import { tagApi } from '@/api/tag'
+import { remotefsApi, tagApi } from '@/api/common'
 import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -769,6 +924,238 @@ const isBatchPowerOperation = ref(false)
 
 // 关注相关
 const followLoading = ref<Record<string, boolean>>({})
+
+// MCR包更新相关
+const updateMcrDialogVisible = ref(false)
+const mcrLoading = ref(false)
+const resetMcrLoading = ref(false)
+const fileList = ref<any[]>([])
+const currentPath = ref('/auto/asic-dump/meta_release')
+const selectedMcrFile = ref('')
+const fileFilterText = ref('')
+const directoryCache = ref<Record<string, any[]>>({})
+const updateOption = ref<'all' | 'fw' | 'no-fw'>('all')
+const currentPathInput = ref('')
+
+// 添加监听，当 currentPath 变化时更新输入框
+watch(currentPath, (newPath) => {
+  currentPathInput.value = newPath
+}, { immediate: true })
+
+// 方法：处理路径输入框回车
+const handlePathInputEnter = async () => {
+  const newPath = currentPathInput.value.trim()
+  
+  // 如果路径没有变化，不做任何操作
+  if (newPath === currentPath.value) {
+    return
+  }
+  
+  try {
+    await loadDirectory(newPath)
+    currentPath.value = newPath
+    fileFilterText.value = '' // 清空筛选
+  } catch (error) {
+    // 如果加载失败，恢复原来的路径
+    currentPathInput.value = currentPath.value
+  }
+}
+
+// 方法：处理输入框失去焦点
+const handlePathInputBlur = () => {
+  // 失去焦点时恢复当前路径
+  currentPathInput.value = currentPath.value
+}
+
+// 计算属性：筛选后的文件列表
+const filteredFileList = computed(() => {
+  if (!fileFilterText.value) {
+    return fileList.value
+  }
+  
+  const keyword = fileFilterText.value.toLowerCase()
+  return fileList.value.filter(item => 
+    item.name.toLowerCase().includes(keyword)
+  )
+})
+
+// 添加获取完整路径的方法（因为item没有path属性）
+const getFullPath = (fileName: string) => {
+  return currentPath.value === '/' ? `/${fileName}` : `${currentPath.value}/${fileName}`
+}
+
+
+// 计算属性：路径面包屑
+const currentPathParts = computed(() => {
+  const parts = currentPath.value.split('/').filter(part => part !== '')
+  return ['', ...parts] // 第一个固定为 auto
+})
+
+// 方法：检查是否为MCR文件
+const isMcrFile = (fileName: string) => {
+  return fileName.startsWith('mcr_') && fileName.endsWith('.tar.gz')
+}
+
+// 方法：获取文件名（从完整路径中提取）
+const getFileName = (filePath: string) => {
+  return filePath.split('/').pop() || filePath
+}
+
+// 方法：处理更新MCR包对话框
+const handleUpdateMcrDialog = async (device: ServerDetailResponse) => {
+  currentDevice.value = device
+  currentPath.value = '/auto/asic-dump/meta_release'
+  selectedMcrFile.value = ''
+  updateMcrDialogVisible.value = true
+  
+  // 加载初始目录
+  await loadDirectory(currentPath.value)
+}
+
+// 方法：加载目录
+const loadDirectory = async (path: string) => {
+  // 检查缓存
+  if (directoryCache.value[path]) {
+    fileList.value = directoryCache.value[path]
+    return
+  }
+
+  try {
+    mcrLoading.value = true
+    const response = await remotefsApi.listRemoteDir(path)
+    
+    // 如果不是根目录，添加返回上一级选项
+    if (path !== '/auto') {
+      response.unshift({
+        name: '..',
+        type: 'directory',
+        // 可以添加其他需要的属性
+      })
+    }
+    
+    fileList.value = response
+    
+    // 存入缓存
+    directoryCache.value[path] = response
+    
+    fileList.value.sort((a, b) => {
+      // .. 始终在最前面
+      if (a.name === '..') return -1
+      if (b.name === '..') return 1
+      
+      if (a.type !== b.type) {
+        return a.type === 'directory' ? -1 : 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+  } catch (error: any) {
+    ElMessage.error(`加载目录失败: ${error.response?.data?.detail || '网络错误'}`)
+    fileList.value = []
+  } finally {
+    mcrLoading.value = false
+  }
+}
+
+watch(updateMcrDialogVisible, (visible) => {
+  if (!visible) {
+    fileFilterText.value = ''
+  }
+})
+
+// 方法：处理文件/目录点击
+const handleFileItemClick = async (item: any) => {
+  if (item.name === '..') {
+    // 返回上一级时清理已选择的MCR包
+    selectedMcrFile.value = ''
+    const pathParts = currentPath.value.split('/').filter(part => part !== '')
+    if (pathParts.length > 1) {
+      pathParts.pop()
+      const parentPath = '/' + pathParts.join('/')
+      currentPath.value = parentPath
+      fileFilterText.value = '' // 清空筛选
+      await loadDirectory(parentPath)
+    }
+    return
+  }
+  
+  if (item.type === 'directory') {
+    // 进入子目录时清理已选择的MCR包
+    selectedMcrFile.value = ''
+    const newPath = getFullPath(item.name)
+    currentPath.value = newPath
+    fileFilterText.value = '' // 清空筛选
+    await loadDirectory(newPath)
+  } else if (item.type === 'file' && isMcrFile(item.name)) {
+    // 选择MCR文件
+    selectedMcrFile.value = getFullPath(item.name)
+  } else {
+    // 点击非MCR文件时清理已选择的MCR包
+    selectedMcrFile.value = ''
+  }
+}
+
+// 方法：处理面包屑点击
+const handleBreadcrumbClick = async (index: number) => {
+  if (index === 0) {
+    // 点击根目录
+    currentPath.value = '/auto'
+  } else {
+    // 点击中间路径 - 重新拼接路径
+    const newPath = '/' + currentPathParts.value.slice(1, index + 1).join('/')
+    currentPath.value = newPath
+  }
+  
+  await loadDirectory(currentPath.value)
+}
+
+// 方法：重置MCR包
+const handleResetMcr = async () => {
+  if (!currentDevice.value || !selectedMcrFile.value) return
+
+  try {
+    resetMcrLoading.value = true
+    
+    await ElMessageBox.confirm(
+      `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新服务器 "${currentDevice.value.bmc.hostname}" 吗？\n更新选项: ${getUpdateOptionText(updateOption.value)}`,
+      '确认更新MCR包',
+      {
+        type: 'warning',
+        confirmButtonText: '确定更新',
+        cancelButtonText: '取消'
+      }
+    )
+
+    // 调用重置MCR接口
+    await deviceApi.resetMcr(currentDevice.value.id!, selectedMcrFile.value, updateOption.value)
+    
+    ElMessage.success('MCR包更新成功')
+    updateMcrDialogVisible.value = false
+    
+    // 重置状态
+    selectedMcrFile.value = ''
+    currentPath.value = '/auto'
+    updateOption.value = 'all'
+    
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消操作
+      return
+    }
+    ElMessage.error(error.response?.data?.detail || '更新MCR包失败')
+  } finally {
+    resetMcrLoading.value = false
+  }
+}
+
+// 添加更新选项文本显示
+const getUpdateOptionText = (option: string) => {
+  const optionsMap = {
+    'all': '全部更新',
+    'fw': '只更新固件',
+    'no-fw': '不更新固件'
+  }
+  return optionsMap[option as keyof typeof optionsMap] || option
+}
 
 // 检查当前用户是否已关注某台服务器
 const isFollowing = (device: ServerDetailResponse) => {
@@ -1930,6 +2317,9 @@ const handleCommand = (command: string, device: ServerDetailResponse) => {
     case 'powerReset':
       handlePowerOperation(device, 'reset')
       break
+    case 'updateMcr':
+      // 这个命令现在通过 @click 直接处理，不在这里处理
+      break
     case 'occupy':
       handleOccupyDialog(device)
       break
@@ -2088,6 +2478,189 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.current-path {
+  margin-bottom: 16px;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.path-input {
+  width: 100%;
+}
+
+/* 输入框聚焦样式 */
+:deep(.path-input .el-input__wrapper) {
+  transition: all 0.3s ease;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+:deep(.path-input .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+
+.filter-section {
+  margin-bottom: 16px;
+  padding: 0 8px;
+}
+
+.filter-tags {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.filter-tag {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-tag:hover {
+  transform: translateY(-1px);
+}
+
+/* 文件列表统计信息 */
+.file-stats {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+  padding: 0 8px;
+}
+
+/* 更新MCR包对话框样式 */
+.update-mcr-dialog {
+  :deep(.el-dialog__header) {
+    padding: 20px 20px 0;
+    margin-right: 0;
+  }
+  
+  :deep(.el-dialog__body) {
+    padding: 16px 20px;
+  }
+  
+  :deep(.el-dialog__footer) {
+    padding: 0 20px 20px;
+  }
+}
+
+.update-mcr-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+
+.path-breadcrumb {
+  cursor: pointer;
+  color: #409eff;
+}
+
+.path-breadcrumb:hover {
+  color: #337ecc;
+  text-decoration: underline;
+}
+
+.file-browser {
+  background: white;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.file-list {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  overflow: hidden;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.file-item:last-child {
+  border-bottom: none;
+}
+
+.file-item:hover {
+  background-color: #f5f7fa;
+}
+
+.file-item-selected {
+  background-color: #e6f7ff;
+  border-left: 3px solid #1890ff;
+}
+
+.directory-item:hover {
+  background-color: #f0f9ff;
+}
+
+.file-icon {
+  margin-right: 12px;
+  font-size: 20px;
+  color: #909399;
+}
+
+.directory-item .file-icon {
+  color: #409eff;
+}
+
+.mcr-file-icon {
+  color: #e6a23c !important;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcr-file-name {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+.file-type {
+  font-size: 12px;
+  color: #909399;
+}
+
+.file-action {
+  color: #c0c4cc;
+}
+
+.mcr-tag {
+  font-size: 10px;
+  padding: 0 4px;
+  height: 18px;
+  line-height: 18px;
+}
+
+.empty-files {
+  padding: 40px 0;
+}
+
+/* 更新MCR包按钮样式 */
+:deep(.update-mcr-item:not(.is-disabled)) {
+  color: #7239ea !important;
+}
+
+:deep(.update-mcr-item:not(.is-disabled):hover) {
+  color: #5f2bc3 !important;
+  background-color: #f8f5ff !important;
+}
+
 /* 关注心形按钮样式 */
 .follow-heart-btn {
   width: 32px;
@@ -2578,6 +3151,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 300px;
 }
 
 .server-icon {
@@ -2715,8 +3289,35 @@ onMounted(() => {
 /* 对话框底部 */
 .dialog-footer {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.update-options-left {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  justify-content: flex-end;
+}
+
+.options-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+:deep(.update-options-left .el-radio-group) {
+  display: flex;
+  gap: 20px;
+}
+
+:deep(.update-options-left .el-radio) {
+  margin-right: 0;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 12px;
 }
 
 .cancel-btn {

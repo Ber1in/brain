@@ -90,7 +90,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { deviceApi } from '@/api/device'
-import { tagApi } from '@/api/tag'
+import { tagApi } from '@/api/common'
 import type { ServerRequest, TagResponse } from '@/types/api'
 
 const router = useRouter()

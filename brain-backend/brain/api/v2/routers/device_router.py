@@ -403,6 +403,6 @@ async def power_reset_server(server_id: str):
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}
 
 
-@router.post("/devices/{server_id}/reset-hw")
-async def reset_hw(server_id: str, version: str):
+@router.post("/devices/{server_id}/update_mcr")
+async def reset_fw(server_id: str, data: device_schemas.MCRRequest):
     pass

@@ -17,3 +17,8 @@ class TagResponse(TagsRequest):
 
 class TagsResponse(BaseModel):
     tags: List[TagResponse]
+
+
+class RemoteFSResponse(BaseModel):
+    type: str
+    name: str

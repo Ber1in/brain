@@ -2,23 +2,27 @@
 # All rights reserved.
 
 import random
+from typing import List
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException
 import logging
 
 
 from brain.auth import authenticate_user
-from brain.api.v2.schemas import tag_schemas
+from brain.api.v2.schemas import common_schemas
 from brain.json_db import SQLiteDocumentDB
+from brain.utils.ssh_client import AsyncRemoteFS
 
 LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 TAG_COLLERCTION = "tags"
 db = SQLiteDocumentDB()
+COMMON_USER = "tester"
+COMMON_USER_PASSWORD = "Test.999"
 
 
-@router.post("/tag", status_code=status.HTTP_201_CREATED, response_model=tag_schemas.TagsRequest)
-async def create_tags(data: tag_schemas.TagsRequest):
+@router.post("/tag", status_code=status.HTTP_201_CREATED, response_model=common_schemas.TagsRequest)
+async def create_tags(data: common_schemas.TagsRequest):
     exist = db.find(TAG_COLLERCTION, {"name": data.name})
     if exist:
         LOG.info(f"Tag already exists: {data.name}")
@@ -35,7 +39,7 @@ async def create_tags(data: tag_schemas.TagsRequest):
     return tag_data
 
 
-@router.get("/tags", response_model=tag_schemas.TagsResponse)
+@router.get("/tags", response_model=common_schemas.TagsResponse)
 async def get_all_tags():
     all_tags = db.find(TAG_COLLERCTION)
     LOG.info(f"Total tags fetched: {len(all_tags)}")
@@ -51,3 +55,11 @@ async def delete_tag(tag_id: str):
 
     db.delete(TAG_COLLERCTION, {"id": tag_id})
     LOG.info(f"Tag deleted: ID={tag_id}")
+
+
+@router.get("/remotefs/list_dir", response_model=List[common_schemas.RemoteFSResponse])
+async def list_dir(path: str):
+    items = []
+    async with AsyncRemoteFS("10.0.3.248", COMMON_USER, COMMON_USER_PASSWORD) as fs:
+        items = await fs.listdir(path)
+    return items

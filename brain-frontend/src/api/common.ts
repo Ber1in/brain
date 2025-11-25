@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { TagsRequest, TagsResponse } from '@/types/api'
+import type { TagsRequest, TagsResponse, RemoteFsResponse } from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -15,5 +15,13 @@ export const tagApi = {
   // 删除标签
   deleteTag(tagId: string): Promise<void> {
     return apiClient.delete(`/api/tag/${tagId}`)
+  },
+}
+
+export const remotefsApi = {
+  listRemoteDir(path: string): Promise<RemoteFsResponse[]> {
+    return apiClient.get('/api/remotefs/list_dir', {
+      params: { path }
+    })
   },
 }

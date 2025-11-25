@@ -768,7 +768,7 @@
               class="occupy-new-server-btn"
             >
               <el-icon><Plus /></el-icon>
-              占用新服务器
+              占用空闲服务器
             </el-button>
           </div>
           
@@ -918,7 +918,7 @@
             </div>
             
             <div v-if="sortedAvailableServers.length === 0" class="no-servers">
-              <el-empty description="暂无可用服务器，请先占用服务器" />
+              <el-empty description="暂无可用服务器，请先占用空闲服务器" />
             </div>
           </div>
         </div>
@@ -2427,11 +2427,11 @@ const goToServerManagement = async () => {
   try {
     // 显示确认对话框
     await ElMessageBox.confirm(
-      '即将跳转到服务器管理页面，您可以在那里占用新的服务器。',
+      '即将跳转到【服务器管理】页面，占用空闲的服务器。',
       '跳转到服务器管理',
       {
-        confirmButtonText: '确定跳转',
-        cancelButtonText: '留在此页',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
         type: 'info',
         confirmButtonClass: 'confirm-btn',
         cancelButtonClass: 'cancel-btn',

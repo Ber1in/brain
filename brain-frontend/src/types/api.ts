@@ -160,6 +160,11 @@ export interface UploadToImage {
   description?: string
 }
 
+export interface MCRRequest {
+  path: string
+  update_options: 'all' | 'fw' | 'no-fw'
+}
+
 export interface BootEntriesResponse {
   entries: Record<string, string>
   current: string
@@ -307,6 +312,11 @@ export interface TagResponse {
 
 export interface TagsResponse {
   tags: TagResponse[]
+}
+
+export interface RemoteFsResponse {
+  type: string
+  name: string
 }
 
 export interface CheckoutRequest {

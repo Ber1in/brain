@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse } from '@/types/api'
+import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest } from '@/types/api'
 
 export const deviceApi = {
   // 获取所有设备
@@ -52,5 +52,13 @@ export const deviceApi = {
 
   powerReset(serverId: string): Promise<void> {
     return apiClient.post(`/api/devices/${serverId}/power-reset`)
+  },
+
+  resetMcr(serverId: string, mcrFilePath: string, updateOptions: 'all' | 'fw' | 'no-fw' = 'all'): Promise<void> {
+    const data: MCRRequest = {
+      path: mcrFilePath,
+      update_options: updateOptions
+    }
+    return apiClient.post(`/api/devices/${serverId}/update_mcr`, data)
   }
 }
