@@ -21,6 +21,8 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
+COMMON_USER = "tester"
+COMMON_USER_PASSWORD = "Test.999"
 
 
 @router.post("/devices", response_model=device_schemas.ServerDetailResponse)
@@ -399,3 +401,8 @@ async def power_reset_server(server_id: str):
 
     LOG.info(f"Successfully completed power reset for server {server_id}")
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}
+
+
+@router.post("/devices/{server_id}/reset-hw")
+async def reset_hw(server_id: str, version: str):
+    pass

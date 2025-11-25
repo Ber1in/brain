@@ -89,8 +89,8 @@
           </template>
           <div class="system-status">
             <el-descriptions :column="1" border>
-              <el-descriptions-item label="API服务状态">
-                <el-tag type="success">正常</el-tag>
+              <el-descriptions-item label="API服务">
+                <el-tag :type="apiStatusType">{{ apiStatusText }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="认证服务">
                 <el-tag type="success">正常</el-tag>
@@ -123,6 +123,7 @@ const mv200Servers = ref<MVServer[]>([])
 const devices = ref<ServerDetailResponse[]>([])
 const disks = ref<SystemDisk[]>([])
 const xscInterfaces = ref<InterfaceInfo[]>([])
+const loadError = ref(false)
 
 const imageCount = computed(() => images.value.length)
 const mv200Count = computed(() => mv200Servers.value.length)
@@ -130,6 +131,15 @@ const deviceCount = computed(() => devices.value.length)
 const diskCount = computed(() => disks.value.length)
 const xscInterfaceCount = computed(() => xscInterfaces.value.length)
 const recentDisks = computed(() => disks.value.slice(0, 5))
+
+// API服务状态计算属性
+const apiStatusType = computed(() => {
+  return loadError.value ? 'danger' : 'success'
+})
+
+const apiStatusText = computed(() => {
+  return loadError.value ? '异常' : '正常'
+})
 
 const getImageName = (row: SystemDisk) => {
   const image = images.value.find((img) => img.id === row.image_id)
@@ -165,6 +175,7 @@ const goToPage = (pageType: string) => {
 
 const loadData = async () => {
   loading.value = true
+  loadError.value = false
   try {
     const [imagesResponse, serversResponse, disksResponse, devicesResponse, interfacesResponse] = await Promise.all([
       imagesApi.getAll(),
@@ -181,6 +192,13 @@ const loadData = async () => {
     xscInterfaces.value = interfacesResponse
   } catch (error) {
     console.error('加载数据失败:', error)
+    loadError.value = true
+    // 清空数据，避免显示旧数据
+    images.value = []
+    mv200Servers.value = []
+    disks.value = []
+    devices.value = []
+    xscInterfaces.value = []
   } finally {
     loading.value = false
   }

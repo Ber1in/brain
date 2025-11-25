@@ -760,6 +760,16 @@
           <div class="section-title">
             <el-icon><Monitor /></el-icon>
             <span>选择服务器和网口</span>
+            <!-- 新增占用新服务器按钮 -->
+            <el-button 
+              type="primary" 
+              link 
+              @click="goToServerManagement"
+              class="occupy-new-server-btn"
+            >
+              <el-icon><Plus /></el-icon>
+              占用新服务器
+            </el-button>
           </div>
           
           <!-- 服务器数量统计 -->
@@ -1011,6 +1021,7 @@ import {
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import type { 
   BranchAndTagResponse, 
   CheckoutRequest, 
@@ -1088,6 +1099,7 @@ const selectedDirectory = ref('')
 const directoryTreeRef = ref<InstanceType<typeof ElTree>>()
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 const generateFileUrl = (filePath: string): string => {
   const token = authStore.accessToken
@@ -2410,6 +2422,40 @@ const deleteCombination = async () => {
   }
 }
 
+// 导航到服务器管理页面
+const goToServerManagement = async () => {
+  try {
+    // 显示确认对话框
+    await ElMessageBox.confirm(
+      '即将跳转到服务器管理页面，您可以在那里占用新的服务器。',
+      '跳转到服务器管理',
+      {
+        confirmButtonText: '确定跳转',
+        cancelButtonText: '留在此页',
+        type: 'info',
+        confirmButtonClass: 'confirm-btn',
+        cancelButtonClass: 'cancel-btn',
+        customClass: 'navigation-confirm-dialog'
+      }
+    )
+    
+    // 用户确认后关闭当前对话框并跳转
+    serverDialogVisible.value = false
+    
+    // 短暂延迟让用户看到对话框关闭
+    setTimeout(() => {
+      router.push('/devices')
+    }, 300)
+    
+  } catch (error) {
+    // 用户取消操作，什么都不做
+    if (error !== 'cancel') {
+      console.error('确认对话框错误:', error)
+      ElMessage.error('跳转失败，请重试')
+    }
+  }
+}
+
 // 修改 handleRunSelected 方法
 const handleRunSelected = async () => {
   if (rightTestCases.value.length === 0) {
@@ -2626,6 +2672,91 @@ onMounted(() => {
 </script>
 
 <style scoped>
+:deep(.navigation-confirm-dialog) {
+  border-radius: 8px;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__header) {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  padding: 16px 20px;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__title) {
+  color: #1f2937;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__content) {
+  padding: 20px;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__message) {
+  color: #64748b;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__status) {
+  font-size: 20px !important;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__btns) {
+  padding: 0 20px 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+:deep(.navigation-confirm-dialog .el-message-box__btns button) {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+:deep(.navigation-confirm-dialog .confirm-btn) {
+  background: #409eff;
+  border-color: #409eff;
+  font-weight: 500;
+}
+
+:deep(.navigation-confirm-dialog .confirm-btn:hover) {
+  background: #337ecc;
+  border-color: #337ecc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.navigation-confirm-dialog .cancel-btn) {
+  border-color: #d1d5db;
+  color: #6b7280;
+  background: #fff;
+}
+
+:deep(.navigation-confirm-dialog .cancel-btn:hover) {
+  border-color: #9ca3af;
+  color: #374151;
+  background: #f9fafb;
+  transform: translateY(-1px);
+}
+
+/* 占用新服务器按钮样式 */
+.occupy-new-server-btn {
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.occupy-new-server-btn .el-icon {
+  margin-right: 4px;
+}
+
+.occupy-server-btn {
+  margin-top: 16px;
+}
+
 /* 所有样式保持不变 */
 .directory-picker-dialog {
   :deep(.el-dialog__body) {
@@ -3707,6 +3838,31 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  :deep(.navigation-confirm-dialog) {
+    width: 90% !important;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  
+  :deep(.navigation-confirm-dialog .el-message-box__btns) {
+    flex-direction: column;
+  }
+  
+  :deep(.navigation-confirm-dialog .el-message-box__btns button) {
+    width: 100%;
+  }
+
+  .occupy-new-server-btn {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+
+  .server-nic-selection .section-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
   .server-list-with-nics {
     max-height: 400px;
   }
