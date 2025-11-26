@@ -172,6 +172,7 @@ export interface TaskStatusResponse {
   stage: string
   detail: string
   timestamp: string
+  mcr: string
 }
 
 export interface BootEntriesResponse {

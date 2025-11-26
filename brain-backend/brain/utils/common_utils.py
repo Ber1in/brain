@@ -309,7 +309,8 @@ def create_task(server_id):
         "status": "pending",
         "stage": "waiting",
         "detail": "",
-        "timestamp": now
+        "timestamp": now,
+        "mcr": ""
     }
 
     db.insert(TASK_POOL_COLLECTION, task_info)
@@ -345,7 +346,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str,
         # Step Group 1: Fetch MCR Package
         LOG.info(f"[{task_id}] Step 1: Creating temp directory")
         update_task(task_id, status="running", stage="getting_mcr",
-                    detail="Creating temp directory")
+                    detail="Creating temp directory", mcr=data.path)
 
         package_name = os.path.basename(data.path)
         root_name = package_name.replace(".tar.gz", "")
@@ -360,6 +361,36 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str,
         check_pkg = f"test -f {pkg_path} && echo 'exists' || echo 'not_exists'"
         pkg_exists = (await ssh_execute_async(host, check_pkg, user, pwd)).strip() == "exists"
         if not pkg_exists:
+            install_sshpass_cmd = """
+            if ! command -v sshpass >/dev/null 2>&1; then
+                echo "sshpass not found, installing..."
+
+                if [ -f /etc/os-release ]; then
+                    . /etc/os-release
+                    OS=$ID_LIKE
+                else
+                    OS=$(uname -s)
+                fi
+
+                if echo "$OS" | grep -qi "debian"; then
+                    apt-get update -y && apt-get install -y sshpass
+                elif echo "$OS" | grep -qi "rhel"; then
+                    yum install -y epel-release && yum install -y sshpass
+                elif echo "$OS" | grep -qi "fedora"; then
+                    dnf install -y sshpass
+                elif echo "$OS" | grep -qi "suse"; then
+                    zypper install -y sshpass
+                else
+                    echo "Unsupported Linux distro: $OS"
+                    exit 1
+                fi
+            else
+                echo "sshpass already installed"
+            fi
+            """
+
+            await ssh_execute_async(host, install_sshpass_cmd, user, pwd)
+
             update_task(task_id, detail="Downloading MCR package from common server")
             LOG.info(f"[{task_id}] Downloading MCR {package_name} package from {COMMON_SERVER}")
 

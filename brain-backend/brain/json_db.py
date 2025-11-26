@@ -215,7 +215,8 @@ class SQLiteDocumentDB:
             "gateway": None,
             "nic_sn": "",
             "clouddisk_enable": 0,
-            "recovery_mode": ""
+            "recovery_mode": "",
+            "task_id": ""
         },
         "system_disks": {
             "id": None,
@@ -311,7 +312,8 @@ class SQLiteDocumentDB:
             "status": "",
             "stage": "", 
             "detail": "",
-            "timestamp": ""
+            "timestamp": "",
+            "mcr": ""
         }
     }
 

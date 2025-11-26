@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { MVServer, MVServerCreate, MVServerUpdate } from '@/types/api'
+import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest } from '@/types/api'
 
 export const mv200Api = {
   getAll(): Promise<MVServer[]> {
@@ -21,4 +21,13 @@ export const mv200Api = {
   delete(id: string): Promise<void> {
     return apiClient.delete(`/mv-servers/${id}`)
   },
+
+  resetMcr(serverId: string, mcrFilePath: string, updateOptions: 'all' | 'fw' | 'no-fw' = 'all'): Promise<void> {
+    const data: MCRRequest = {
+      path: mcrFilePath,
+      update_options: updateOptions
+    }
+    return apiClient.post(`/mv-servers/${serverId}/update_mcr`, data)
+  },
+
 }

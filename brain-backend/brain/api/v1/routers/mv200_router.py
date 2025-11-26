@@ -1,11 +1,12 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import List
 import logging
 import uuid
 import urllib3
+from brain.api.v2.schemas import common_schemas
 
 from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
@@ -64,7 +65,8 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
     server_dict = {
         "id": server_id,
         **server_data.dict(),
-        "nic_sn": nics[0]["sn"]
+        "nic_sn": nics[0]["sn"],
+        "task_id": ""
     }
     server_dict.update(device)
 
@@ -341,3 +343,36 @@ async def delete_mv_server(server_id: str):
         )
 
     LOG.info(f"Successfully deleted MV server {server_id}")
+
+
+@router.post("/mv-servers/{server_id}/update_mcr", status_code=202)
+async def reset_fw(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
+    LOG.info("Received MCR update request for server_id="
+             f"{server_id} with options={data.update_options}")
+
+    # Fetch server information
+    try:
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
+        if not server:
+            LOG.warning(f"Server {server_id} not found in database")
+            raise HTTPException(status_code=404, detail="bare metal not found")
+        LOG.debug(f"Fetched server info: {server}")
+    except Exception as e:
+        LOG.error(f"Failed to fetch server {server_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch server info")
+
+    # Create a task entry
+    task_id = common_utils.create_task(server_id)
+    LOG.info(f"Created MCR update task {task_id} for server {server_id}")
+
+    server["task_id"] = task_id
+    db.update(MV_SERVER_COLLECTION, {"id": server_id}, server)
+
+    # Run background task
+    background.add_task(
+        common_utils.run_mcr_update_task, task_id, server["ip_address"],
+        MV200_OS_USER, MV200_OS_PASSWORD, data)
+    LOG.info(f"Background task {task_id} started for server {server_id}")
+
+    return {"message": "MCR update task accepted", "task_id": task_id}
+

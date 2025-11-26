@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status, HTTPException, Query, Background
 import logging
 
 from brain.auth import authenticate_user
-from brain.api.v2.schemas import device_schemas
+from brain.api.v2.schemas import common_schemas, device_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils, task_scheduler
@@ -403,7 +403,7 @@ async def power_reset_server(server_id: str):
 
 
 @router.post("/devices/{server_id}/update_mcr", status_code=202)
-async def reset_fw(server_id: str, data: device_schemas.MCRRequest, background: BackgroundTasks):
+async def reset_fw(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
     LOG.info("Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")
 
@@ -427,8 +427,8 @@ async def reset_fw(server_id: str, data: device_schemas.MCRRequest, background: 
 
     # Run background task
     background.add_task(
-        common_utils.run_mcr_update_task, server["device"]["ip"],
-        server["device"]["username"], server["device"]["password"], server, data)
+        common_utils.run_mcr_update_task, task_id, server["device"]["ip"],
+        server["device"]["username"], server["device"]["password"], data)
     LOG.info(f"Background task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}

@@ -31,6 +31,7 @@ class TaskStatusResponse(BaseModel):
     stage: str
     detail: str
     timestamp: str
+    mcr: str
 
 
 class MCRRequest(BaseModel):

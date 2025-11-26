@@ -43,3 +43,4 @@ class MVServer(BaseModel):
     recovery_mode: Optional[str] = Field(None,
                                          description="The recovery mode of aidpu, the "
                                                      "value is one of auto and manual")
+    task_id: str = None

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest, TaskStatusResponse } from '@/types/api'
+import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest } from '@/types/api'
 
 export const deviceApi = {
   // 获取所有设备
@@ -62,7 +62,4 @@ export const deviceApi = {
     return apiClient.post(`/api/devices/${serverId}/update_mcr`, data)
   },
 
-  getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
-    return apiClient.get(`/api/tasks/${taskId}`)
-  }
 }

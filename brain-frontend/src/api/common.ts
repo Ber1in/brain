@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { TagsRequest, TagsResponse, RemoteFsResponse } from '@/types/api'
+import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse } from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -24,4 +24,10 @@ export const remotefsApi = {
       params: { path }
     })
   },
+}
+
+export const tasksApi = {
+  getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    return apiClient.get(`/api/tasks/${taskId}`)
+  }
 }

@@ -77,7 +77,7 @@
           prop="bmc.hostname" 
           label="服务器名称"
           sortable
-          width="130"
+          width="120"
         >
           <template #default="{ row }">
             <el-link 
@@ -92,10 +92,10 @@
         </el-table-column>
         <el-table-column 
           prop="device.ip" 
-          label="服务器管理IP"
+          label="管理IP"
           sortable
           :sort-method="ipSortMethod"
-          width="130"
+          width="110"
         >
           <template #default="{ row }">
             <span class="highlight-ip">{{ row.device.ip }}</span>
@@ -103,7 +103,7 @@
         </el-table-column>
         <el-table-column 
           label="网卡信息"
-          min-width="175"
+          min-width="170"
         >
           <template #default="{ row }">
             <div v-if="getNicSummary(row).length > 0" class="nic-summary-compact">
@@ -122,7 +122,7 @@
         </el-table-column>
         <el-table-column 
           label="标签"
-          min-width="215"
+          min-width="200"
         >
           <template #default="{ row }">
             <div v-if="row.tags && row.tags.length > 0" class="tags-container">
@@ -164,7 +164,7 @@
           prop="notes" 
           label="备注"
           show-overflow-tooltip
-          min-width="280"
+          min-width="245"
         >
           <template #default="{ row }">
             <span v-if="row.notes">{{ row.notes }}</span>
@@ -173,7 +173,7 @@
         </el-table-column>
         <el-table-column 
           label="MCR状态"
-          width="120"
+          width="105"
         >
           <template #default="{ row }">
             <div v-if="row.task_id" class="mcr-status">
@@ -184,6 +184,7 @@
                 <template #content>
                   <div class="mcr-tooltip-content">
                     <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
+                    <div>MCR: {{ getMcrPackage(row) }}</div>
                     <div v-if="getTaskDetail(row)" class="detail-section">
                       <div>详情:</div>
                       <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
@@ -210,9 +211,9 @@
         </el-table-column>
         <el-table-column 
           prop="user" 
-          label="当前占用人"
+          label="占用人"
           sortable
-          width="110"
+          width="90"
         >
           <template #default="{ row }">
             <el-tag v-if="isDeviceOccupied(row)" type="success" size="small">{{ row.user }}</el-tag>
@@ -911,7 +912,7 @@ import {
   QuestionFilled
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import { remotefsApi, tagApi } from '@/api/common'
+import { remotefsApi, tagApi, tasksApi } from '@/api/common'
 import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -997,6 +998,12 @@ const getMcrStatusText = (device: ServerDetailResponse) => {
   return statusMap[status] || status
 }
 
+// 获取 MCR 包信息
+const getMcrPackage = (device: ServerDetailResponse): string => {
+  if (!device.task_id) return '-'
+  return taskStatusMap.value[device.task_id]?.mcr || '-'
+}
+
 const getStageText = (stage: string) => {
   const stageMap: Record<string, string> = {
     'getting_mcr': '下载MCR包',
@@ -1057,7 +1064,7 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
   if (!device.task_id) return
   
   try {
-    const taskStatus: TaskStatusResponse = await deviceApi.getTaskStatus(device.task_id)
+    const taskStatus: TaskStatusResponse = await tasksApi.getTaskStatus(device.task_id)
     
     // 更新状态映射
     taskStatusMap.value[device.task_id] = taskStatus
