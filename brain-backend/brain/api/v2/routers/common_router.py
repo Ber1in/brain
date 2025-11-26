@@ -16,6 +16,7 @@ from brain.utils.ssh_client import AsyncRemoteFS
 LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 TAG_COLLERCTION = "tags"
+TASK_POOL_COLLECTION = "tasks"
 db = SQLiteDocumentDB()
 COMMON_USER = "tester"
 COMMON_USER_PASSWORD = "Test.999"
@@ -63,3 +64,18 @@ async def list_dir(path: str):
     async with AsyncRemoteFS("10.0.3.248", COMMON_USER, COMMON_USER_PASSWORD) as fs:
         items = await fs.listdir(path)
     return items
+
+
+@router.get("/tasks/{task_id}", response_model=common_schemas.TaskStatusResponse)
+def query_task_status(task_id: str):
+    LOG.info(f"Querying status for task_id={task_id}")
+    try:
+        task = db.find_one(TASK_POOL_COLLECTION, {"id": task_id})
+        if not task:
+            LOG.warning(f"Task {task_id} not found")
+            raise HTTPException(status_code=404, detail="task not found")
+        LOG.debug(f"Task {task_id} info: {task}")
+    except Exception as e:
+        LOG.error(f"Failed to query task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to query task")
+    return task

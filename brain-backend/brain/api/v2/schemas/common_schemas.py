@@ -22,3 +22,17 @@ class TagsResponse(BaseModel):
 class RemoteFSResponse(BaseModel):
     type: str
     name: str
+
+
+class TaskStatusResponse(BaseModel):
+    id: str
+    server_id: str
+    status: str
+    stage: str
+    detail: str
+    timestamp: str
+
+
+class MCRRequest(BaseModel):
+    path: str
+    update_options: str

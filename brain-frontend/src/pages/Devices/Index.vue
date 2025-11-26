@@ -172,6 +172,43 @@
           </template>
         </el-table-column>
         <el-table-column 
+          label="MCR状态"
+          width="120"
+        >
+          <template #default="{ row }">
+            <div v-if="row.task_id" class="mcr-status">
+              <el-tooltip
+                placement="top"
+                popper-class="mcr-status-tooltip"
+              >
+                <template #content>
+                  <div class="mcr-tooltip-content">
+                    <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
+                    <div v-if="getTaskDetail(row)" class="detail-section">
+                      <div>详情:</div>
+                      <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
+                    </div>
+                  </div>
+                </template>
+                <el-tag 
+                  :type="getMcrStatusType(row)" 
+                  size="small"
+                  class="mcr-status-tag"
+                >
+                  {{ getMcrStatusText(row) }}
+                </el-tag>
+              </el-tooltip>
+              <el-icon 
+                v-if="getMcrStatus(row) === 'running'" 
+                class="loading-spinner"
+              >
+                <Loading />
+              </el-icon>
+            </div>
+            <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column 
           prop="user" 
           label="当前占用人"
           sortable
@@ -842,7 +879,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, reactive, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -870,11 +907,12 @@ import {
   Upload,
   Folder,
   Document,
-  ArrowRight
+  ArrowRight,
+  QuestionFilled
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { remotefsApi, tagApi } from '@/api/common'
-import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse } from '@/types/api'
+import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -936,6 +974,118 @@ const fileFilterText = ref('')
 const directoryCache = ref<Record<string, any[]>>({})
 const updateOption = ref<'all' | 'fw' | 'no-fw'>('all')
 const currentPathInput = ref('')
+const taskStatusMap = ref<Record<string, TaskStatusResponse>>({})
+const taskStatusTimers = ref<Record<string, number>>({})
+
+// MCR状态相关方法
+const getMcrStatus = (device: ServerDetailResponse): string => {
+  if (!device.task_id) return ''
+  return taskStatusMap.value[device.task_id]?.status || ''
+}
+
+const getMcrStatusText = (device: ServerDetailResponse) => {
+  const status = getMcrStatus(device)
+  const stage = taskStatusMap.value[device.task_id!]?.stage || ''
+  
+  const statusMap: Record<string, string> = {
+    'pending': '等待中',
+    'running': getStageText(stage),
+    'finished': '更新完成',
+    'failed': '更新失败'
+  }
+  
+  return statusMap[status] || status
+}
+
+const getStageText = (stage: string) => {
+  const stageMap: Record<string, string> = {
+    'getting_mcr': '下载MCR包',
+    'uninstalling_mcr': '卸载旧MCR',
+    'installing_mcr': '安装新MCR',
+    'waiting': '等待中'
+  }
+  return stageMap[stage] || stage
+}
+
+const getMcrStatusType = (device: ServerDetailResponse) => {
+  const status = getMcrStatus(device)
+  const typeMap: Record<string, any> = {
+    'pending': 'info',
+    'running': 'warning',
+    'finished': 'success',
+    'failed': 'danger'
+  }
+  return typeMap[status] || 'info'
+}
+
+const getTaskStage = (device: ServerDetailResponse): string => {
+  if (!device.task_id) return ''
+  return taskStatusMap.value[device.task_id]?.stage || ''
+}
+
+// 获取任务详情
+const getTaskDetail = (device: ServerDetailResponse): string => {
+  if (!device.task_id) return ''
+  return taskStatusMap.value[device.task_id]?.detail || ''
+}
+
+// 清理ANSI颜色代码和处理转义字符
+const cleanAnsiCodes = (text: string): string => {
+  try {
+    // 使用JSON.parse来处理所有转义字符
+    let cleaned = JSON.parse(`"${text}"`)
+    
+    // 移除ANSI颜色代码
+    cleaned = cleaned.replace(/\u001b\[\d+(;\d+)*m/g, '')
+    
+    // 清理多余的换行
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
+    
+    return cleaned.trim()
+  } catch (error) {
+    // 如果JSON解析失败，回退到简单处理
+    return text
+      .replace(/\\n/g, '\n')
+      .replace(/\u001b\[\d+(;\d+)*m/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+}
+
+// 查询任务状态
+const queryTaskStatus = async (device: ServerDetailResponse) => {
+  if (!device.task_id) return
+  
+  try {
+    const taskStatus: TaskStatusResponse = await deviceApi.getTaskStatus(device.task_id)
+    
+    // 更新状态映射
+    taskStatusMap.value[device.task_id] = taskStatus
+    
+    // 如果状态是running，继续轮询
+    if (taskStatus.status === 'running') {
+      if (taskStatusTimers.value[device.id!]) {
+        clearTimeout(taskStatusTimers.value[device.id!])
+      }
+      taskStatusTimers.value[device.id!] = setTimeout(() => {
+        queryTaskStatus(device)
+      }, 5000)
+    } else {
+      // 状态不是running，清除定时器
+      if (taskStatusTimers.value[device.id!]) {
+        clearTimeout(taskStatusTimers.value[device.id!])
+        delete taskStatusTimers.value[device.id!]
+      }
+    }
+  } catch (error) {
+    console.error(`查询任务状态失败: ${device.task_id}`, error)
+    // 查询失败也清除定时器，避免无限重试
+    if (taskStatusTimers.value[device.id!]) {
+      clearTimeout(taskStatusTimers.value[device.id!])
+      delete taskStatusTimers.value[device.id!]
+    }
+  }
+}
 
 // 添加监听，当 currentPath 变化时更新输入框
 watch(currentPath, (newPath) => {
@@ -1128,20 +1278,6 @@ const handleFileItemClick = async (item: any) => {
   }
 }
 
-// 方法：处理面包屑点击
-const handleBreadcrumbClick = async (index: number) => {
-  if (index === 0) {
-    // 点击根目录
-    currentPath.value = '/auto'
-  } else {
-    // 点击中间路径 - 重新拼接路径
-    const newPath = '/' + currentPathParts.value.slice(1, index + 1).join('/')
-    currentPath.value = newPath
-  }
-  
-  await loadDirectory(currentPath.value)
-}
-
 // 方法：重置MCR包
 const handleResetMcr = async () => {
   if (!currentDevice.value || !selectedMcrFile.value) return
@@ -1160,9 +1296,28 @@ const handleResetMcr = async () => {
     )
 
     // 调用重置MCR接口
-    await deviceApi.resetMcr(currentDevice.value.id!, selectedMcrFile.value, updateOption.value)
+    const response = await deviceApi.resetMcr(currentDevice.value.id!, selectedMcrFile.value, updateOption.value)
     
-    ElMessage.success('MCR包更新成功')
+    // 更新当前设备的task_id
+    const deviceIndex = devices.value.findIndex(d => d.id === currentDevice.value!.id)
+    if (deviceIndex > -1) {
+      devices.value[deviceIndex].task_id = response.task_id
+      // 设置初始状态
+      taskStatusMap.value[response.task_id] = {
+        id: response.task_id,
+        server_id: currentDevice.value.id!,
+        status: 'pending',
+        stage: 'waiting',
+        detail: '任务已创建，等待执行',
+        timestamp: new Date().toISOString()
+      }
+      // 启动状态查询
+      setTimeout(() => {
+        queryTaskStatus(devices.value[deviceIndex])
+      }, 1000) // 1秒后开始查询
+    }
+    
+    ElMessage.success('MCR包更新任务已开始')
     updateMcrDialogVisible.value = false
     
     // 重置状态
@@ -1172,7 +1327,6 @@ const handleResetMcr = async () => {
     
   } catch (error: any) {
     if (error === 'cancel' || error === 'close') {
-      // 用户取消操作
       return
     }
     ElMessage.error(error.response?.data?.detail || '更新MCR包失败')
@@ -1180,6 +1334,15 @@ const handleResetMcr = async () => {
     resetMcrLoading.value = false
   }
 }
+
+// 组件卸载时清除所有定时器
+onUnmounted(() => {
+  Object.values(taskStatusTimers.value).forEach(timer => {
+    clearTimeout(timer)
+  })
+  taskStatusTimers.value = {}
+  taskStatusMap.value = {}
+})
 
 // 添加更新选项文本显示
 const getUpdateOptionText = (option: string) => {
@@ -1601,15 +1764,6 @@ const bootEntriesList = computed(() => {
 
   return result
 })
-
-// 获取当前启动项显示文本
-const getCurrentBootEntry = () => {
-  const current = bootEntriesData.value?.current
-  if (!current) return '-'
-  
-  const entry = bootEntriesList.value.find(item => item.key === current)
-  return entry ? entry.value : '-'
-}
 
 // 加载启动项信息
 const loadBootEntries = async (deviceId: string) => {
@@ -2297,23 +2451,6 @@ const filteredDevices = computed(() => {
   return filtered
 })
 
-// 格式化时间显示
-const formatTime = (timeStr: string) => {
-  if (!timeStr) return '-'
-  try {
-    return new Date(timeStr).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    }).replace(/\//g, '/')
-  } catch (error) {
-    return timeStr // 如果解析失败，返回原始字符串
-  }
-}
 
 // 加载数据
 const loadData = async () => {
@@ -2321,6 +2458,23 @@ const loadData = async () => {
   try {
     const data = await deviceApi.getAll()
     devices.value = data
+    
+    // 为有task_id的设备启动状态查询
+    data.forEach(device => {
+      if (device.task_id) {
+        // 先设置一个初始状态
+        taskStatusMap.value[device.task_id] = {
+          id: device.task_id,
+          server_id: device.id!,
+          status: 'pending',
+          stage: 'waiting',
+          detail: '状态查询中...',
+          timestamp: new Date().toISOString()
+        }
+        // 启动状态查询
+        queryTaskStatus(device)
+      }
+    })
   } catch (error) {
     ElMessage.error('加载设备列表失败')
   } finally {
@@ -2512,6 +2666,53 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* MCR状态样式 */
+.mcr-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mcr-status-tag {
+  cursor: help;
+}
+
+.mcr-tooltip-content {
+  text-align: left;
+}
+
+.detail-text {
+  margin: 4px 0 0 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.detail-section {
+  margin-top: 8px;
+}
+
+.mcr-status-tooltip :deep(.el-tooltip__popper) {
+  white-space: pre-line;
+  max-width: 300px;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+  color: #e6a23c;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .current-path {
   margin-bottom: 16px;
   padding: 8px 0;
@@ -2918,24 +3119,6 @@ onMounted(() => {
   gap: 4px;
 }
 
-.nic-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-}
-
-.nic-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: #f0f7ff;
-  border: 1px solid #d4e8ff;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
 .nic-item {
   display: flex;
   align-items: center;
@@ -3016,37 +3199,14 @@ onMounted(() => {
   }
 }
 
-.loading-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 40px;
-  color: #909399;
-}
-
 .boot-entries-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.current-boot-info {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: #f0f7ff;
-  border: 1px solid #d4e8ff;
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
 
-.info-label {
-  font-weight: 600;
-  margin-right: 8px;
-  color: #1890ff;
-  min-width: 80px;
-}
+
 
 .current-entry {
   font-family: 'Courier New', monospace;

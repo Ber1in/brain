@@ -2,17 +2,27 @@
 # All rights reserved.
 
 from collections import defaultdict
+from datetime import datetime
 import logging
+import os
 import re
 import subprocess
 from typing import Dict, List
+from uuid import uuid4
 from fastapi import HTTPException
 
+from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute, ssh_execute_async
+from brain.api.v2.schemas import common_schemas
 
 LOG = logging.getLogger(__name__)
 BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
+COMMON_USER = "tester"
+COMMON_USER_PASSWORD = "Test.999"
+COMMON_SERVER = "10.0.3.248"
+TASK_POOL_COLLECTION = "tasks"
+db = SQLiteDocumentDB()
 
 
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
@@ -266,7 +276,7 @@ async def update_automatic_async(ip, user, password):
                 info["iface"] = iface
 
     # Primary route interface
-    route_cmd = ("ip route get 10.0.3.248 | head -1 | "
+    route_cmd = (f"ip route get {COMMON_SERVER} | head -1 | "
                  "awk '{for(i=1;i<=NF;i++) if($i==\"dev\") print $(i+1)}'")
     iface_name = await ssh_execute_async(ip, route_cmd, user, password)
 
@@ -286,3 +296,117 @@ async def update_automatic_async(ip, user, password):
         "cpu_mode": cpu_infos[2]
     }
     return device_info, nics
+
+
+def create_task(server_id):
+    """Create a new task and store in DB. Keep only the latest 10 tasks per server."""
+    task_id = str(uuid4())
+    now = datetime.now().isoformat()
+
+    task_info = {
+        "id": task_id,
+        "server_id": server_id,
+        "status": "pending",
+        "stage": "waiting",
+        "detail": "",
+        "timestamp": now
+    }
+
+    db.insert(TASK_POOL_COLLECTION, task_info)
+
+    tasks = db.find(TASK_POOL_COLLECTION, {"server_id": server_id})
+
+    if len(tasks) > 10:
+        tasks_sorted = sorted(tasks, key=lambda x: x.get("timestamp", ""))
+
+        remove_count = len(tasks) - 10
+        old_tasks = tasks_sorted[:remove_count]
+
+        for t in old_tasks:
+            db.delete(TASK_POOL_COLLECTION, {"id": t["id"]})
+
+    return task_id
+
+
+def update_task(task_id, **kwargs):
+    """Update task info in DB."""
+    try:
+        task = db.find_one(TASK_POOL_COLLECTION, {"id": task_id})
+    except Exception:
+        return
+    for k, v in kwargs.items():
+        task[k] = v
+    db.update(TASK_POOL_COLLECTION, {"id": task_id}, task)
+
+
+async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str,
+                              data: common_schemas.MCRRequest):
+    try:
+        # Step Group 1: Fetch MCR Package
+        LOG.info(f"[{task_id}] Step 1: Creating temp directory")
+        update_task(task_id, status="running", stage="getting_mcr",
+                    detail="Creating temp directory")
+
+        package_name = os.path.basename(data.path)
+        root_name = package_name.replace(".tar.gz", "")
+        temp_dir = f"/tmp/tmp_mcr_{root_name}"
+        pkg_path = os.path.join(temp_dir, package_name)
+        root_dir = os.path.join(temp_dir, root_name)
+
+        mkdir_cmd = f"mkdir -p {temp_dir}"
+        await ssh_execute_async(host, mkdir_cmd, user, pwd)
+        LOG.info(f"[{task_id}] Temp directory created: {temp_dir}")
+
+        check_pkg = f"test -f {pkg_path} && echo 'exists' || echo 'not_exists'"
+        pkg_exists = (await ssh_execute_async(host, check_pkg, user, pwd)).strip() == "exists"
+        if not pkg_exists:
+            update_task(task_id, detail="Downloading MCR package from common server")
+            LOG.info(f"[{task_id}] Downloading MCR {package_name} package from {COMMON_SERVER}")
+
+            download_cmd = (
+                f"sshpass -p '{COMMON_USER_PASSWORD}' scp -o StrictHostKeyChecking=no "
+                f"{COMMON_USER}@{COMMON_SERVER}:{data.path} {temp_dir}"
+            )
+            await ssh_execute_async(host, download_cmd, user, pwd)
+            LOG.info(f"[{task_id}] MCR package downloaded: {package_name}")
+
+        check_root = f"test -d {root_dir} && echo 'exists' || echo 'not_exists'"
+        root_exists = (await ssh_execute_async(host, check_root, user, pwd)).strip() == "exists"
+        if not root_exists:
+            update_task(task_id, detail="Extracting package")
+            LOG.info(f"[{task_id}] Extracting package {package_name}")
+
+            extract_cmd = f"tar -zxvf {pkg_path} -C {temp_dir}"
+            await ssh_execute_async(host, extract_cmd, user, pwd)
+            LOG.info(f"[{task_id}] Package extracted to {temp_dir}")
+
+        # Step Group 2: Uninstall Old MCR
+        update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
+        LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
+
+        uninstall_cmd = f"cd {root_dir} && ./install.sh --force"
+        await ssh_execute_async(host, uninstall_cmd, user, pwd)
+        LOG.info(f"[{task_id}] Old MCR uninstalled")
+
+        # Step Group 3: Install New MCR
+        update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
+        LOG.info(f"[{task_id}] Installing new MCR with option: {data.update_options}")
+
+        if data.update_options == "all":
+            install_cmd = f"cd {root_dir} && ./install.sh"
+        elif data.update_options == "fw":
+            install_cmd = f"cd {root_dir} && ./install.sh --fw-update-only"
+        elif data.update_options == "no-fw":
+            install_cmd = f"cd {root_dir} && ./install.sh --no-fw-update"
+        else:
+            raise Exception("Invalid update option")
+
+        await ssh_execute_async(host, install_cmd, user, pwd)
+        LOG.info(f"[{task_id}] New MCR installed successfully")
+
+        # Finished
+        update_task(task_id, status="finished", detail="MCR update completed")
+        LOG.info(f"[{task_id}] MCR update task finished successfully")
+
+    except Exception as e:
+        update_task(task_id, status="failed", detail=str(e))

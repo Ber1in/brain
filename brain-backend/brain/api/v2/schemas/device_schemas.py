@@ -6,6 +6,15 @@ from ipaddress import IPv4Address
 from typing import List, Optional, Union, Dict
 
 
+class TaskStatusResponse(BaseModel):
+    id: str
+    server_id: str
+    status: str
+    stage: str
+    detail: str
+    timestamp: str
+
+
 class MCRRequest(BaseModel):
     path: str
     update_options: str

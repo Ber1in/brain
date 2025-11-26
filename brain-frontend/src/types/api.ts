@@ -165,6 +165,15 @@ export interface MCRRequest {
   update_options: 'all' | 'fw' | 'no-fw'
 }
 
+export interface TaskStatusResponse {
+  id: string
+  server_id: string
+  status: 'pending' | 'running' | 'finished' | 'failed'
+  stage: string
+  detail: string
+  timestamp: string
+}
+
 export interface BootEntriesResponse {
   entries: Record<string, string>
   current: string

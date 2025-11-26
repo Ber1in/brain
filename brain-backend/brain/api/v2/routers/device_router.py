@@ -2,7 +2,6 @@
 # All rights reserved.
 
 from datetime import datetime
-import os
 import re
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException, Query, BackgroundTasks
@@ -22,36 +21,6 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
-TASK_POOL_COLLECTION = "tasks"
-COMMON_USER = "tester"
-COMMON_USER_PASSWORD = "Test.999"
-COMMON_SERVER = "10.0.3.248"
-
-
-def create_task(server_id):
-    """Create a new task and store in DB."""
-    task_id = str(uuid4())
-    task_info = {
-        "id": task_id,
-        "server_id": server_id,
-        "status": "pending",      # pending / running / finished / failed
-        "stage": "waiting",       # getting_mcr / uninstalling_mcr / installing_mcr
-        "detail": "",
-        "timestamp": datetime.now().isoformat()
-    }
-    db.insert(TASK_POOL_COLLECTION, task_info)
-    return task_id
-
-
-def update_task(task_id, **kwargs):
-    """Update task info in DB."""
-    try:
-        task = db.find_one(TASK_POOL_COLLECTION, {"id": task_id})
-    except Exception:
-        return
-    for k, v in kwargs.items():
-        task[k] = v
-    db.update(TASK_POOL_COLLECTION, {"id": task_id}, task)
 
 
 @router.post("/devices", response_model=device_schemas.ServerDetailResponse)
@@ -433,90 +402,6 @@ async def power_reset_server(server_id: str):
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}
 
 
-async def run_mcr_update_task(task_id: str, server: dict, data: device_schemas.MCRRequest):
-    host = server["device"]["ip"]
-    user = server["device"]["username"]
-    pwd = server["device"]["password"]
-
-    try:
-        # ------------------------------
-        # Step Group 1: Fetch MCR Package
-        # ------------------------------
-        LOG.info(f"[{task_id}] Step 1: Creating temp directory")
-        update_task(task_id, status="running", stage="getting_mcr",
-                    detail="Creating temp directory")
-
-        package_name = os.path.basename(data.path)
-        root_name = package_name.replace(".tar.gz", "")
-        temp_dir = f"/tmp/tmp_mcr_{root_name}"
-        pkg_path = os.path.join(temp_dir, package_name)
-        root_dir = os.path.join(temp_dir, root_name)
-
-        mkdir_cmd = f"mkdir -p {temp_dir}"
-        await ssh_execute_async(host, mkdir_cmd, user, pwd)
-        LOG.info(f"[{task_id}] Temp directory created: {temp_dir}")
-
-        check_pkg = f"test -f {pkg_path} && echo 'exists' || echo 'not_exists'"
-        pkg_exists = (await ssh_execute_async(host, check_pkg, user, pwd)).strip() == "exists"
-        if not pkg_exists:
-            update_task(task_id, detail="Downloading MCR package from common server")
-            LOG.info(f"[{task_id}] Downloading MCR {package_name} package from {COMMON_SERVER}")
-
-            download_cmd = (
-                f"sshpass -p '{COMMON_USER_PASSWORD}' scp -o StrictHostKeyChecking=no "
-                f"{COMMON_USER}@{COMMON_SERVER}:{data.path} {temp_dir}"
-            )
-            await ssh_execute_async(host, download_cmd, user, pwd)
-            LOG.info(f"[{task_id}] MCR package downloaded: {package_name}")
-
-        check_root = f"test -d {root_dir} && echo 'exists' || echo 'not_exists'"
-        root_exists = (await ssh_execute_async(host, check_root, user, pwd)).strip() == "exists"
-        if not root_exists:
-            update_task(task_id, detail="Extracting package")
-            LOG.info(f"[{task_id}] Extracting package {package_name}")
-
-            extract_cmd = f"tar -zxvf {pkg_path} -C {temp_dir}"
-            await ssh_execute_async(host, extract_cmd, user, pwd)
-            LOG.info(f"[{task_id}] Package extracted to {temp_dir}")
-
-        # ------------------------------
-        # Step Group 2: Uninstall Old MCR
-        # ------------------------------
-        update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
-        LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
-
-        uninstall_cmd = f"cd {root_dir} && ./install.sh --force"
-        await ssh_execute_async(host, uninstall_cmd, user, pwd)
-        LOG.info(f"[{task_id}] Old MCR uninstalled")
-
-        # ------------------------------
-        # Step Group 3: Install New MCR
-        # ------------------------------
-        update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
-        LOG.info(f"[{task_id}] Installing new MCR with option: {data.update_options}")
-
-        if data.update_options == "all":
-            install_cmd = f"cd {root_dir} && ./install.sh"
-        elif data.update_options == "fw":
-            install_cmd = f"cd {root_dir} && ./install.sh --fw-update-only"
-        elif data.update_options == "no-fw":
-            install_cmd = f"cd {root_dir} && ./install.sh --no-fw-update"
-        else:
-            raise Exception("Invalid update option")
-
-        await ssh_execute_async(host, install_cmd, user, pwd)
-        LOG.info(f"[{task_id}] New MCR installed successfully")
-
-        # ------------------------------
-        # Finished
-        # ------------------------------
-        update_task(task_id, status="finished", detail="MCR update completed")
-        LOG.info(f"[{task_id}] MCR update task finished successfully")
-
-    except Exception as e:
-        update_task(task_id, status="failed", detail=str(e))
-
-
 @router.post("/devices/{server_id}/update_mcr", status_code=202)
 async def reset_fw(server_id: str, data: device_schemas.MCRRequest, background: BackgroundTasks):
     LOG.info("Received MCR update request for server_id="
@@ -534,29 +419,17 @@ async def reset_fw(server_id: str, data: device_schemas.MCRRequest, background: 
         raise HTTPException(status_code=500, detail="Failed to fetch server info")
 
     # Create a task entry
-    task_id = create_task(server_id)
+    task_id = common_utils.create_task(server_id)
     LOG.info(f"Created MCR update task {task_id} for server {server_id}")
 
     server["task_id"] = task_id
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
     # Run background task
-    background.add_task(run_mcr_update_task, task_id, server, data)
+    background.add_task(
+        common_utils.run_mcr_update_task, server["device"]["ip"],
+        server["device"]["username"], server["device"]["password"], server, data)
     LOG.info(f"Background task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}
 
-
-@router.get("/tasks/{task_id}")
-def query_task_status(task_id: str):
-    LOG.info(f"Querying status for task_id={task_id}")
-    try:
-        task = db.find_one(TASK_POOL_COLLECTION, {"task_id": task_id})
-        if not task:
-            LOG.warning(f"Task {task_id} not found")
-            raise HTTPException(status_code=404, detail="task not found")
-        LOG.debug(f"Task {task_id} info: {task}")
-    except Exception as e:
-        LOG.error(f"Failed to query task {task_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to query task")
-    return task
