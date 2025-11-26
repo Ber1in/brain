@@ -13,7 +13,7 @@ from brain.api.v1.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
 from brain.utils.get_client import get_dpuagentclient
 from brain.utils.ssh_client import ssh_execute
-from brain.utils import tools
+from brain.utils import common_utils
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
             detail="Server with this IP address already exists"
         )
 
-    device, nics = await tools.update_automatic_async(
+    device, nics = await common_utils.update_automatic_async(
         str(server_data.ip_address), MV200_OS_USER, MV200_OS_PASSWORD
     )
 
@@ -236,7 +236,7 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
     if update_dict.pop("auto"):
         LOG.info(f"Automatic updating mv200: {server_id}")
 
-        device, nics = await tools.update_automatic_async(
+        device, nics = await common_utils.update_automatic_async(
             update_data.ip_address,
             MV200_OS_USER,
             MV200_OS_PASSWORD

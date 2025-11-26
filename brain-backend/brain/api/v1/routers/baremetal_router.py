@@ -9,7 +9,7 @@ import uuid
 from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
 from brain.api.v1.schemas import bare_metal_schemas
-from brain.utils import tools
+from brain.utils import common_utils
 from brain.utils.ssh_client import ssh_execute
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -237,7 +237,7 @@ async def get_boot_entries(
         credentials_pwd = pwd
 
     LOG.info(f"Retrieving boot entries from server {server_id} ({host_ip})")
-    entries, current_boot, next_boot, default_boot = tools.get_boot_entries(
+    entries, current_boot, next_boot, default_boot = common_utils.get_boot_entries(
         host_ip, credentials_user, credentials_pwd)
 
     LOG.info(f"Found {len(entries)} boot entries for server {server_id}")
@@ -326,7 +326,7 @@ async def power_cycle_server(server_id: str):
 
     bmcip = get_bmc_ip(host_ip)
     LOG.info(f"Power cycling server {server_id} via BMC {bmcip}")
-    tools.ipmi_power_action(bmcip, "cycle")
+    common_utils.ipmi_power_action(bmcip, "cycle")
 
     LOG.info(f"Successfully completed power cycle for server {server_id}")
     return {"message": f"Server {server_id} power cycled via BMC {bmcip}"}
@@ -350,7 +350,7 @@ async def power_reset_server(server_id: str):
 
     bmcip = get_bmc_ip(host_ip)
     LOG.info(f"Power resetting server {server_id} via BMC {bmcip}")
-    tools.ipmi_power_action(bmcip, "reset")
+    common_utils.ipmi_power_action(bmcip, "reset")
 
     LOG.info(f"Successfully completed power reset for server {server_id}")
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}

@@ -85,6 +85,7 @@ class ServerDetailResponse(ServerResponse):
     updated_at: str = None
     id: str = None
     recipients: List[str] = []
+    task_id: str = None
 
 
 class ServerUpdateRequest(BaseModel):

@@ -1,3 +1,6 @@
+# Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
+# All rights reserved.
+
 import json
 import threading
 import sqlite3
@@ -10,6 +13,7 @@ from abc import ABC, abstractmethod
 SERVER_COLLECTION = "servers"
 TEST_CASE_COLLECTION = "test_cases"
 TEST_HISTORY_COLLECTION = "test_history"
+TASK_POOL_COLLECTION = "tasks"
 
 
 class BaseDocumentDB(ABC):
@@ -276,7 +280,8 @@ class SQLiteDocumentDB:
             "created_at": "2025-11-04 15:24:12",
             "updated_at": "",
             "id": "99b62073-21dd-440a-9d2a-5e8f5b538a81",
-            "recipients": []
+            "recipients": [],
+            "task_id": ""
         },
         "tags": {
             "id": "",
@@ -299,6 +304,14 @@ class SQLiteDocumentDB:
             "user": "",
             "topo": "",
             "log": ""
+        }, 
+        TASK_POOL_COLLECTION: {
+            "id": "",
+            "server_id": "",
+            "status": "",
+            "stage": "", 
+            "detail": "",
+            "timestamp": ""
         }
     }
 

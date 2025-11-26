@@ -43,9 +43,15 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
         stdin, stdout, stderr = ssh.exec_command(command)
         out = stdout.read().decode()
         err = stderr.read().decode()
+        exit_code = stdout.channel.recv_exit_status()
         ssh.close()
+
         if err:
-            LOG.warning(f"Command error on {host}: {err.strip()}")
+            LOG.error(f"Command error on {host}: {err.strip()}")
+        if exit_code != 0:
+            LOG.debug(f"Command failed on {host} (exit {exit_code}): {out.strip()}")
+            raise HTTPException(status_code=500, detail=f"SSH command failed: {out.strip()}")
+
         LOG.debug(f"SSH command completed on {host}")
         return out.strip()
     except (ssh_exception.NoValidConnectionsError, TimeoutError) as e:
@@ -88,7 +94,7 @@ class AsyncRemoteFS:
         try:
             await self._conn.run("echo ok", check=True, timeout=5)
             return True
-        except:
+        except Exception:
             return False
 
     async def _ensure_connected(self):
@@ -119,7 +125,7 @@ class AsyncRemoteFS:
         if self._sftp:
             try:
                 self._sftp.exit()
-            except:
+            except Exception:
                 pass
             self._sftp = None
 
@@ -127,7 +133,7 @@ class AsyncRemoteFS:
             try:
                 self._conn.close()
                 await self._conn.wait_closed()
-            except:
+            except Exception:
                 pass
             self._conn = None
 

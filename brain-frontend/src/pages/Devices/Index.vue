@@ -210,7 +210,7 @@
           <template #default="{ row }">
             <el-button 
               :type="isFollowing(row) ? 'danger' : 'default'" 
-              :icon="isFollowing(row) ? 'Check' : 'Star'"
+              :icon="isFollowing(row) ? 'StarFilled' : 'Star'"
               @click="handleFollow(row)"
               :loading="followLoading[row.id!]"
               size="small"
@@ -734,7 +734,7 @@
                 v-model="fileFilterText"
                 placeholder="筛选文件或文件夹..."
                 clearable
-                style="width: 200px; margin-left: 16px;"
+                style="width: 150px; margin-left: 16px;"
                 size="small"
                 :prefix-icon="Search"
               />
@@ -842,7 +842,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, watch } from 'vue'
+import { ref, onMounted, reactive, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -865,7 +865,7 @@ import {
   RefreshRight,
   ArrowDown,
   Warning,
-  Check,
+  StarFilled,
   Star,
   Upload,
   Folder,
@@ -952,12 +952,46 @@ const handlePathInputEnter = async () => {
   }
   
   try {
-    await loadDirectory(newPath)
-    currentPath.value = newPath
-    fileFilterText.value = '' // 清空筛选
-  } catch (error) {
+    // 检查输入的是否是MCR文件路径
+    const fileName = newPath.split('/').pop() || ''
+    if (isMcrFile(fileName)) {
+      // 如果是MCR文件路径，加载其父目录并选中该文件
+      const parentPath = newPath.substring(0, newPath.lastIndexOf('/')) || '/'
+      
+      // 先检查父目录是否存在
+      await loadDirectory(parentPath)
+      
+      // 检查该文件是否存在于当前目录中
+      const fileExists = fileList.value.some(item => 
+        item.type === 'file' && item.name === fileName
+      )
+      
+      if (fileExists) {
+        currentPath.value = parentPath
+        fileFilterText.value = '' // 清空筛选
+        selectedMcrFile.value = newPath // 选中该MCR文件
+        
+        // 滚动到选中的文件（可选）
+        nextTick(() => {
+          const selectedElement = document.querySelector('.file-item-selected')
+          if (selectedElement) {
+            selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        })
+      } else {
+        throw new Error('MCR文件不存在')
+      }
+    } else {
+      // 如果是目录路径，正常加载
+      await loadDirectory(newPath)
+      currentPath.value = newPath
+      fileFilterText.value = '' // 清空筛选
+      selectedMcrFile.value = '' // 清理已选择的MCR包
+    }
+  } catch (error: any) {
     // 如果加载失败，恢复原来的路径
     currentPathInput.value = currentPath.value
+    ElMessage.error(error.message || '路径不存在或无法访问')
   }
 }
 
@@ -2663,39 +2697,34 @@ onMounted(() => {
 
 /* 关注心形按钮样式 */
 .follow-heart-btn {
-  width: 32px;
-  height: 32px;
-  transition: all 0.3s ease;
+  display: inline-flex;
+  padding: 0;
   border: none !important;
-  background: transparent !important;
-}
-
-.follow-heart-btn:hover {
-  transform: scale(1.2);
-  background-color: rgba(64, 158, 255, 0.1) !important;
+  background: none !important;
+  width: auto;
+  height: auto;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .follow-heart-btn:deep(.el-icon) {
   font-size: 18px;
+  line-height: 1;
 }
 
-/* 已关注状态 - 红色心形 */
-.follow-heart-btn.el-button--danger {
-  color: #f56c6c !important;
+/* Hover effect */
+.follow-heart-btn:hover:deep(.el-icon) {
+  transform: scale(1.2);
+  color: #409eff; /* 可根据是否已关注调整 */
 }
 
-.follow-heart-btn.el-button--danger:hover {
-  color: #f78989 !important;
-  background-color: rgba(245, 108, 108, 0.1) !important;
+/* 已关注状态 */
+.follow-heart-btn.el-button--danger:deep(.el-icon) {
+  color: #f56c6c;
 }
 
-/* 未关注状态 - 灰色心形 */
-.follow-heart-btn:not(.el-button--danger) {
-  color: #c0c4cc !important;
-}
-
-.follow-heart-btn:not(.el-button--danger):hover {
-  color: #409eff !important;
+.follow-heart-btn.el-button--danger:hover:deep(.el-icon) {
+  color: #f78989;
 }
 
 /* 电源重启对话框样式 */
