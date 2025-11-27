@@ -519,7 +519,7 @@ async def wait_for_server_reboot(host: str, timeout: int = 900,
             await asyncio.sleep(interval)
 
 
-async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str,
+async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi: str,
                               data: common_schemas.MCRRequest):
     try:
         # Step Group 1: Fetch MCR Package
@@ -530,7 +530,8 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str,
             update_task(task_id, stage="upgrading_fw", detail="Upgrading fw hw")
             LOG.info(f"[{task_id}] run yun_upgrade.sh in {root_dir}/fw_hw/")
 
-            uninstall_cmd = f"cd {root_dir}/fw_hw/ && chmod +x yun_upgrade.sh && ./yun_upgrade.sh 2>&1"
+            uninstall_cmd = (f"cd {root_dir}/fw_hw/ && chmod +x yun_upgrade.sh"
+                             " && ./yun_upgrade.sh 2>&1")
             upgrade_result = await ssh_execute_async(host, uninstall_cmd, user, pwd)
             LOG.info(f"[{task_id}] fw hw upgraded")
 
@@ -544,7 +545,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str,
             update_task(task_id, stage="reboot", detail="The server is restarting")
             ipmi_power_action(host, "reset")
 
-            success = await wait_for_server_reboot(host)
+            success = await wait_for_server_reboot(ipmi)
             if success:
                 update_task(task_id, status="finished", detail="MCR update completed")
                 LOG.info(f"[{task_id}] Reset Fw task finished successfully")
