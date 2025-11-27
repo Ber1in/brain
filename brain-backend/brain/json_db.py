@@ -314,7 +314,7 @@ class SQLiteDocumentDB:
             "detail": "",
             "timestamp": "",
             "mcr": "",
-            "type": ""
+            "option": ""
         }
     }
 

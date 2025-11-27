@@ -189,8 +189,9 @@
                 >
                   <template #content>
                     <div class="mcr-tooltip-content">
-                      <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
                       <div>MCR: {{ getMcrPackage(row) }}</div>
+                      <div>选项: {{ getTaskOption(row) }}</div>
+                      <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
                       <div v-if="getTaskDetail(row)" class="detail-section">
                         <div>详情:</div>
                         <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
@@ -843,7 +844,7 @@
             <span class="options-label">更新选项：</span>
             <el-radio-group v-model="updateOption" size="large">
               <el-radio label="all">全部更新</el-radio>
-              <el-radio label="fw">只更新固件</el-radio>
+              <el-radio label="fw">仅更新固件</el-radio>
               <el-radio label="no-fw">不更新固件</el-radio>
             </el-radio-group>
           </div>
@@ -1012,6 +1013,19 @@ const getMcrPackage = (device: ServerDetailResponse): string => {
   return taskStatusMap.value[device.task_id]?.mcr || '-'
 }
 
+const getTaskOption = (device: ServerDetailResponse): string => {
+  if (!device.task_id) return '-'
+  const option = taskStatusMap.value[device.task_id]?.mcr || '-'
+  if (option === "fw") {
+    return "仅更新固件"
+  } else if (option === "no-fw") {
+    return "不更新固件"
+  } else if (option === "all") {
+    return "全部更新"
+  }
+  return option
+}
+
 const getStageText = (stage: string) => {
   const stageMap: Record<string, string> = {
     'getting_mcr': '下载MCR包',
@@ -1106,25 +1120,20 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
     
     // 如果状态是running，根据阶段设置不同的轮询间隔
     if (taskStatus.status === 'running') {
-      let queryInterval = 5000 // 默认5秒
+      let queryInterval = 1000 // 默认1秒间隔
       
       if (taskStatus.stage === 'getting_mcr') {
         // 对于getting_mcr阶段，前5秒使用1秒间隔，之后使用5秒间隔
         const gettingMcrDuration = currentTime - taskStartTime
         queryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
       } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr') {
-        // 对于卸载和安装阶段，使用15秒间隔
-        queryInterval = 15000
-      } else if (taskStatus.stage === 'upgrading_fw') {
-        // 固件升级阶段，使用5秒间隔
-        queryInterval = 5000
-      } else if (taskStatus.stage === 'erasing_bdf') {
-        // 清理BDF阶段，使用1秒间隔
-        queryInterval = 1000
+        // 对于卸载和安装阶段，使用10秒间隔
+        queryInterval = 10000
       } else if (taskStatus.stage === 'reboot') {
         // 重启阶段，使用20秒间隔
         queryInterval = 20000
       }
+      // 其他阶段使用默认的1秒间隔
       
       // 清除之前的定时器
       if (taskStatusTimers.value[device.id!]) {
@@ -1146,7 +1155,7 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
     console.error(`查询任务状态失败: ${device.task_id}`, error)
     
     // 查询失败时，根据当前阶段设置重试间隔
-    let retryInterval = 5000 // 默认5秒
+    let retryInterval = 1000 // 默认1秒
     
     const currentStatus = taskStatusMap.value[device.task_id]
     if (currentStatus) {
@@ -1156,14 +1165,11 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
         const gettingMcrDuration = currentTime - taskStartTime
         retryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
       } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr') {
-        retryInterval = 15000
-      } else if (currentStatus.stage === 'upgrading_fw') {
-        retryInterval = 5000
-      } else if (currentStatus.stage === 'erasing_bdf') {
-        retryInterval = 1000
+        retryInterval = 10000
       } else if (currentStatus.stage === 'reboot') {
         retryInterval = 20000
       }
+      // 其他阶段使用默认的1秒间隔
     }
     
     // 查询失败也清除之前的定时器

@@ -32,6 +32,7 @@ class TaskStatusResponse(BaseModel):
     detail: str
     timestamp: str
     mcr: str
+    option: str
 
 
 class ResetFwRequest(BaseModel):

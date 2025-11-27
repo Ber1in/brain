@@ -299,7 +299,7 @@ async def update_automatic_async(ip, user, password):
     return device_info, nics
 
 
-def create_task(server_id):
+def create_task(server_id, option):
     """Create a new task and store in DB. Keep only the latest 10 tasks per server."""
     task_id = str(uuid4())
     now = datetime.now().isoformat()
@@ -311,12 +311,13 @@ def create_task(server_id):
         "stage": "waiting",
         "detail": "",
         "timestamp": now,
-        "mcr": ""
+        "mcr": "",
+        "option": option
     }
 
     db.insert(TASK_POOL_COLLECTION, task_info)
 
-    tasks = db.find(TASK_POOL_COLLECTION, {"server_id": server_id})
+    tasks = db.find(TASK_POOL_COLLECTION, {"server_id": server_id, "option": option})
 
     if len(tasks) > 10:
         tasks_sorted = sorted(tasks, key=lambda x: x.get("timestamp", ""))

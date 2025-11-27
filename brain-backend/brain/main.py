@@ -76,7 +76,7 @@ uvicorn_access_logger = logging.getLogger("uvicorn.access")
 uvicorn_access_logger.handlers.clear()
 uvicorn_access_logger.addHandler(file_handler)
 uvicorn_access_logger.addFilter(request_id_filter)
-uvicorn_access_logger.setLevel(logging.INFO)
+uvicorn_access_logger.setLevel(logging.WARNING)
 
 
 @app.on_event("startup")

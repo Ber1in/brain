@@ -178,6 +178,7 @@ export interface TaskStatusResponse {
   detail: string
   timestamp: string
   mcr: string
+  option?: string
 }
 
 export interface BootEntriesResponse {

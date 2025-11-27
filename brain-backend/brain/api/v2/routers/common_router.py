@@ -68,7 +68,7 @@ async def list_dir(path: str):
 
 @router.get("/tasks/{task_id}", response_model=common_schemas.TaskStatusResponse)
 async def query_task_status(task_id: str):
-    LOG.info(f"Querying status for task_id={task_id}")
+    LOG.debug(f"Querying status for task_id={task_id}")
     try:
         task = db.find_one(TASK_POOL_COLLECTION, {"id": task_id})
         if not task:
