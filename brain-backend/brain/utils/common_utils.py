@@ -543,9 +543,9 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             LOG.info(f"[{task_id}]All BDFs in {bdf_list} have been successfully erased.")
 
             update_task(task_id, stage="reboot", detail="The server is restarting")
-            ipmi_power_action(host, "reset")
+            ipmi_power_action(ipmi, "reset")
 
-            success = await wait_for_server_reboot(ipmi)
+            success = await wait_for_server_reboot(host)
             if success:
                 update_task(task_id, status="finished", detail="MCR update completed")
                 LOG.info(f"[{task_id}] Reset Fw task finished successfully")
