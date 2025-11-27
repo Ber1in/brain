@@ -172,7 +172,7 @@
           </template>
         </el-table-column>
         <el-table-column 
-          label="MCR状态"
+          label="MCR版本"
           width="105"
         >
           <template #default="{ row }">
@@ -1015,7 +1015,7 @@ const getMcrPackage = (device: ServerDetailResponse): string => {
 
 const getTaskOption = (device: ServerDetailResponse): string => {
   if (!device.task_id) return '-'
-  const option = taskStatusMap.value[device.task_id]?.mcr || '-'
+  const option = taskStatusMap.value[device.task_id]?.option || '-'
   if (option === "fw") {
     return "仅更新固件"
   } else if (option === "no-fw") {

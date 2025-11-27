@@ -26,6 +26,51 @@ TASK_POOL_COLLECTION = "tasks"
 db = SQLiteDocumentDB()
 
 
+async def ensure_packages_installed(host: str, user: str, pwd: str, packages: list):
+    """
+    Ensure the given packages are installed on the remote host.
+    Supports Debian / RHEL / Fedora / SUSE. Executes one SSH command.
+    """
+    pkg_str = " ".join(packages)
+
+    cmd = f"""
+    MISSING=()
+    for pkg in {pkg_str}; do
+        if ! command -v $pkg >/dev/null 2>&1; then
+            MISSING+=($pkg)
+        fi
+    done
+
+    if [ ${{#MISSING[@]}} -gt 0 ]; then
+        echo "Packages not found: ${{MISSING[@]}}, installing..."
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            OS=$ID_LIKE
+        else
+            OS=$(uname -s)
+        fi
+
+        if echo "$OS" | grep -qi "debian"; then
+            apt-get update -y && apt-get install -y ${{MISSING[@]}}
+        elif echo "$OS" | grep -qi "rhel"; then
+            yum install -y epel-release && yum install -y ${{MISSING[@]}}
+        elif echo "$OS" | grep -qi "fedora"; then
+            dnf install -y ${{MISSING[@]}}
+        elif echo "$OS" | grep -qi "suse"; then
+            zypper install -y ${{MISSING[@]}}
+        else
+            echo "Unsupported Linux distro: $OS"
+            exit 1
+        fi
+    else
+        echo "All packages already installed"
+    fi
+    """
+
+    LOG.info(f"Ensuring packages are installed on {host}: {packages}")
+    await ssh_execute_async(host, cmd, user, pwd)
+
+
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
     """
     Parse yuncli lspci output and return a list of devices.
@@ -379,29 +424,7 @@ async def fetch_mcr_package(task_id: str, host: str, user: str, pwd: str, path: 
             await ssh_execute_async(host, check_sshpass_cmd, user, pwd)
         except Exception:
             update_task(task_id, detail="installing sshpass")
-
-            install_sshpass_cmd = """
-            if [ -f /etc/os-release ]; then
-                . /etc/os-release
-                OS=$ID_LIKE
-            else
-                OS=$(uname -s)
-            fi
-
-            if echo "$OS" | grep -qi "debian"; then
-                apt-get update -y && apt-get install -y sshpass
-            elif echo "$OS" | grep -qi "rhel"; then
-                yum install -y epel-release && yum install -y sshpass
-            elif echo "$OS" | grep -qi "fedora"; then
-                dnf install -y sshpass
-            elif echo "$OS" | grep -qi "suse"; then
-                zypper install -y sshpass
-            else
-                echo "Unsupported Linux distro: $OS"
-                exit 1
-            fi
-            """
-            await ssh_execute_async(host, install_sshpass_cmd, user, pwd)
+            ensure_packages_installed(host, user, pwd, ["sshpass"])
 
         # Step 2-2: Download package
         update_task(task_id, detail="Downloading MCR package from common server")
@@ -559,7 +582,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
             LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
 
-            uninstall_cmd = f"cd {root_dir} && ./install.sh --force"
+            uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force"
             await ssh_execute_async(host, uninstall_cmd, user, pwd)
             LOG.info(f"[{task_id}] Old MCR uninstalled")
 

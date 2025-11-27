@@ -50,6 +50,8 @@ async def create_device(data: device_schemas.ServerRequest):
     )
     LOG.info(f"Auto discovery completed, SN: {device['sn']}, NICs: {len(nics)}")
 
+    await common_utils.ensure_packages_installed(
+        str(data.device.ip), data.device.username, data.device.password, ["ipmitool"])
     impi_info = await ssh_execute_async(str(data.device.ip), "ipmitool lan print 1",
                                         data.device.username, data.device.password)
     match = re.search(r"IP Address\s*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)", impi_info)
