@@ -51,9 +51,9 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
         fi
 
         if echo "$OS" | grep -qi "debian"; then
-            apt-get update -y && apt-get install -y ${{MISSING[@]}}
+            apt install -y ${{MISSING[@]}}
         elif echo "$OS" | grep -qi "rhel"; then
-            yum install -y epel-release && yum install -y ${{MISSING[@]}}
+            yum install -y ${{MISSING[@]}}
         elif echo "$OS" | grep -qi "fedora"; then
             dnf install -y ${{MISSING[@]}}
         elif echo "$OS" | grep -qi "suse"; then
@@ -424,7 +424,7 @@ async def fetch_mcr_package(task_id: str, host: str, user: str, pwd: str, path: 
             await ssh_execute_async(host, check_sshpass_cmd, user, pwd)
         except Exception:
             update_task(task_id, detail="installing sshpass")
-            ensure_packages_installed(host, user, pwd, ["sshpass"])
+            await ensure_packages_installed(host, user, pwd, ["sshpass"])
 
         # Step 2-2: Download package
         update_task(task_id, detail="Downloading MCR package from common server")

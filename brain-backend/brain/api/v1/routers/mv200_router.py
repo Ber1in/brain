@@ -362,7 +362,7 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background
         raise HTTPException(status_code=500, detail="Failed to fetch server info")
 
     # Create a task entry
-    task_id = common_utils.create_task(server_id)
+    task_id = common_utils.create_task(server_id, data.update_options)
     LOG.info(f"Created MCR update task {task_id} for server {server_id}")
 
     server["task_id"] = task_id
