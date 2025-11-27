@@ -75,7 +75,7 @@ async def create_device(data: device_schemas.ServerRequest):
         "updated_at": "",
         "id": str(uuid4()),
         "recipients": [],
-        "task_id": ""
+        "task_id": "",
     }
 
     db.insert(SERVER_COLLECTION, result)
@@ -403,7 +403,7 @@ async def power_reset_server(server_id: str):
 
 
 @router.post("/devices/{server_id}/update_mcr", status_code=202)
-async def reset_fw(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
+async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
     LOG.info("Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")
 
@@ -432,4 +432,3 @@ async def reset_fw(server_id: str, data: common_schemas.MCRRequest, background: 
     LOG.info(f"Background task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}
-

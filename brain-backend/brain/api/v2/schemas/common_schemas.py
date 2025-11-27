@@ -34,6 +34,9 @@ class TaskStatusResponse(BaseModel):
     mcr: str
 
 
-class MCRRequest(BaseModel):
+class ResetFwRequest(BaseModel):
     path: str
+
+
+class MCRRequest(ResetFwRequest):
     update_options: str

@@ -6,8 +6,6 @@ from ipaddress import IPv4Address
 from typing import List, Optional, Union, Dict
 
 
-
-
 class BMC(BaseModel):
     ip: IPv4Address = None
     hostname: str

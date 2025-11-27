@@ -313,7 +313,8 @@ class SQLiteDocumentDB:
             "stage": "", 
             "detail": "",
             "timestamp": "",
-            "mcr": ""
+            "mcr": "",
+            "type": ""
         }
     }
 

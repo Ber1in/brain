@@ -160,6 +160,11 @@ export interface UploadToImage {
   description?: string
 }
 
+
+export interface ResetFwRequest {
+  path: string
+}
+
 export interface MCRRequest {
   path: string
   update_options: 'all' | 'fw' | 'no-fw'

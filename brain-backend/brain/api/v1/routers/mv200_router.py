@@ -346,7 +346,7 @@ async def delete_mv_server(server_id: str):
 
 
 @router.post("/mv-servers/{server_id}/update_mcr", status_code=202)
-async def reset_fw(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
+async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
     LOG.info("Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")
 

@@ -177,34 +177,41 @@
         >
           <template #default="{ row }">
             <div v-if="row.task_id" class="mcr-status">
-              <el-tooltip
-                placement="top"
-                popper-class="mcr-status-tooltip"
-              >
-                <template #content>
-                  <div class="mcr-tooltip-content">
-                    <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
-                    <div>MCR: {{ getMcrPackage(row) }}</div>
-                    <div v-if="getTaskDetail(row)" class="detail-section">
-                      <div>详情:</div>
-                      <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
-                    </div>
-                  </div>
-                </template>
-                <el-tag 
-                  :type="getMcrStatusType(row)" 
-                  size="small"
-                  class="mcr-status-tag"
+              <template v-if="!taskStatusMap[row.task_id]">
+                <!-- 状态查询中 -->
+                <el-icon class="loading-spinner"><Loading /></el-icon>
+                <span class="status-text">查询中...</span>
+              </template>
+              <template v-else>
+                <el-tooltip
+                  placement="top"
+                  popper-class="mcr-status-tooltip"
                 >
-                  {{ getMcrStatusText(row) }}
-                </el-tag>
-              </el-tooltip>
-              <el-icon 
-                v-if="getMcrStatus(row) === 'running'" 
-                class="loading-spinner"
-              >
-                <Loading />
-              </el-icon>
+                  <template #content>
+                    <div class="mcr-tooltip-content">
+                      <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
+                      <div>MCR: {{ getMcrPackage(row) }}</div>
+                      <div v-if="getTaskDetail(row)" class="detail-section">
+                        <div>详情:</div>
+                        <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
+                      </div>
+                    </div>
+                  </template>
+                  <el-tag 
+                    :type="getMcrStatusType(row)" 
+                    size="small"
+                    class="mcr-status-tag"
+                  >
+                    {{ getMcrStatusText(row) }}
+                  </el-tag>
+                </el-tooltip>
+                <el-icon 
+                  v-if="getMcrStatus(row) === 'running'" 
+                  class="loading-spinner"
+                >
+                  <Loading />
+                </el-icon>
+              </template>
             </div>
             <span v-else class="empty-text">-</span>
           </template>
@@ -853,7 +860,7 @@
             <el-button 
               type="primary" 
               @click="handleResetMcr" 
-              :loading="resetMcrLoading"
+              :loading="upgradeMcrLoading"
               :disabled="!selectedMcrFile"
               size="large"
               class="confirm-btn"
@@ -967,7 +974,7 @@ const followLoading = ref<Record<string, boolean>>({})
 // MCR包更新相关
 const updateMcrDialogVisible = ref(false)
 const mcrLoading = ref(false)
-const resetMcrLoading = ref(false)
+const upgradeMcrLoading = ref(false)
 const fileList = ref<any[]>([])
 const currentPath = ref('/auto/asic-dump/meta_release')
 const selectedMcrFile = ref('')
@@ -992,7 +999,8 @@ const getMcrStatusText = (device: ServerDetailResponse) => {
     'pending': '等待中',
     'running': getStageText(stage),
     'finished': '更新完成',
-    'failed': '更新失败'
+    'failed': '更新失败',
+    'reboot_timeout': '重启超时'  // 新增状态
   }
   
   return statusMap[status] || status
@@ -1009,6 +1017,9 @@ const getStageText = (stage: string) => {
     'getting_mcr': '下载MCR包',
     'uninstalling_mcr': '卸载旧MCR',
     'installing_mcr': '安装新MCR',
+    'upgrading_fw': '升级固件',    // 新增阶段
+    'erasing_bdf': '擦拭设备',      // 新增阶段
+    'reboot': '热重启',              // 新增阶段
     'waiting': '等待中'
   }
   return stageMap[stage] || stage
@@ -1020,7 +1031,8 @@ const getMcrStatusType = (device: ServerDetailResponse) => {
     'pending': 'info',
     'running': 'warning',
     'finished': 'success',
-    'failed': 'danger'
+    'failed': 'danger',
+    'reboot_timeout': 'danger'  // 新增状态类型
   }
   return typeMap[status] || 'info'
 }
@@ -1069,14 +1081,60 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
     // 更新状态映射
     taskStatusMap.value[device.task_id] = taskStatus
     
-    // 如果状态是running，继续轮询
+    // 检查任务是否超时（超过1小时）
+    const taskStartTime = new Date(taskStatus.timestamp).getTime()
+    const currentTime = new Date().getTime()
+    const taskDuration = currentTime - taskStartTime
+    const oneHour = 60 * 60 * 1000 // 1小时的毫秒数
+    
+    if (taskDuration > oneHour && taskStatus.status === 'running') {
+      console.warn(`任务 ${device.task_id} 已运行超过1小时，停止轮询`)
+      // 更新状态为超时
+      taskStatusMap.value[device.task_id] = {
+        ...taskStatus,
+        status: 'failed',
+        detail: '任务执行超时（超过1小时）'
+      }
+      
+      // 清除定时器
+      if (taskStatusTimers.value[device.id!]) {
+        clearTimeout(taskStatusTimers.value[device.id!])
+        delete taskStatusTimers.value[device.id!]
+      }
+      return
+    }
+    
+    // 如果状态是running，根据阶段设置不同的轮询间隔
     if (taskStatus.status === 'running') {
+      let queryInterval = 5000 // 默认5秒
+      
+      if (taskStatus.stage === 'getting_mcr') {
+        // 对于getting_mcr阶段，前5秒使用1秒间隔，之后使用5秒间隔
+        const gettingMcrDuration = currentTime - taskStartTime
+        queryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
+      } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr') {
+        // 对于卸载和安装阶段，使用15秒间隔
+        queryInterval = 15000
+      } else if (taskStatus.stage === 'upgrading_fw') {
+        // 固件升级阶段，使用5秒间隔
+        queryInterval = 5000
+      } else if (taskStatus.stage === 'erasing_bdf') {
+        // 清理BDF阶段，使用1秒间隔
+        queryInterval = 1000
+      } else if (taskStatus.stage === 'reboot') {
+        // 重启阶段，使用20秒间隔
+        queryInterval = 20000
+      }
+      
+      // 清除之前的定时器
       if (taskStatusTimers.value[device.id!]) {
         clearTimeout(taskStatusTimers.value[device.id!])
       }
+      
+      // 设置新的定时器
       taskStatusTimers.value[device.id!] = setTimeout(() => {
         queryTaskStatus(device)
-      }, 5000)
+      }, queryInterval)
     } else {
       // 状态不是running，清除定时器
       if (taskStatusTimers.value[device.id!]) {
@@ -1086,11 +1144,37 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
     }
   } catch (error) {
     console.error(`查询任务状态失败: ${device.task_id}`, error)
-    // 查询失败也清除定时器，避免无限重试
+    
+    // 查询失败时，根据当前阶段设置重试间隔
+    let retryInterval = 5000 // 默认5秒
+    
+    const currentStatus = taskStatusMap.value[device.task_id]
+    if (currentStatus) {
+      if (currentStatus.stage === 'getting_mcr') {
+        const taskStartTime = new Date(currentStatus.timestamp).getTime()
+        const currentTime = new Date().getTime()
+        const gettingMcrDuration = currentTime - taskStartTime
+        retryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
+      } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr') {
+        retryInterval = 15000
+      } else if (currentStatus.stage === 'upgrading_fw') {
+        retryInterval = 5000
+      } else if (currentStatus.stage === 'erasing_bdf') {
+        retryInterval = 1000
+      } else if (currentStatus.stage === 'reboot') {
+        retryInterval = 20000
+      }
+    }
+    
+    // 查询失败也清除之前的定时器
     if (taskStatusTimers.value[device.id!]) {
       clearTimeout(taskStatusTimers.value[device.id!])
-      delete taskStatusTimers.value[device.id!]
     }
+    
+    // 设置重试
+    taskStatusTimers.value[device.id!] = setTimeout(() => {
+      queryTaskStatus(device)
+    }, retryInterval)
   }
 }
 
@@ -1290,7 +1374,7 @@ const handleResetMcr = async () => {
   if (!currentDevice.value || !selectedMcrFile.value) return
 
   try {
-    resetMcrLoading.value = true
+    upgradeMcrLoading.value = true
     
     await ElMessageBox.confirm(
       `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新服务器 "${currentDevice.value.bmc.hostname}" 吗？\n更新选项: ${getUpdateOptionText(updateOption.value)}`,
@@ -1303,7 +1387,7 @@ const handleResetMcr = async () => {
     )
 
     // 调用重置MCR接口
-    const response = await deviceApi.resetMcr(currentDevice.value.id!, selectedMcrFile.value, updateOption.value)
+    const response = await deviceApi.upgradeMcr(currentDevice.value.id!, selectedMcrFile.value, updateOption.value)
     
     // 更新当前设备的task_id
     const deviceIndex = devices.value.findIndex(d => d.id === currentDevice.value!.id)
@@ -1338,7 +1422,7 @@ const handleResetMcr = async () => {
     }
     ElMessage.error(error.response?.data?.detail || '更新MCR包失败')
   } finally {
-    resetMcrLoading.value = false
+    upgradeMcrLoading.value = false
   }
 }
 
@@ -2469,15 +2553,6 @@ const loadData = async () => {
     // 为有task_id的设备启动状态查询
     data.forEach(device => {
       if (device.task_id) {
-        // 先设置一个初始状态
-        taskStatusMap.value[device.task_id] = {
-          id: device.task_id,
-          server_id: device.id!,
-          status: 'pending',
-          stage: 'waiting',
-          detail: '状态查询中...',
-          timestamp: new Date().toISOString()
-        }
         // 启动状态查询
         queryTaskStatus(device)
       }

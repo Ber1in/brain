@@ -113,34 +113,41 @@
         >
           <template #default="{ row }">
             <div v-if="row.task_id" class="mcr-status">
-              <el-tooltip
-                placement="top"
-                popper-class="mcr-status-tooltip"
-              >
-                <template #content>
-                  <div class="mcr-tooltip-content">
-                    <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
-                    <div>MCR: {{ getMcrPackage(row) }}</div>
-                    <div v-if="getTaskDetail(row)" class="detail-section">
-                      <div>详情:</div>
-                      <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
-                    </div>
-                  </div>
-                </template>
-                <el-tag 
-                  :type="getMcrStatusType(row)" 
-                  size="small"
-                  class="mcr-status-tag"
+              <template v-if="!taskStatusMap[row.task_id]">
+                <!-- 状态查询中 -->
+                <el-icon class="loading-spinner"><Loading /></el-icon>
+                <span class="status-text">查询中...</span>
+              </template>
+              <template v-else>
+                <el-tooltip
+                  placement="top"
+                  popper-class="mcr-status-tooltip"
                 >
-                  {{ getMcrStatusText(row) }}
-                </el-tag>
-              </el-tooltip>
-              <el-icon 
-                v-if="getMcrStatus(row) === 'running'" 
-                class="loading-spinner"
-              >
-                <Loading />
-              </el-icon>
+                  <template #content>
+                    <div class="mcr-tooltip-content">
+                      <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
+                      <div>MCR: {{ getMcrPackage(row) }}</div>
+                      <div v-if="getTaskDetail(row)" class="detail-section">
+                        <div>详情:</div>
+                        <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
+                      </div>
+                    </div>
+                  </template>
+                  <el-tag 
+                    :type="getMcrStatusType(row)" 
+                    size="small"
+                    class="mcr-status-tag"
+                  >
+                    {{ getMcrStatusText(row) }}
+                  </el-tag>
+                </el-tooltip>
+                <el-icon 
+                  v-if="getMcrStatus(row) === 'running'" 
+                  class="loading-spinner"
+                >
+                  <Loading />
+                </el-icon>
+              </template>
             </div>
             <span v-else class="empty-text">-</span>
           </template>
@@ -407,7 +414,7 @@
             <el-button 
               type="primary" 
               @click="handleResetMcr" 
-              :loading="resetMcrLoading"
+              :loading="upgradeMcrLoading"
               :disabled="!selectedMcrFile"
               size="large"
               class="confirm-btn"
@@ -485,7 +492,7 @@ const selectedServers = ref<MVServer[]>([])
 // MCR包更新相关
 const updateMcrDialogVisible = ref(false)
 const mcrLoading = ref(false)
-const resetMcrLoading = ref(false)
+const upgradeMcrLoading = ref(false)
 const fileList = ref<any[]>([])
 const currentPath = ref('/auto/asic-dump/meta_release')
 const selectedMcrFile = ref('')
@@ -505,12 +512,14 @@ const currentServer = ref<(MVServer & {
 
 // MCR状态相关方法
 const getMcrStatus = (server: MVServer): string => {
-  if (!server.task_id) return ''
+  if (!server.task_id || !taskStatusMap.value[server.task_id]) return ''
   return taskStatusMap.value[server.task_id]?.status || ''
 }
 
 const getMcrStatusText = (server: MVServer) => {
   const status = getMcrStatus(server)
+  if (!status) return '查询中...'
+  
   const stage = taskStatusMap.value[server.task_id!]?.stage || ''
   
   const statusMap: Record<string, string> = {
@@ -519,13 +528,13 @@ const getMcrStatusText = (server: MVServer) => {
     'finished': '更新完成',
     'failed': '更新失败'
   }
-  
+  console.log(statusMap[status])
   return statusMap[status] || status
 }
 
 // 获取 MCR 包信息
 const getMcrPackage = (server: MVServer): string => {
-  if (!server.task_id) return '-'
+  if (!server.task_id || !taskStatusMap.value[server.task_id]) return '-'
   return taskStatusMap.value[server.task_id]?.mcr || '-'
 }
 
@@ -541,6 +550,8 @@ const getStageText = (stage: string) => {
 
 const getMcrStatusType = (server: MVServer) => {
   const status = getMcrStatus(server)
+  if (!status) return 'info' // 查询中显示info类型
+  
   const typeMap: Record<string, any> = {
     'pending': 'info',
     'running': 'warning',
@@ -550,14 +561,15 @@ const getMcrStatusType = (server: MVServer) => {
   return typeMap[status] || 'info'
 }
 
+
 const getTaskStage = (server: MVServer): string => {
-  if (!server.task_id) return ''
+  if (!server.task_id || !taskStatusMap.value[server.task_id]) return ''
   return taskStatusMap.value[server.task_id]?.stage || ''
 }
 
 // 获取任务详情
 const getTaskDetail = (server: MVServer): string => {
-  if (!server.task_id) return ''
+  if (!server.task_id || !taskStatusMap.value[server.task_id]) return ''
   return taskStatusMap.value[server.task_id]?.detail || ''
 }
 
@@ -594,14 +606,51 @@ const queryTaskStatus = async (server: MVServer) => {
     // 更新状态映射
     taskStatusMap.value[server.task_id] = taskStatus
     
-    // 如果状态是running，继续轮询
+    // 检查任务是否超时（超过1小时）
+    const taskStartTime = new Date(taskStatus.timestamp).getTime()
+    const currentTime = new Date().getTime()
+    const taskDuration = currentTime - taskStartTime
+    const oneHour = 60 * 60 * 1000 // 1小时的毫秒数
+    
+    if (taskDuration > oneHour && taskStatus.status === 'running') {
+      console.warn(`任务 ${server.task_id} 已运行超过1小时，停止轮询`)
+      // 更新状态为超时
+      taskStatusMap.value[server.task_id] = {
+        ...taskStatus,
+        status: 'failed',
+        detail: '任务执行超时（超过1小时）'
+      }
+      
+      // 清除定时器
+      if (taskStatusTimers.value[server.id]) {
+        clearTimeout(taskStatusTimers.value[server.id])
+        delete taskStatusTimers.value[server.id]
+      }
+      return
+    }
+    
+    // 如果状态是running，根据阶段设置不同的轮询间隔
     if (taskStatus.status === 'running') {
+      let queryInterval = 5000 // 默认5秒
+      
+      if (taskStatus.stage === 'getting_mcr') {
+        // 对于getting_mcr阶段，前5秒使用1秒间隔，之后使用5秒间隔
+        const gettingMcrDuration = currentTime - taskStartTime
+        queryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
+      } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr') {
+        // 对于卸载和安装阶段，使用15秒间隔
+        queryInterval = 15000
+      }
+      
+      // 清除之前的定时器
       if (taskStatusTimers.value[server.id]) {
         clearTimeout(taskStatusTimers.value[server.id])
       }
+      
+      // 设置新的定时器
       taskStatusTimers.value[server.id] = setTimeout(() => {
         queryTaskStatus(server)
-      }, 5000)
+      }, queryInterval)
     } else {
       // 状态不是running，清除定时器
       if (taskStatusTimers.value[server.id]) {
@@ -611,11 +660,31 @@ const queryTaskStatus = async (server: MVServer) => {
     }
   } catch (error) {
     console.error(`查询任务状态失败: ${server.task_id}`, error)
-    // 查询失败也清除定时器，避免无限重试
+    
+    // 查询失败时，根据当前阶段设置重试间隔
+    let retryInterval = 5000 // 默认5秒
+    
+    const currentStatus = taskStatusMap.value[server.task_id]
+    if (currentStatus) {
+      if (currentStatus.stage === 'getting_mcr') {
+        const taskStartTime = new Date(currentStatus.timestamp).getTime()
+        const currentTime = new Date().getTime()
+        const gettingMcrDuration = currentTime - taskStartTime
+        retryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
+      } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr') {
+        retryInterval = 15000
+      }
+    }
+    
+    // 查询失败也清除之前的定时器
     if (taskStatusTimers.value[server.id]) {
       clearTimeout(taskStatusTimers.value[server.id])
-      delete taskStatusTimers.value[server.id]
     }
+    
+    // 设置重试
+    taskStatusTimers.value[server.id] = setTimeout(() => {
+      queryTaskStatus(server)
+    }, retryInterval)
   }
 }
 
@@ -808,7 +877,7 @@ const handleResetMcr = async () => {
   if (!currentServer.value || !selectedMcrFile.value) return
 
   try {
-    resetMcrLoading.value = true
+    upgradeMcrLoading.value = true
     
     await ElMessageBox.confirm(
       `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新MV200 "${currentServer.value.name}" 吗？\n更新选项: ${getUpdateOptionText(updateOption.value)}`,
@@ -821,7 +890,7 @@ const handleResetMcr = async () => {
     )
 
     // 调用MV200的重置MCR接口
-    const response = await mv200Api.resetMcr(currentServer.value.id, selectedMcrFile.value, updateOption.value)
+    const response = await mv200Api.upgradeMcr(currentServer.value.id, selectedMcrFile.value, updateOption.value)
     
     // 更新当前设备的task_id
     const serverIndex = servers.value.findIndex(s => s.id === currentServer.value!.id)
@@ -856,7 +925,7 @@ const handleResetMcr = async () => {
     }
     ElMessage.error(error.response?.data?.detail || '更新MCR包失败')
   } finally {
-    resetMcrLoading.value = false
+    upgradeMcrLoading.value = false
   }
 }
 
@@ -1019,15 +1088,6 @@ const loadData = async () => {
     // 为有task_id的MV200启动状态查询
     servers.value.forEach(server => {
       if (server.task_id) {
-        // 先设置一个初始状态
-        taskStatusMap.value[server.task_id] = {
-          id: server.task_id,
-          server_id: server.id,
-          status: 'pending',
-          stage: 'waiting',
-          detail: '状态查询中...',
-          timestamp: new Date().toISOString()
-        }
         // 启动状态查询
         queryTaskStatus(server)
       }
@@ -1063,14 +1123,6 @@ const loadServerDetails = async () => {
 
       // 如果有task_id，启动状态查询
       if (serverDetail.task_id) {
-        taskStatusMap.value[serverDetail.task_id] = {
-          id: serverDetail.task_id,
-          server_id: server.id,
-          status: 'pending',
-          stage: 'waiting',
-          detail: '状态查询中...',
-          timestamp: new Date().toISOString()
-        }
         queryTaskStatus(servers.value[index])
       }
     } catch (error) {
