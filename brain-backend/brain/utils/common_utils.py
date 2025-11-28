@@ -544,7 +544,7 @@ async def wait_for_server_reboot(host: str, timeout: int = 900,
 
 
 async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi: str,
-                              data: common_schemas.MCRRequest):
+                              data: common_schemas.MCRRequest, aidpu: bool = False):
     try:
         # Step Group 1: Fetch MCR Package
         root_dir = await fetch_mcr_package(task_id, host, user, pwd, data.path)
@@ -582,7 +582,9 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
             LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
 
-            uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force"
+            extra_args = " --ovs-dpdk --spdk" if aidpu else ""
+            uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force{extra_args}"
+
             await ssh_execute_async(host, uninstall_cmd, user, pwd)
             LOG.info(f"[{task_id}] Old MCR uninstalled")
 
@@ -590,12 +592,16 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
             LOG.info(f"[{task_id}] Installing new MCR with option: {data.update_options}")
 
-            if data.update_options == "all":
-                install_cmd = f"cd {root_dir} && ./install.sh"
-            elif data.update_options == "no-fw":
-                install_cmd = f"cd {root_dir} && ./install.sh --no-fw-update"
+            if aidpu:
+                install_cmd = (f'cd {root_dir} &&./install.sh --ovs-dpdk --spdk '
+                               '--yun-upgrade-option "--dpu-blk-oprom --best-try" --dpuagent')
             else:
-                raise Exception("Invalid update option")
+                if data.update_options == "all":
+                    install_cmd = f"cd {root_dir} && ./install.sh"
+                elif data.update_options == "no-fw":
+                    install_cmd = f"cd {root_dir} && ./install.sh --no-fw-update"
+                else:
+                    raise Exception("Invalid update option")
 
             await ssh_execute_async(host, install_cmd, user, pwd)
             LOG.info(f"[{task_id}] New MCR installed successfully")

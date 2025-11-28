@@ -372,7 +372,7 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background
     # Run background task
     background.add_task(
         common_utils.run_mcr_update_task, task_id, server["ip_address"],
-        MV200_OS_USER, MV200_OS_PASSWORD, host_ipmi, data)
+        MV200_OS_USER, MV200_OS_PASSWORD, host_ipmi, data, aidpu=True)
     LOG.info(f"Background task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}

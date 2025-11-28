@@ -23,7 +23,7 @@ db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 
 
-@router.post("/devices", response_model=device_schemas.ServerDetailResponse)
+@router.post("/servers", response_model=device_schemas.ServerDetailResponse)
 async def create_device(data: device_schemas.ServerRequest):
     LOG.info(f"Creating server, IP: {data.device.ip}, hostname: {data.bmc.hostname}")
 
@@ -92,7 +92,7 @@ async def create_device(data: device_schemas.ServerRequest):
     return result
 
 
-@router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/servers/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_device(device_id: str):
     LOG.info(f"Deleting Server, ID: {device_id}")
     try:
@@ -125,7 +125,7 @@ async def delete_device(device_id: str):
         LOG.warning("Failed to initialize the server usage warning message.")
 
 
-@router.get("/devices", response_model=list[device_schemas.ServerDetailResponse])
+@router.get("/servers", response_model=list[device_schemas.ServerDetailResponse])
 async def get_all_devices():
     devices = db.find(SERVER_COLLECTION, {})
     for i in devices:
@@ -139,7 +139,7 @@ async def get_all_devices():
     return devices
 
 
-@router.get("/devices/{device_id}", response_model=device_schemas.ServerDetailResponse)
+@router.get("/servers/{device_id}", response_model=device_schemas.ServerDetailResponse)
 async def get_device(device_id: str):
     LOG.info(f"Fetching device, ID: {device_id}")
     try:
@@ -158,7 +158,7 @@ async def get_device(device_id: str):
     return device
 
 
-@router.put("/devices/{device_id}", response_model=device_schemas.ServerDetailResponse)
+@router.put("/servers/{device_id}", response_model=device_schemas.ServerDetailResponse)
 async def update_device(
     device_id: str,
     data: device_schemas.ServerUpdateRequest,
@@ -284,7 +284,7 @@ async def update_device(
     return server
 
 
-@router.get("/devices/{server_id}/boot-entries",
+@router.get("/servers/{server_id}/boot-entries",
             response_model=device_schemas.BootEntriesResponse)
 async def get_boot_entries(server_id: str):
     """
@@ -316,7 +316,7 @@ async def get_boot_entries(server_id: str):
     }
 
 
-@router.post("/devices/{server_id}/set-boot")
+@router.post("/servers/{server_id}/set-boot")
 async def set_boot_entry(
     server_id: str, 
     boot_id: str = Query(...),
@@ -364,7 +364,7 @@ async def set_boot_entry(
                         f"{' (default updated)' if set_default else ''}")}
 
 
-@router.post("/devices/{server_id}/power-cycle")
+@router.post("/servers/{server_id}/power-cycle")
 async def power_cycle_server(server_id: str):
     """
     Power cycle bare metal server via BMC
@@ -384,7 +384,7 @@ async def power_cycle_server(server_id: str):
     return {"message": f"Server {server_id} power cycled via BMC {bmcip}"}
 
 
-@router.post("/devices/{server_id}/power-reset")
+@router.post("/servers/{server_id}/power-reset")
 async def power_reset_server(server_id: str):
     """
     Warm reset bare metal server via BMC
@@ -404,7 +404,7 @@ async def power_reset_server(server_id: str):
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}
 
 
-@router.post("/devices/{server_id}/update_mcr", status_code=202)
+@router.post("/servers/{server_id}/update_mcr", status_code=202)
 async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
     LOG.info("Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")

@@ -164,7 +164,7 @@
           prop="notes" 
           label="备注"
           show-overflow-tooltip
-          min-width="245"
+          min-width="240"
         >
           <template #default="{ row }">
             <span v-if="row.notes">{{ row.notes }}</span>

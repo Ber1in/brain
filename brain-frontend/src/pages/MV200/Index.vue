@@ -392,16 +392,6 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <!-- 左侧添加更新选项 -->
-          <div class="update-options-left">
-            <span class="options-label">更新选项：</span>
-            <el-radio-group v-model="updateOption" size="large">
-              <el-radio label="all">全部更新</el-radio>
-              <el-radio label="fw">只更新固件</el-radio>
-              <el-radio label="no-fw">不更新固件</el-radio>
-            </el-radio-group>
-          </div>
-          
           <!-- 右侧按钮 -->
           <div class="footer-buttons">
             <el-button 
@@ -498,7 +488,6 @@ const currentPath = ref('/auto/asic-dump/meta_release')
 const selectedMcrFile = ref('')
 const fileFilterText = ref('')
 const directoryCache = ref<Record<string, any[]>>({})
-const updateOption = ref<'all' | 'fw' | 'no-fw'>('all')
 const currentPathInput = ref('')
 const taskStatusMap = ref<Record<string, TaskStatusResponse>>({})
 const taskStatusTimers = ref<Record<string, number>>({})
@@ -880,7 +869,7 @@ const handleResetMcr = async () => {
     upgradeMcrLoading.value = true
     
     await ElMessageBox.confirm(
-      `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新MV200 "${currentServer.value.name}" 吗？\n更新选项: ${getUpdateOptionText(updateOption.value)}`,
+      `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新MV200 "${currentServer.value.name}" 吗？`,
       '确认更新MCR包',
       {
         type: 'warning',
@@ -889,8 +878,8 @@ const handleResetMcr = async () => {
       }
     )
 
-    // 调用MV200的重置MCR接口
-    const response = await mv200Api.upgradeMcr(currentServer.value.id, selectedMcrFile.value, updateOption.value)
+    // 调用MV200的重置MCR接口，去掉updateOption参数
+    const response = await mv200Api.upgradeMcr(currentServer.value.id, selectedMcrFile.value)
     
     // 更新当前设备的task_id
     const serverIndex = servers.value.findIndex(s => s.id === currentServer.value!.id)
@@ -917,7 +906,6 @@ const handleResetMcr = async () => {
     // 重置状态
     selectedMcrFile.value = ''
     currentPath.value = '/auto'
-    updateOption.value = 'all'
     
   } catch (error: any) {
     if (error === 'cancel' || error === 'close') {
@@ -937,16 +925,6 @@ onUnmounted(() => {
   taskStatusTimers.value = {}
   taskStatusMap.value = {}
 })
-
-// 添加更新选项文本显示
-const getUpdateOptionText = (option: string) => {
-  const optionsMap = {
-    'all': '全部更新',
-    'fw': '只更新固件',
-    'no-fw': '不更新固件'
-  }
-  return optionsMap[option as keyof typeof optionsMap] || option
-}
 
 // IP地址排序函数 - 正确的数值比较
 const ipSortMethod = (a: MVServer, b: MVServer) => {
@@ -1528,30 +1506,9 @@ onMounted(() => {
 /* 对话框底部 */
 .dialog-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   width: 100%;
-}
-
-.update-options-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.options-label {
-  font-size: 14px;
-  color: #606266;
-  font-weight: 500;
-}
-
-:deep(.update-options-left .el-radio-group) {
-  display: flex;
-  gap: 20px;
-}
-
-:deep(.update-options-left .el-radio) {
-  margin-right: 0;
 }
 
 .footer-buttons {

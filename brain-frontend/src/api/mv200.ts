@@ -22,10 +22,9 @@ export const mv200Api = {
     return apiClient.delete(`/mv-servers/${id}`)
   },
 
-  upgradeMcr(serverId: string, mcrFilePath: string, updateOptions: 'all' | 'fw' | 'no-fw' = 'all'): Promise<void> {
+  upgradeMcr(serverId: string, mcrFilePath: string): Promise<void> {
     const data: MCRRequest = {
-      path: mcrFilePath,
-      update_options: updateOptions
+      path: mcrFilePath
     }
     return apiClient.post(`/mv-servers/${serverId}/update_mcr`, data)
   },

@@ -4,32 +4,32 @@ import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntr
 export const deviceApi = {
   // 获取所有设备
   getAll(): Promise<ServerDetailResponse[]> {
-    return apiClient.get('/api/devices')
+    return apiClient.get('/api/servers')
   },
 
   // 获取设备详情
   getById(id: string): Promise<ServerDetailResponse> {
-    return apiClient.get(`/api/devices/${id}`)
+    return apiClient.get(`/api/servers/${id}`)
   },
 
   // 创建设备
   create(data: ServerRequest): Promise<ServerDetailResponse> {
-    return apiClient.post('/api/devices', data)
+    return apiClient.post('/api/servers', data)
   },
 
   // 更新设备
   update(id: string, data: ServerUpdateRequest): Promise<ServerDetailResponse> {
-    return apiClient.put(`/api/devices/${id}`, data)
+    return apiClient.put(`/api/servers/${id}`, data)
   },
 
   // 删除设备
   delete(id: string): Promise<void> {
-    return apiClient.delete(`/api/devices/${id}`)
+    return apiClient.delete(`/api/servers/${id}`)
   },
 
   // 获取启动项（支持使用保存的凭据）
   getBootEntries(serverId: string): Promise<BootEntriesResponse> {
-    return apiClient.get(`/api/devices/${serverId}/boot-entries`, { cache: false })
+    return apiClient.get(`/api/servers/${serverId}/boot-entries`, { cache: false })
   },
 
   
@@ -43,15 +43,15 @@ export const deviceApi = {
       boot_id: bootId,
       set_default: setDefault
     }
-    return apiClient.post(`/api/devices/${serverId}/set-boot`, null, { params })
+    return apiClient.post(`/api/servers/${serverId}/set-boot`, null, { params })
   },
 
   powerCycle(serverId: string): Promise<void> {
-    return apiClient.post(`/api/devices/${serverId}/power-cycle`)
+    return apiClient.post(`/api/servers/${serverId}/power-cycle`)
   },
 
   powerReset(serverId: string): Promise<void> {
-    return apiClient.post(`/api/devices/${serverId}/power-reset`)
+    return apiClient.post(`/api/servers/${serverId}/power-reset`)
   },
 
   upgradeMcr(serverId: string, mcrFilePath: string, updateOptions: 'all' | 'fw' | 'no-fw' = 'all'): Promise<void> {
@@ -59,14 +59,14 @@ export const deviceApi = {
       path: mcrFilePath,
       update_options: updateOptions
     }
-    return apiClient.post(`/api/devices/${serverId}/update_mcr`, data)
+    return apiClient.post(`/api/servers/${serverId}/update_mcr`, data)
   },
 
   resetFw(serverId: string, mcrFilePath: string): Promise<void> {
     const data: ResetFwRequest = {
       path: mcrFilePath
     }
-    return apiClient.post(`/api/devices/${serverId}/reset_fw`, data)
+    return apiClient.post(`/api/servers/${serverId}/reset_fw`, data)
   },
 
 }

@@ -167,7 +167,7 @@ export interface ResetFwRequest {
 
 export interface MCRRequest {
   path: string
-  update_options: 'all' | 'fw' | 'no-fw'
+  update_options?: 'all' | 'fw' | 'no-fw'
 }
 
 export interface TaskStatusResponse {

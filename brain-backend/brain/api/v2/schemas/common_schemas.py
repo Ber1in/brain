@@ -1,7 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 
 
@@ -40,4 +40,4 @@ class ResetFwRequest(BaseModel):
 
 
 class MCRRequest(ResetFwRequest):
-    update_options: str
+    update_options: str = Field("all")
