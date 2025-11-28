@@ -38,6 +38,7 @@ class ExecuteNicInfo(BaseModel):
     iface: str
     bdf: str
     type: str
+    mac: str
 
 
 class Server(BaseModel):

@@ -10,6 +10,7 @@ import gitlab
 import git
 import logging
 import yaml
+import pytest
 from fastapi import APIRouter, Depends, HTTPException
 
 from brain.auth import authenticate_user
@@ -33,36 +34,36 @@ BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
 
 
-def get_user_repo_dir(user: str) -> str:
+async def get_user_repo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
     user_repo_dir = os.path.join(TEST_DATA_DIR, user, "yuntester")
     os.makedirs(os.path.dirname(user_repo_dir), exist_ok=True)
     return user_repo_dir
 
 
-def get_user_log_dir(user: str) -> str:
+async def get_user_log_dir(user: str) -> str:
     """Return the repo directory for the given user."""
     logs_dir = os.path.join(TEST_DATA_DIR, user, "logs")
     os.makedirs(logs_dir, exist_ok=True)
     return logs_dir
 
 
-def get_user_topo_dir(user: str) -> str:
+async def get_user_topo_dir(user: str) -> str:
     """Return the repo directory for the given user."""
     topo_dir = os.path.join(TEST_DATA_DIR, user, "topo")
     os.makedirs(topo_dir, exist_ok=True)
     return topo_dir
 
 
-def get_user_result_dir(user: str) -> str:
+async def get_user_result_dir(user: str) -> str:
     """Return the repo directory for the given user."""
     result_dir = os.path.join(TEST_DATA_DIR, user, "results")
     os.makedirs(result_dir, exist_ok=True)
     return result_dir
 
 
-def get_current_code_and_commit(user):
-    user_repo_dir = get_user_repo_dir(user)
+async def get_current_code_and_commit(user):
+    user_repo_dir = await get_user_repo_dir(user)
     repo = git.Repo(user_repo_dir)
 
     if repo.head.is_detached:
@@ -79,7 +80,7 @@ def get_current_code_and_commit(user):
 
 
 @router.get("/yuntester/branchs-tags", response_model=yuntester_schemas.BranchAndTagResponse)
-def get_repo_branches_and_tags(user=Depends(authenticate_user)):
+async def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
     LOG.info(f"Query branch and tag information for {user}")
     gl.auth()
@@ -95,7 +96,7 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
     for tag in project.tags.list(all=True):
         tags.append(tag.name)
 
-    user_repo_dir = get_user_repo_dir(user)
+    user_repo_dir = await get_user_repo_dir(user)
 
     try:
         if not os.path.exists(user_repo_dir):
@@ -106,7 +107,7 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
         else:
             LOG.debug("Repo exists, skip cloning")
 
-        current, latest_commit = get_current_code_and_commit(user)
+        current, latest_commit = await get_current_code_and_commit(user)
         LOG.info(f"current={current} latest={latest_commit}")
 
     except Exception as e:
@@ -123,12 +124,13 @@ def get_repo_branches_and_tags(user=Depends(authenticate_user)):
 
 
 @router.post("/yuntester/switch", status_code=204)
-def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest, user=Depends(authenticate_user)):
+async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
+                               user=Depends(authenticate_user)):
     LOG.info(f"{user} witching to branch={data.branch} tag={data.tag}")
 
     try:
-        repo_path = get_user_repo_dir(user)
-        repo = git.Repo(repo_path)
+        user_repo_dir = await get_user_repo_dir(user)
+        repo = git.Repo(user_repo_dir)
 
         repo.git.fetch("--all", "--tags")
         LOG.info("Fetch completed")
@@ -163,27 +165,29 @@ def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest, user=Depends(a
 
 
 @router.post("/yuntester/commands", response_model=yuntester_schemas.CasesResponse)
-def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest, user=Depends(authenticate_user)):
+async def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest, 
+                         user=Depends(authenticate_user)):
     LOG.info(f"{user} collecting tests from: {data.dirs}")
 
+    user_repo_dir = await get_user_repo_dir(user)
     commands = collect_tests_with_detailed_report(
-        data.dirs,
-        get_user_repo_dir(user)
+        data.dirs, user_repo_dir
     )
     return {"cases": commands}
 
 
 @router.post("/yuntester/execute-cases", response_model=yuntester_schemas.ExecuteResponse)
-def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
+async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
 
     def normalize_nic_type(t: str) -> str:
         t = t or ""
         if t == "metaScale-200 OCP3.0":
             return "ms200-ocp3.0"
-        return t.split("-")[0].lower()
+        return t.split("-")[0].upper()
 
-    clients = []
+    clients = {}
 
+    host_num = 0
     for server in data.servers:
         server_info = db.find_one(SERVER_COLLECTION, {"id": server.device_id})
         client_info = {
@@ -191,6 +195,7 @@ def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authentic
             "username": server_info["device"]["username"],
             "password": server_info["device"]["password"],
             "keyfile": "/root/.ssh/id_rsa",
+            "ssh_port": 22,
             "ipmi": {
                 "ip": server_info["bmc"]["ip"],
                 "username": BMC_USER,
@@ -203,22 +208,28 @@ def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authentic
             nic_info = {
                 "ifname": nic.iface,
                 "bdf": nic.bdf,
-                "type": normalize_nic_type(nic.type)
+                "type": normalize_nic_type(nic.type),
+                "mac": nic.mac
             }
             nics.append(nic_info)
         if nics:
             client_info["nics"] = nics
-        clients.append(client_info)
+        host_num += 1
+        clients[f"host{host_num}"] = client_info
 
-    env_info = {"yaml_version": "v1", "clients": clients}
+    env_info = {"yaml_version": "v1"}
+    env_info.update(clients)
 
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     dt = start_time.replace("-", "").replace(" ", "_").replace(":", "")
     env_topo_filename = dt + ".yaml"
     log_filename = dt + ".log"
 
-    env_topo_path = os.path.join(get_user_topo_dir(user), env_topo_filename)
-    log_path = os.path.join(get_user_log_dir(user), log_filename)
+    user_topo_dir = await get_user_topo_dir(user)
+    env_topo_path = os.path.join(user_topo_dir, env_topo_filename)
+    user_log_dir = await get_user_log_dir(user)
+    log_path = os.path.join(user_log_dir, log_filename)
+    result_path = ""
 
     try:
         with open(env_topo_path, "w") as f:
@@ -228,9 +239,12 @@ def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authentic
         LOG.error("Failed to save YAML: %s", str(e))
         raise HTTPException(status_code=500, detail="Failed to save YAML")
 
-    # pytest -s -v    xxx/xxx/xx.py::xxxx:xxx      --env_config xxxx.yaml  --alluredir= xxx/xxxx/xxxx
+    for case in data.cases:
+        args = ["-s", "-v", case, "--log-file", log_path, "--log-file-mode", "a",
+                "--env", env_topo_path, "--alluredir", result_path]
+        pytest.main(args=args)
 
-    current, latest_commit = get_current_code_and_commit(user)
+    current, latest_commit = await get_current_code_and_commit(user)
     record = {"url": f"/qa-auto-files/{user}/results/tmp_report.html", 
               "time": start_time,
               "current": current,
@@ -246,7 +260,7 @@ def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authentic
 
 
 @router.get("/yuntester/execute-history", response_model=List[yuntester_schemas.ExecuteResponse])
-def execute_history(user=Depends(authenticate_user)):
+async def execute_history(user=Depends(authenticate_user)):
     """Retrieve execution history for the authenticated user."""
 
     LOG.info(f"Fetching execution history for user={user}")
@@ -258,7 +272,7 @@ def execute_history(user=Depends(authenticate_user)):
 
 @router.get("/yuntester/custom-combinations", 
             response_model=List[yuntester_schemas.CaseCombinationsResponse])
-def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
+async def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
     """There are many user-defined sets of test cases, and the current interface
     is used to query these combinations."""
 
@@ -270,7 +284,7 @@ def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)):
 
 
 @router.post("/yuntester/custom-combinations", status_code=204)
-def save_custom_combinations_of_test_cases(
+async def save_custom_combinations_of_test_cases(
         data: yuntester_schemas.CaseCombinationsRequest, user=Depends(authenticate_user)):
     """
     Save a new user-defined combination of test cases.
@@ -292,7 +306,7 @@ def save_custom_combinations_of_test_cases(
 
 
 @router.delete("/yuntester/custom-combinations/{combination_id}", status_code=204)
-def delete_custom_combination(combination_id: str):
+async def delete_custom_combination(combination_id: str):
     """
     Delete a user-defined combination of test cases by its ID.
 
@@ -318,15 +332,15 @@ def delete_custom_combination(combination_id: str):
 
 
 @router.get("/yuntester/directory-tree")
-def get_directory_tree(user=Depends(authenticate_user)):
+async def get_directory_tree(user=Depends(authenticate_user)):
     """Get the directory tree of the test code repository (recursive scan, directory-only).
     Node 'name' contains only the current directory name.
     Returned 'path' strips the user repo prefix.
     """
 
-    user_repo_dir = get_user_repo_dir(user)
+    user_repo_dir = await get_user_repo_dir(user)
     base_path = Path(user_repo_dir)
-    products_path = base_path / "products"
+    products_path = base_path / "testcase"
 
     LOG.info(f"Building directory tree for user={user} at base_path={products_path}")
 

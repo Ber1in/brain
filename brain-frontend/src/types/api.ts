@@ -370,6 +370,7 @@ export interface CaseNicInfo {
   iface: string
   bdf: string
   type?: string
+  mac?: string
 }
 
 export interface Server {

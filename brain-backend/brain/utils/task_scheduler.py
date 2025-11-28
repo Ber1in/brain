@@ -19,7 +19,7 @@ from brain.utils.ssh_client import ssh_execute
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 WEBHOOK_URL = (
-    "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/51053ced-7d61-4645-95df-f0c6ac3f67a7")
+    "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/860b5b73-c26f-4520-91be-d13c4f57a2e3")
 SMTP_CONFIG = {
     "host": "smtp.feishu.cn",
     "port": 465,

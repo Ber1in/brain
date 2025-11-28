@@ -227,7 +227,7 @@
                 <template #default="{ row }">
                   <el-link 
                     v-if="row.log" 
-                    :href="row.log" 
+                    :href="generateFileUrl(row.log)" 
                     target="_blank" 
                     type="success"
                     :underline="false"
@@ -1847,20 +1847,20 @@ const getTestCaseName = (fullPath: string): string => {
 const buildTestCasesTree = (cases: string[]) => {
   const root: any = {
     id: 'root',
-    label: 'products',
+    label: 'testcase',
     type: 'directory',
     children: [],
     testCaseCount: 0
   }
   
   cases.forEach(testCase => {
-    const path = testCase.replace(/^products\//, '')
+    const path = testCase.replace(/^testcase\//, '')
     const parts = path.split('::')
     
     let currentLevel = root
     const pathParts = parts[0].split('/')
     
-    let currentPath = 'products'
+    let currentPath = 'testcase'
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i]
       const isLastPath = i === pathParts.length - 1
@@ -2610,7 +2610,8 @@ const handleExecuteConfirm = async () => {
                 const caseNicInfo: CaseNicInfo = {
                   iface: nicInfo.iface,
                   bdf: nicInfo.bdf,
-                  type: nic.type
+                  type: nic.type,
+                  mac: nicInfo.mac
                 }
                 selectedNics.push(caseNicInfo)
               }

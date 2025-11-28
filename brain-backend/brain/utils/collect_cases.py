@@ -2,7 +2,6 @@
 # All rights reserved.
 
 import os
-import re
 import subprocess
 import fnmatch
 import logging
@@ -45,7 +44,7 @@ def collect_tests_with_detailed_report(dirs: list, root_dir):
             LOG.warning(f"Skipped missing directory: {test_dir}")
             continue
 
-        cmd = ["pytest", "--collect-only", "-q", test_dir]
+        cmd = ["pytest", "--collect-only", "-q", test_dir, "--env", r'\"\"']
         try:
             result = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=os.environ
@@ -54,7 +53,7 @@ def collect_tests_with_detailed_report(dirs: list, root_dir):
 
             if result.returncode == 0:
                 output = stdout.decode('utf-8')
-                tests = parse_pytest_output_improved(output, test_dir, root_dir, scanned_tests)
+                tests = parse_pytest_output_improved(output)
                 scanned_tests.extend(tests)
                 LOG.info(f"Collected {len(tests)} tests from {test_dir}")
             else:
@@ -108,51 +107,14 @@ def contains_test_files(directory):
     return 'conftest.py' in files
 
 
-def parse_pytest_output_improved(output, base_dir, root_dir, existing_tests):
+def parse_pytest_output_improved(output):
     """Parse pytest output to extract test cases with full paths"""
     tests = []
-    current_file = ""
-    current_class = ""
 
     for line in output.split('\n'):
         line = line.strip()
-        if not line or 'no tests ran' in line or '===' in line:
+        if "::" not in line:
             continue
-
-        if line.startswith('<Package '):
-            current_file = ""
-            current_class = ""
-        elif line.startswith('<Module '):
-            module_match = re.search(r'<Module\s+([^>]+\.py)>', line)
-            if module_match:
-                file_name = module_match.group(1)
-                current_file = (
-                    os.path.join(base_dir, file_name)
-                    if not os.path.isabs(file_name)
-                    else file_name
-                )
-                current_class = ""
-        elif line.startswith('<Class '):
-            class_match = re.search(r'<Class\s+([^>]+)>', line)
-            if class_match:
-                current_class = class_match.group(1)
-        elif line.startswith('<Function '):
-            func_match = re.search(r'<Function\s+([^>]+)>', line)
-            if func_match and current_file:
-                test_name = func_match.group(1)
-                rel_file_path = (
-                    os.path.relpath(current_file, root_dir)
-                    if current_file.startswith(root_dir)
-                    else current_file
-                )
-                if current_class:
-                    full_test_path = f"{rel_file_path}::{current_class}::{test_name}"
-                else:
-                    full_test_path = f"{rel_file_path}::{test_name}"
-
-                if full_test_path not in existing_tests:
-                    tests.append(full_test_path)
+        tests.append(line)
 
     return tests
-
-

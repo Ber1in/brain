@@ -579,14 +579,14 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 
         else:
             # Step Group 2: Uninstall Old MCR
-            update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
-            LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
+            # update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
+            # LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
 
-            extra_args = " --ovs-dpdk --spdk" if aidpu else ""
-            uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force{extra_args}"
+            # extra_args = " --ovs-dpdk --spdk" if aidpu else ""
+            # uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force{extra_args}"
 
-            await ssh_execute_async(host, uninstall_cmd, user, pwd)
-            LOG.info(f"[{task_id}] Old MCR uninstalled")
+            # await ssh_execute_async(host, uninstall_cmd, user, pwd)
+            # LOG.info(f"[{task_id}] Old MCR uninstalled")
 
             # Step Group 3: Install New MCR
             update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
@@ -597,9 +597,9 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
                                '--yun-upgrade-option "--dpu-blk-oprom --best-try" --dpuagent')
             else:
                 if data.update_options == "all":
-                    install_cmd = f"cd {root_dir} && ./install.sh"
+                    install_cmd = f"cd {root_dir} && ./install.sh --force"
                 elif data.update_options == "no-fw":
-                    install_cmd = f"cd {root_dir} && ./install.sh --no-fw-update"
+                    install_cmd = f"cd {root_dir} && ./install.sh --force --no-fw-update"
                 else:
                     raise Exception("Invalid update option")
 
