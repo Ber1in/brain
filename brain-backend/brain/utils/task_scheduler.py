@@ -15,18 +15,10 @@ from typing import Dict, Callable
 
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute
+from brain.config import settings
 
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
-WEBHOOK_URL = (
-    "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/51053ced-7d61-4645-95df-f0c6ac3f67a7")
-SMTP_CONFIG = {
-    "host": "smtp.feishu.cn",
-    "port": 465,
-    "user": "yuntester@yunsilicon.com",
-    "password": "VIgB7YFDX9Y3g7Dw"
-}
-YUNTESTER_PLOTFORM = "https://yuntester.yunsilicon.com/devices"
 
 
 LOG = logging.getLogger(__name__)
@@ -344,7 +336,7 @@ def send_feishu_group_message(server_info, now=False):
                                 "tag": "button",
                                 "text": {"tag": "plain_text", "content": "🔗 登录管理页面"},
                                 "type": "primary",
-                                "url": YUNTESTER_PLOTFORM
+                                "url": f"{settings.yuntester_platform}/devices"
                             }
                         ]
                     },
@@ -366,7 +358,8 @@ def send_feishu_group_message(server_info, now=False):
 
         # Send Feishu request
         headers = {'Content-Type': 'application/json'}
-        response = requests.post(WEBHOOK_URL, headers=headers, data=json.dumps(message_content))
+        response = requests.post(
+            settings.webhook_url, headers=headers, data=json.dumps(message_content))
 
         if response.status_code == 200:
             result = response.json()
@@ -539,7 +532,7 @@ def create_server_reminder_email(server_info, current_recipient, now=False):
             </div>
 
             <p>
-                <a href="{YUNTESTER_PLOTFORM}" class="button">
+                <a href="{settings.yuntester_platform}/devices" class="button">
                     🔗 登录管理页面
                 </a>
             </p>
@@ -557,7 +550,7 @@ def create_server_reminder_email(server_info, current_recipient, now=False):
 
     # Build MIME message
     msg = MIMEMultipart('alternative')
-    msg['From'] = Header(SMTP_CONFIG['user'])
+    msg['From'] = Header(settings.smtp.user)
     msg['To'] = Header(current_recipient)
     msg['Subject'] = Header(subject)
 
@@ -580,10 +573,10 @@ def send_server_reminder(server_info, now=False):
             msg = create_server_reminder_email(server_info, recipient, now)
 
             # Send via SMTP
-            with smtplib.SMTP_SSL(SMTP_CONFIG['host'], SMTP_CONFIG['port']) as server_smtp:
-                server_smtp.login(SMTP_CONFIG['user'], SMTP_CONFIG['password'])
+            with smtplib.SMTP_SSL(settings.smtp.host, settings.smtp.port) as server_smtp:
+                server_smtp.login(settings.smtp.user, settings.smtp.password)
                 server_smtp.sendmail(
-                    SMTP_CONFIG['user'], [f'{recipient}@yunsilicon.com'], msg.as_string())
+                    settings.smtp.user, [f'{recipient}@yunsilicon.com'], msg.as_string())
 
             # Check ownership for proper logging
             is_owner = recipient.split('@')[0].lower() == server_info['user'].lower()
