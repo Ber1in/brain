@@ -20,6 +20,7 @@ class AppConfig(BaseModel):
     smtp: SMTPConfig = SMTPConfig()
     yuntester_platform: HttpUrl = "https://yuntester.yunsilicon.com"
     platform_port: int = 8088
+    debug: bool = False
     ldap_server: str = "ldaps://it-srv-idc001.yunsilicon.com:636"
 
 

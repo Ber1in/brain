@@ -24,26 +24,6 @@ db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 
 
-@app.exception_handler(Exception)
-async def handle_500_exception(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": str(exc)
-        },
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(req: Request, exc: RequestValidationError):
-    logger.error(f"422 Unprocessable Entity: {exc.errors()}, Request body: {exc.body}")
-
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors()},
-    )
-
-
 class FsyncFileHandler(logging.FileHandler):
     def emit(self, record):
         super().emit(record)
@@ -63,7 +43,7 @@ logger = logging.getLogger("brain")
 logger.handlers.clear()
 logger.addHandler(file_handler)
 logger.addFilter(request_id_filter)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG if settings.debug else logging.INFO)
 
 uvicorn_logger = logging.getLogger("uvicorn")
 uvicorn_logger.handlers.clear()
@@ -75,9 +55,30 @@ uvicorn_access_logger = logging.getLogger("uvicorn.access")
 uvicorn_access_logger.handlers.clear()
 uvicorn_access_logger.addHandler(file_handler)
 uvicorn_access_logger.addFilter(request_id_filter)
-uvicorn_access_logger.setLevel(logging.WARN)
+uvicorn_access_logger.setLevel(logging.INFO)
+
 
 register_routers(app)
+
+
+@app.exception_handler(Exception)
+async def handle_500_exception(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc)
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(req: Request, exc: RequestValidationError):
+    logger.error(f"422 Unprocessable Entity: {exc.errors()}, Request body: {exc.body}")
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 @app.on_event("startup")
@@ -145,7 +146,11 @@ app.mount("/qa-auto-files", StaticFiles(directory="/opt/yunTesterData"), name="q
 
 def main():
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=settings.platform_port)
+    uvicorn.run(
+        app,    
+        host="0.0.0.0", 
+        port=settings.platform_port
+    )
 
 
 if __name__ == "__main__":

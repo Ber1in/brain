@@ -33,7 +33,7 @@ def _register_module_router(app, module, routers_package, module_name):
     prefix = API_PREFIX.get(version, "")
 
     app.include_router(router, prefix=prefix, tags=[tag_name])
-    LOG.debug(f"Registered router: {routers_package}.{module_name} (prefix={prefix})")
+    LOG.debug(f"Registered router: {routers_package}.{module_name} (prefix: {prefix})")
 
 
 def discover_router_packages(base_package: str = "brain.api"):
@@ -76,7 +76,6 @@ def register_routers(app: FastAPI):
     try:
         auth_module = importlib.import_module("brain.api.auth_router")
         _register_module_router(app, auth_module, "brain.api", "auth_router")
-        LOG.debug("Always loaded auth_router")
     except Exception as e:
         LOG.error(f"Failed loading auth_router: {e}")
 
