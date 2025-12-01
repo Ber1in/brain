@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
 from brain import app
+from brain.config import settings
 from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
 from brain.middleware import RequestIdLogFilter, RequestIdMiddleware, QAAutoFileAccessMiddleware
@@ -140,3 +141,12 @@ async def startup_event():
 
 app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
 app.mount("/qa-auto-files", StaticFiles(directory="/opt/yunTesterData"), name="qa-auto-files")
+
+
+def main():
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=settings.platform_port)
+
+
+if __name__ == "__main__":
+    main()
