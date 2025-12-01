@@ -69,4 +69,7 @@ export const deviceApi = {
     return apiClient.post(`/api/servers/${serverId}/reset_fw`, data)
   },
 
+  focusServer(serverId: string, focus: boolean): Promise<void> {
+    return apiClient.patch(`/api/servers/${serverId}/focus`, { focus })
+  }
 }

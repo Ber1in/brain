@@ -33,7 +33,7 @@ def _register_module_router(app, module, routers_package, module_name):
     prefix = API_PREFIX.get(version, "")
 
     app.include_router(router, prefix=prefix, tags=[tag_name])
-    LOG.info(f"✅ Registered router: {routers_package}.{module_name} (prefix={prefix})")
+    LOG.debug(f"Registered router: {routers_package}.{module_name} (prefix={prefix})")
 
 
 def discover_router_packages(base_package: str = "brain.api"):
@@ -50,11 +50,9 @@ def discover_router_packages(base_package: str = "brain.api"):
 
         sub_pkg = f"{base_package}.{pkg_name}"
 
-        # ❌ 忽略 auth_router 因为我们会单独处理
         if pkg_name == "auth_router":
             continue
 
-        # ❌ 根据配置决定是否处理 v1 / v2
         if pkg_name == "v1" and not ENABLE_API_V1:
             LOG.warning("Skipping v1 APIs by config")
             continue
@@ -75,15 +73,13 @@ def discover_router_packages(base_package: str = "brain.api"):
 
 
 def register_routers(app: FastAPI):
-    # ✅ 固定注册 auth_router
     try:
         auth_module = importlib.import_module("brain.api.auth_router")
         _register_module_router(app, auth_module, "brain.api", "auth_router")
-        LOG.info("✅ Always loaded auth_router")
+        LOG.debug("Always loaded auth_router")
     except Exception as e:
-        LOG.error(f"❌ Failed loading auth_router: {e}")
+        LOG.error(f"Failed loading auth_router: {e}")
 
-    # ✅ 按配置注册其它 API 模块
     router_packages = discover_router_packages()
     for routers_package in router_packages:
         try:
@@ -96,7 +92,7 @@ def register_routers(app: FastAPI):
                     module = importlib.import_module(f"{routers_package}.{module_name}")
                     _register_module_router(app, module, routers_package, module_name)
                 except Exception as e:
-                    LOG.error(f"❌ Error registering router {module_name}: {e}")
+                    LOG.error(f"Error registering router {module_name}: {e}")
 
         except ImportError:
-            LOG.error(f"❌ Router package not found: {routers_package}")
+            LOG.error(f"Router package not found: {routers_package}")

@@ -197,11 +197,6 @@ async def update_device(
         if data.notes is not None:
             server["notes"] = data.notes
 
-        recipients = server.get("recipients", [])
-        if data.focus:
-            server["recipients"] = list(set(recipients + [user]))
-        else:
-            server["recipients"] = [r for r in recipients if r != user]
         if data.time is not None:
             server["time"] = data.time
             server["start"] = datetime.now().timestamp()
@@ -282,6 +277,28 @@ async def update_device(
 
     LOG.info(f"Device updated, ID: {device_id}, user: {user}, time: {server.get('time', 0)}")
     return server
+
+
+@router.patch("/servers/{server_id}/focus")
+async def focus_server(server_id: str, data: server_schemas.FocusRequest,
+                       user=Depends(authenticate_user)):
+    """following/unfollowing server"""
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception as e:
+        LOG.warning(f"Server {server_id} not found for boot entries query")
+        raise HTTPException(status_code=404, detail=f"{e}")
+
+    recipients = server.get("recipients", [])
+    if data.focus:
+        server["recipients"] = list(set(recipients + [user]))
+        LOG.info(f"User {user} followed server {server_id}.")
+    else:
+        server["recipients"] = [r for r in recipients if r != user]
+        LOG.info(f"User {user} unfollowed server {server_id}.")
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
 
 @router.get("/servers/{server_id}/boot-entries",

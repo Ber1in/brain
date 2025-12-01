@@ -1462,24 +1462,7 @@ const handleFollow = async (device: ServerDetailResponse) => {
   try {
     followLoading.value[device.id!] = true
     
-    const updateData = {
-      auto: false,
-      focus: !isFollowing(device), // true表示关注，false表示取消关注
-      device: {
-        ip: device.device.ip,
-        username: device.device.username,
-        password: '' // 密码不更新
-      },
-      bmc: {
-        hostname: device.bmc.hostname,
-        ip: device.bmc.ip
-      },
-      tags: device.tags || [],
-      notes: device.notes || '',
-      os_types: device.os_types || []
-    }
-    
-    await deviceApi.update(device.id!, updateData)
+    await deviceApi.focusServer(device.id!, !isFollowing(device))
     
     if (!isFollowing(device)) {
       // 关注成功

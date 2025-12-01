@@ -2,6 +2,7 @@
 # All rights reserved.
 
 import logging
+import time
 import uuid
 from contextvars import ContextVar
 
@@ -35,7 +36,25 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         req_id = incoming_id or f"req-{uuid.uuid4()}"
         set_request_id(req_id)
 
+        start_time = time.time()
         response: Response = await call_next(request)
+        duration = time.time() - start_time
+
+        client_host = request.client.host if request.client else "unknown"
+        client_port = request.client.port if request.client else "unknown"
+
+        status_code = response.status_code
+        log_message = (
+            f'{client_host}:{client_port} - '
+            f'"{request.method} {request.url.path} HTTP/{request.scope.get("http_version","1.1")}" '
+            f'{status_code} - {duration:.4f}s'
+        )
+
+        if 200 <= status_code < 400:
+            LOG.info(log_message)
+        else:
+            LOG.error(log_message)
+
         response.headers["X-Request-ID"] = req_id
         return response
 

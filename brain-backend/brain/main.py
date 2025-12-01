@@ -22,8 +22,6 @@ os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 
-register_routers(app)
-
 
 @app.exception_handler(Exception)
 async def handle_500_exception(request: Request, exc: Exception):
@@ -76,7 +74,9 @@ uvicorn_access_logger = logging.getLogger("uvicorn.access")
 uvicorn_access_logger.handlers.clear()
 uvicorn_access_logger.addHandler(file_handler)
 uvicorn_access_logger.addFilter(request_id_filter)
-uvicorn_access_logger.setLevel(logging.WARNING)
+uvicorn_access_logger.setLevel(logging.WARN)
+
+register_routers(app)
 
 
 @app.on_event("startup")

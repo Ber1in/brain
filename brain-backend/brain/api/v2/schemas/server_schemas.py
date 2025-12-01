@@ -92,3 +92,7 @@ class ServerUpdateRequest(BaseModel):
     notes: Optional[str] = None
     time: Optional[str] = None
     focus: bool = False
+
+
+class FocusRequest(BaseModel):
+    focus: bool

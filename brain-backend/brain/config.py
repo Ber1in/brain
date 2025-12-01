@@ -17,7 +17,7 @@ class SMTPConfig(BaseModel):
 class AppConfig(BaseModel):
     webhook_url: HttpUrl = (
         "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/51053ced-7d61-4645-95df-f0c6ac3f67a7")
-    smtp: SMTPConfig = SMTPConfig()
+    smtp: SMTPConfig
     yuntester_platform: HttpUrl = "https://yuntester.yunsilicon.com"
     ldap_server: str = "ldaps://it-srv-idc001.yunsilicon.com:636"
 

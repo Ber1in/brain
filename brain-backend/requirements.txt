@@ -1,5 +1,5 @@
 contextvars
-fastapi
+fastapi==0.109.2
 uvicorn
 ldap3
 tox
@@ -17,4 +17,3 @@ python-gitlab
 GitPython
 PyYAML
 asyncssh
-pydantic-settings

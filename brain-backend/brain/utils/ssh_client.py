@@ -3,6 +3,7 @@
 
 import asyncio
 import concurrent.futures
+import contextvars
 import paramiko
 import logging
 from paramiko import ssh_exception
@@ -19,11 +20,13 @@ IGNORE_DIRS = [".", ".."]
 async def ssh_execute_async(host: str, command: str, user: str, pwd: str) -> str:
     """Execute a command on remote host via SSH asynchronously"""
     loop = asyncio.get_event_loop()
+    ctx = contextvars.copy_context()
+
     try:
         with concurrent.futures.ThreadPoolExecutor() as pool:
             result = await loop.run_in_executor(
-                pool, 
-                lambda: ssh_execute(host, command, user, pwd)
+                pool,
+                lambda: ctx.run(ssh_execute, host, command, user, pwd)
             )
             return result
     except HTTPException:
