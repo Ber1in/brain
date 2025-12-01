@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status, HTTPException, Query, Background
 import logging
 
 from brain.auth import authenticate_user
-from brain.api.v2.schemas import common_schemas, device_schemas
+from brain.api.v2.schemas import common_schemas, server_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils, task_scheduler
@@ -23,8 +23,8 @@ db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 
 
-@router.post("/servers", response_model=device_schemas.ServerDetailResponse)
-async def create_device(data: device_schemas.ServerRequest):
+@router.post("/servers", response_model=server_schemas.ServerDetailResponse)
+async def create_device(data: server_schemas.ServerRequest):
     LOG.info(f"Creating server, IP: {data.device.ip}, hostname: {data.bmc.hostname}")
 
     exist = db.find(SERVER_COLLECTION,
@@ -125,7 +125,7 @@ async def delete_device(device_id: str):
         LOG.warning("Failed to initialize the server usage warning message.")
 
 
-@router.get("/servers", response_model=list[device_schemas.ServerDetailResponse])
+@router.get("/servers", response_model=list[server_schemas.ServerDetailResponse])
 async def get_all_devices():
     devices = db.find(SERVER_COLLECTION, {})
     for i in devices:
@@ -139,7 +139,7 @@ async def get_all_devices():
     return devices
 
 
-@router.get("/servers/{device_id}", response_model=device_schemas.ServerDetailResponse)
+@router.get("/servers/{device_id}", response_model=server_schemas.ServerDetailResponse)
 async def get_device(device_id: str):
     LOG.info(f"Fetching device, ID: {device_id}")
     try:
@@ -158,10 +158,10 @@ async def get_device(device_id: str):
     return device
 
 
-@router.put("/servers/{device_id}", response_model=device_schemas.ServerDetailResponse)
+@router.put("/servers/{device_id}", response_model=server_schemas.ServerDetailResponse)
 async def update_device(
     device_id: str,
-    data: device_schemas.ServerUpdateRequest,
+    data: server_schemas.ServerUpdateRequest,
     user=Depends(authenticate_user)
 ):
     LOG.info(f"Updating device, ID: {device_id}, auto: {data.auto}, user: {user}")
@@ -285,7 +285,7 @@ async def update_device(
 
 
 @router.get("/servers/{server_id}/boot-entries",
-            response_model=device_schemas.BootEntriesResponse)
+            response_model=server_schemas.BootEntriesResponse)
 async def get_boot_entries(server_id: str):
     """
     Get all boot entries (name + parent disk), current boot, next boot, and default boot
