@@ -7,7 +7,8 @@ import type {
   ExecuteResponse, 
   ExecuteRequest,
   CaseCombinationsResponse,
-  CaseCombinationRequest
+  CaseCombinationRequest,
+  ExecuteTaskResponse
 } from '@/types/api'
 
 export const testApi = {
@@ -26,8 +27,13 @@ export const testApi = {
     })
   },
   
-  executeTestCasesWithResponse(request: ExecuteRequest): Promise<ExecuteResponse> {
+  executeTestCasesWithResponse(request: ExecuteRequest): Promise<ExecuteTaskResponse> {
     return apiClient.post('/api/yuntester/execute-cases', request)
+  },
+
+  
+  getExecuteStatus(task_id: string): Promise<ExecuteResponse[]> {
+    return apiClient.get(`/api/yuntester/task/${task_id}`)
   },
 
   getExecuteHistory(): Promise<ExecuteResponse[]> {

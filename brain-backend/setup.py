@@ -26,10 +26,5 @@ setuptools.setup(
     version=get_version(),
     packages=setuptools.find_packages(),
     install_requires=load_requirements(),
-    include_package_data=True,
-    entry_points={
-        "console_scripts": [
-            "brain-backend=brain.main:main",
-        ],
-    },
+    include_package_data=True
 )

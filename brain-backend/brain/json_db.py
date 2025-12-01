@@ -298,13 +298,16 @@ class SQLiteDocumentDB:
         },
         TEST_HISTORY_COLLECTION: {
             "id": "",
+            "status": "",
+            "user": "",
             "current": "",
             "latest_commit": "",
-            "time": "",
+            "created_at": "",
+            "end_time": "",
             "url": "",
-            "user": "",
             "topo": "",
-            "log": ""
+            "log": "",
+            "executed": ""
         }, 
         TASK_POOL_COLLECTION: {
             "id": "",

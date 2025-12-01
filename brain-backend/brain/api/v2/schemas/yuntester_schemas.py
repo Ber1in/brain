@@ -52,14 +52,21 @@ class ExecuteRequest(BaseModel):
 
 
 class ExecuteResponse(BaseModel):
+    id: str
+
+
+class ExecuteHistoryResponse(BaseModel):
     url: str = None
-    time: str = None
+    created_at: str = None
+    end_time: str = None
     current: str = None
     latest_commit: str = None
     id: str
     topo: str
     log: str
     user: str
+    executed: int
+    status: str
 
 
 class CaseCombinationsResponse(BaseModel):

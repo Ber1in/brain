@@ -340,15 +340,24 @@ export interface CheckoutRequest {
   tag?: string | null;
 }
 
+
+export interface ExecuteTaskResponse {
+  id: string;
+}
+
+
 export interface ExecuteResponse {
   url?: string;
-  time?: string;
+  created_at?: string;
+  end_time?: string
   current?: string;
   latest_commit?: string;
   id: string;
   topo: string;
   log: string;
   user: string;
+  status: string
+  executed: string
 }
 
 export interface BranchAndTagResponse {

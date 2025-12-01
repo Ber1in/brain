@@ -1,6 +1,8 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import asyncio
+from contextlib import contextmanager
 from typing import Dict, List
 from datetime import datetime
 import os
@@ -176,9 +178,76 @@ async def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest,
     return {"cases": commands}
 
 
-@router.post("/yuntester/execute-cases", response_model=yuntester_schemas.ExecuteResponse)
-async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
+async def execute_test_task(task_id: str, cases: list, 
+                            env_topo_path: str, log_path: str):
 
+    try:
+        db.update(
+            TEST_HISTORY_COLLECTION,
+            {"id": task_id},
+            {"status": "running"}
+        )
+
+        @contextmanager
+        def working_directory(path: str):
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(path)
+                yield
+            finally:
+                os.chdir(original_cwd)
+
+        test_base_dir = os.path.dirname(env_topo_path)
+
+        if not os.path.exists(test_base_dir):
+            raise Exception(f"Test directory not found: {test_base_dir}")
+
+        executed_cases = 0
+        all_cases = len(cases)
+        with working_directory(test_base_dir):
+            for case in cases:
+                args = ["-s", "-v", case, "--log-file", log_path, 
+                        "--log-file-mode", "a", "--env", env_topo_path]
+
+                LOG.info(f"Executing test case: {case}")
+                exit_code = pytest.main(args=args)
+
+                if exit_code != 0:
+                    LOG.warning(f"Test case {case} failed with exit code: {exit_code}")
+
+                executed_cases += 1
+
+                db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, 
+                          {"executed": f"{executed_cases}/{all_cases}"})
+
+        end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        db.update(
+            TEST_HISTORY_COLLECTION,
+            {"id": task_id},
+            {
+                "status": "success",
+                "end_time": end_time
+            }
+        )
+
+        LOG.info(f"Test task {task_id} completed successfully")
+
+    except Exception as e:
+        end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        db.update(
+            TEST_HISTORY_COLLECTION,
+            {"id": task_id},
+            {
+                "status": "failed",
+                "end_time": end_time
+            }
+        )
+
+        LOG.error(f"Test task {task_id} failed: {str(e)}")
+
+
+async def prepare_test_environment(data, user, dt):
     def normalize_nic_type(t: str) -> str:
         t = t or ""
         if t == "metaScale-200 OCP3.0":
@@ -217,19 +286,11 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(aut
         host_num += 1
         clients[f"host{host_num}"] = client_info
 
-    env_info = {"yaml_version": "v1"}
+    env_info = {}
     env_info.update(clients)
 
-    start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    dt = start_time.replace("-", "").replace(" ", "_").replace(":", "")
-    env_topo_filename = dt + ".yaml"
-    log_filename = dt + ".log"
-
     user_topo_dir = await get_user_topo_dir(user)
-    env_topo_path = os.path.join(user_topo_dir, env_topo_filename)
-    user_log_dir = await get_user_log_dir(user)
-    log_path = os.path.join(user_log_dir, log_filename)
-    result_path = ""
+    env_topo_path = os.path.join(user_topo_dir, f'{dt}.yaml')
 
     try:
         with open(env_topo_path, "w") as f:
@@ -239,27 +300,63 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(aut
         LOG.error("Failed to save YAML: %s", str(e))
         raise HTTPException(status_code=500, detail="Failed to save YAML")
 
-    for case in data.cases:
-        args = ["-s", "-v", case, "--log-file", log_path, "--log-file-mode", "a",
-                "--env", env_topo_path, "--alluredir", result_path]
-        pytest.main(args=args)
-
-    current, latest_commit = await get_current_code_and_commit(user)
-    record = {"url": f"/qa-auto-files/{user}/results/tmp_report.html", 
-              "time": start_time,
-              "current": current,
-              "latest_commit": latest_commit,
-              "id": str(uuid4()),
-              "topo": f"/qa-auto-files/{user}/topo/{env_topo_filename}",
-              "log": f"/qa-auto-files/{user}/logs/{log_filename}",
-              "user": user}
-    db.insert(TEST_HISTORY_COLLECTION, record)
-    LOG.info("Test case execution records have been logged.")
-
-    return record
+    return env_topo_path
 
 
-@router.get("/yuntester/execute-history", response_model=List[yuntester_schemas.ExecuteResponse])
+@router.post("/yuntester/execute-cases", response_model=yuntester_schemas.ExecuteResponse)
+async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
+    task_id = str(uuid4())
+    start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    dt = start_time.replace("-", "").replace(" ", "_").replace(":", "")
+
+    env_topo_path = await prepare_test_environment(data, user, dt)
+
+    log_filename = dt + ".log"
+    log_dir = await get_user_log_dir(user)
+    log_path = os.path.join(log_dir, log_filename)
+
+    current, latest_commit = await get_current_code_and_commit(user,)
+
+    task_record = {
+        "id": task_id,
+        "status": "pending",
+        "user": user,
+        "current": current,
+        "latest_commit": latest_commit,
+        "created_at": start_time,
+        "executed": "",
+        "end_time": "",
+        "url": f"/qa-auto-files/{user}/results/{task_id}.html",
+        "topo": f"/qa-auto-files/{user}/topo/{os.path.basename(env_topo_path)}",
+        "log": f"/qa-auto-files/{user}/logs/{log_filename}",
+    }
+
+    db.insert(TEST_HISTORY_COLLECTION, task_record)
+
+    asyncio.create_task(execute_test_task(
+        task_id=task_id,
+        cases=data.cases,
+        env_topo_path=env_topo_path,
+        log_path=log_path
+    ))
+
+    LOG.info(f"Test task {task_id} submitted for user {user}")
+
+    return {"id": task_id}
+
+
+@router.get("/yuntester/task/{task_id}", response_model=yuntester_schemas.ExecuteHistoryResponse)
+async def get_task_status(task_id: str, user=Depends(authenticate_user)):
+    task = db.find_one(TEST_HISTORY_COLLECTION, {"id": task_id, "user": user})
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return task
+
+
+@router.get("/yuntester/execute-history", response_model=List[yuntester_schemas.ExecuteHistoryResponse])
 async def execute_history(user=Depends(authenticate_user)):
     """Retrieve execution history for the authenticated user."""
 

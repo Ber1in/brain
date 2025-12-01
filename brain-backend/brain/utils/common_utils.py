@@ -344,7 +344,7 @@ async def update_automatic_async(ip, user, password):
     return device_info, nics
 
 
-def create_task(server_id, option):
+def create_mcr_task(server_id, option):
     """Create a new task and store in DB. Keep only the latest 10 tasks per server."""
     task_id = str(uuid4())
     now = datetime.now().isoformat()
