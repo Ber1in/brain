@@ -72,7 +72,7 @@ apiClient.interceptors.response.use(
         // 刷新失败，跳转到登录页
         isRefreshing = false
         retryQueue = []
-        authStore.logout('登录已过期，请重新登录')
+        authStore.logout()
         return Promise.reject(refreshError)
       }
     }

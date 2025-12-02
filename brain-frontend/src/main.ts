@@ -32,7 +32,7 @@ const setupPageVisibility = () => {
     if (isVisible && authStore.accessToken) {
       authStore.onTabActivated().then(isValid => {
         if (!isValid && authStore.autoLogin) {
-          authStore.logout('登录已过期，请重新登录')
+          authStore.logout()
         }
       })
     }

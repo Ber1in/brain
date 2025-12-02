@@ -147,9 +147,10 @@ app.mount("/qa-auto-files", StaticFiles(directory="/opt/yunTesterData"), name="q
 def main():
     import uvicorn
     uvicorn.run(
-        app,    
+        "brain.main:app",    
         host="0.0.0.0", 
-        port=settings.platform_port
+        port=settings.platform_port,
+        reload=True
     )
 
 

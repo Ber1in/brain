@@ -2361,7 +2361,6 @@ const loadTags = async () => {
     availableTags.value = response.tags || []
   } catch (error) {
     console.error('加载标签失败:', error)
-    ElMessage.error('加载标签列表失败')
   } finally {
     tagsLoading.value = false
   }
@@ -2547,7 +2546,6 @@ const loadData = async () => {
       }
     })
   } catch (error) {
-    ElMessage.error('加载设备列表失败')
   } finally {
     loading.value = false
   }

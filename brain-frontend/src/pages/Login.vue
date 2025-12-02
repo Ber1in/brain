@@ -75,7 +75,6 @@ const handleLogin = async () => {
   try {
     // 传递 rememberMe 参数
     await authStore.login(form.value, form.value.rememberMe)
-    ElMessage.success('登录成功')
     router.push('/')
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '登录失败')
