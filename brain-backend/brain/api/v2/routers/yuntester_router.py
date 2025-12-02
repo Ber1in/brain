@@ -178,7 +178,7 @@ async def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest,
     return {"cases": commands}
 
 
-def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path):
+def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, result_dir):
     """Execute pytest using subprocess and redirect terminal output to log file"""
     @contextmanager
     def working_directory(path: str):
@@ -194,13 +194,16 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path):
 
     with working_directory(test_base_dir):
         # Ensure log directory exists
+        allure_results_dir = os.path.join(result_dir, "allure-results")
         os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
+        os.makedirs(allure_results_dir, exist_ok=True)
 
         for idx, case in enumerate(cases, 1):
             LOG.info(f"Executing test case {idx}/{all_cases}: {case}")
 
             # Construct pytest command
-            cmd = ["pytest", "-q", "-s", case, "--env", env_topo_path]
+            cmd = ["pytest", "-q", "-s", "-v", case, "--env",
+                   env_topo_path, "--alluredir", allure_results_dir]
 
             try:
                 with open(log_path, 'a', encoding='utf-8') as log_file:
@@ -228,9 +231,30 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path):
             except Exception as e:
                 LOG.error(f"Failed to update database: {e}")
 
+        try:
+            allure_report_dir = os.path.join(result_dir, "allure-report")
+
+            # 只执行命令，不捕获输出
+            subprocess.run(
+                ["allure", "generate", allure_results_dir, "-c", "-o", allure_report_dir],
+                check=True,  # 如果命令失败会抛出异常
+                timeout=300,  # 5分钟应该足够
+                cwd=test_base_dir
+            )
+
+            LOG.info(f"Allure report generated at {allure_report_dir}")
+
+        except subprocess.CalledProcessError as e:
+            LOG.warning(f"Allure report generation failed with exit code {e.returncode}")
+            # 可以继续，不抛出异常，因为测试可能已经成功了
+        except subprocess.TimeoutExpired:
+            LOG.warning("Allure report generation timeout")
+        except Exception as e:
+            LOG.warning(f"Error generating Allure report: {e}")
+
 
 async def execute_test_task(task_id: str, cases: list, user: str,
-                            env_topo_path: str, log_path: str):
+                            env_topo_path: str, log_path: str, result_dir: str):
 
     try:
         db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": "running"})
@@ -241,7 +265,7 @@ async def execute_test_task(task_id: str, cases: list, user: str,
 
         await asyncio.to_thread(
             run_sync_pytest,
-            task_id, cases, test_base_dir, log_path, env_topo_path
+            task_id, cases, test_base_dir, log_path, env_topo_path, result_dir
         )
 
         end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -328,6 +352,8 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
     log_filename = dt + ".log"
     log_dir = await get_user_log_dir(user)
     log_path = os.path.join(log_dir, log_filename)
+    result_base_dir = await get_user_result_dir(user)
+    result_dir = os.path.join(result_base_dir, dt)
 
     current, latest_commit = await get_current_code_and_commit(user,)
 
@@ -340,7 +366,7 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
         "created_at": start_time,
         "executed": "",
         "end_time": "",
-        "url": f"/qa-auto-files/{user}/results/{task_id}.html",
+        "url": f"/qa-auto-files/{user}/results/{dt}/allure-report/index.html",
         "topo": f"/qa-auto-files/{user}/topo/{os.path.basename(env_topo_path)}",
         "log": f"/qa-auto-files/{user}/logs/{log_filename}",
     }
@@ -353,7 +379,8 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
         cases=data.cases,
         user=user,
         env_topo_path=env_topo_path,
-        log_path=log_path
+        log_path=log_path,
+        result_dir=result_dir
     )
 
     LOG.info(f"Test task {task_id} submitted for user {user}")

@@ -258,7 +258,7 @@
                 <template #default="{ row }">
                   <el-link 
                     v-if="row.url" 
-                    :href="row.url" 
+                    :href="generateFileUrl(row.url)" 
                     target="_blank" 
                     type="primary"
                     :underline="false"
@@ -1123,29 +1123,20 @@ const authStore = useAuthStore()
 const router = useRouter()
 
 const generateFileUrl = (filePath: string): string => {
-  const token = authStore.accessToken
-  
-  if (!token) {
-    ElMessage.warning('请先登录以访问文件')
-    return filePath
-  }
-  
-  // 如果路径已经是完整URL，直接返回
+  // 如果路径已经是完整URL，直接返回（不再添加token）
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-    const separator = filePath.includes('?') ? '&' : '?'
-    return `${filePath}${separator}token=${encodeURIComponent(token)}`
+    return filePath
   }
   
   // 确保路径以 / 开头
   const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`
   
   // 使用固定的后端文件服务地址（8088端口）
+  // 注意：这里不需要添加 token 参数了
   const baseUrl = `${window.location.protocol}//${window.location.hostname}:8088`
   const fullUrl = `${baseUrl}${normalizedPath}`
   
-  const separator = fullUrl.includes('?') ? '&' : '?'
-  const result = `${fullUrl}${separator}token=${encodeURIComponent(token)}`
-  return result
+  return fullUrl
 }
 
 // 格式化拓扑信息为YAML

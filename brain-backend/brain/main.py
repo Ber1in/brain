@@ -140,7 +140,7 @@ async def startup_event():
         logger.error(f"Error while restoring device timers: {str(e)}")
 
 
-app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
+# app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
 app.mount("/qa-auto-files", StaticFiles(directory="/opt/yunTesterData"), name="qa-auto-files")
 
 
