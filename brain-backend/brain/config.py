@@ -1,10 +1,10 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-import json
+import yaml
 from pydantic import BaseModel, HttpUrl
 
-CONFIG_FILE = "/etc/yuntester/yuntester.json"
+CONFIG_FILE = "/etc/yuntester/yuntester.yaml"
 
 
 class SMTPConfig(BaseModel):
@@ -31,7 +31,7 @@ def load_config() -> AppConfig:
     """
     try:
         with open(CONFIG_FILE, "r") as f:
-            config_dict = json.load(f)
+            config_dict = yaml.safe_load(f) or {}
     except FileNotFoundError:
         config_dict = {}
 
