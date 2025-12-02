@@ -181,28 +181,43 @@
               style="width: 100%"
               :max-height="400"
             >
-              <el-table-column prop="time" label="执行时间" width="170" sortable />
-              <el-table-column prop="current" label="执行分支/标签" width="200">
+              <el-table-column prop="created_at" label="执行时间" width="170" sortable>
                 <template #default="{ row }">
-                  <el-tooltip v-if="row.current && row.current.length > 20" :content="row.current" placement="top">
-                    <el-tag size="small" type="info" class="current-tag">
-                      {{ formatBranchTag(row.current) }}
-                    </el-tag>
-                  </el-tooltip>
-                  <el-tag v-else-if="row.current" size="small" type="info" class="current-tag">
-                    {{ row.current }}
-                  </el-tag>
-                  <span v-else class="no-data">-</span>
+                  {{ formatTime(row.created_at) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="latest_commit" label="执行时Commit" width="140">
+              <el-table-column prop="current" label="测试代码" width="200">
                 <template #default="{ row }">
-                  <el-tooltip v-if="row.latest_commit" :content="row.latest_commit" placement="top">
-                    <el-tag size="small" type="success" class="commit-tag">
-                      {{ formatCommitHash(row.latest_commit) }}
-                    </el-tag>
+                  <el-tooltip 
+                    placement="top" 
+                    :content="getCodeTooltipContent(row)"
+                    raw-content
+                  >
+                    <div class="code-display">
+                      <el-tag size="small" type="info" class="code-tag">
+                        {{ formatBranchTag(row.current) }}
+                      </el-tag>
+                    </div>
                   </el-tooltip>
-                  <span v-else class="no-data">-</span>
+                </template>
+              </el-table-column>
+              <!-- 执行状态列 -->
+              <el-table-column prop="status" label="执行状态" width="120">
+                <template #default="{ row }">
+                  <el-tooltip 
+                    placement="top" 
+                    :content="getStatusTooltip(row)"
+                  >
+                    <div>
+                      <el-tag 
+                        :type="getStatusType(row.status)" 
+                        size="small"
+                        class="status-tag"
+                      >
+                        {{ getStatusText(row.status) }}
+                      </el-tag>
+                    </div>
+                  </el-tooltip>
                 </template>
               </el-table-column>
               <!-- 新增拓扑列 -->
@@ -790,10 +805,9 @@
             >
               <div class="server-checkbox">
                 <el-checkbox 
-                  v-model="selectedServers" 
-                  :label="server.id"
+                  :model-value="selectedServers.includes(server.id!)"
                   :disabled="serverUpdatingStatus[server.id!] !== false"
-                  @change="handleServerSelectionChange(server)"
+                  @update:model-value="(val) => handleServerSelectionChange(server, val)"
                 >
                   <div class="server-info">
                     <span class="server-name">{{ server.bmc.hostname }}</span>
@@ -990,7 +1004,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { v4 as uuidv4 } from 'uuid'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus'
 import { 
   Setting, 
@@ -1016,7 +1031,8 @@ import {
   FolderAdd,
   Lightning,
   View,
-  CircleClose
+  CircleClose,
+  QuestionFilled
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
@@ -1032,7 +1048,8 @@ import type {
   Server,
   CaseNicInfo,
   CaseCombinationResponse,
-  CaseCombinationRequest 
+  CaseCombinationRequest,
+  ExecuteTaskResponse
 } from '@/types/api'
 
 // 响应式数据
@@ -1075,6 +1092,10 @@ const selectedServers = ref<string[]>([])
 const serverDialogVisible = ref(false)
 const executeLoading = ref(false)
 const serverUpdatingStatus = ref<Record<string, boolean>>({})
+
+// 新增：任务状态轮询相关
+const pollingTasks = ref<Map<string, any>>(new Map()) // 存储轮询中的任务
+const pollingIntervals = ref<Map<string, number>>(new Map()) // 存储每个任务的当前轮询间隔
 
 const leftTreeRef = ref<InstanceType<typeof ElTree>>()
 const rightTreeRef = ref<InstanceType<typeof ElTree>>()
@@ -1577,18 +1598,27 @@ const sortedAvailableServers = computed(() => {
 })
 
 // 处理服务器选择变化
-const handleServerSelectionChange = (server: ServerDetailResponse) => {
-  // 当取消选择服务器时，取消选择该服务器的所有网口
-  if (!selectedServers.value.includes(server.id!)) {
-    if (server.nics) {
-      server.nics.forEach(nic => {
-        nic.allInterfacesSelected = false
-        if (nic.nic_info) {
-          nic.nic_info.forEach(nicInfo => {
-            nicInfo.selected = false
-          })
-        }
-      })
+const handleServerSelectionChange = (server: ServerDetailResponse, checked: boolean) => {
+  if (checked) {
+    if (!selectedServers.value.includes(server.id!)) {
+      selectedServers.value.push(server.id!)
+    }
+  } else {
+    const index = selectedServers.value.indexOf(server.id!)
+    if (index > -1) {
+      selectedServers.value.splice(index, 1)
+      
+      // 当取消选择服务器时，取消选择该服务器的所有网口
+      if (server.nics) {
+        server.nics.forEach(nic => {
+          nic.allInterfacesSelected = false
+          if (nic.nic_info) {
+            nic.nic_info.forEach(nicInfo => {
+              nicInfo.selected = false
+            })
+          }
+        })
+      }
     }
   }
 }
@@ -1834,7 +1864,7 @@ const formatBranchTag = (text: string): string => {
 const formatTime = (timeStr: string): string => {
   if (!timeStr) return ''
   const date = new Date(timeStr)
-  return date.toLocaleDateString()
+  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
 }
 
 // 获取测试用例的简短名称
@@ -2251,15 +2281,305 @@ const loadExecuteHistory = async () => {
     historyLoading.value = true
     // 直接获取 ExecuteResponse[] 数组
     const history: ExecuteResponse[] = await testApi.getExecuteHistory()
+    
+    // 先停止所有现有的轮询
+    stopAllPolling()
+    
     // 按时间倒序排列（最新的在前面）
     executeHistory.value = history.sort((a, b) => {
-      return new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime()
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return timeB - timeA
+    })
+    
+    // 检查是否有需要轮询的任务
+    history.forEach(task => {
+      if (shouldPollTask(task)) {
+        console.log(`任务 ${task.id} 需要轮询，状态: ${task.status}`)
+        startTaskPolling(task.id)
+      } else {
+        console.log(`任务 ${task.id} 不需要轮询，状态: ${task.status}`)
+      }
     })
   } catch (error) {
     ElMessage.error('获取执行历史失败')
   } finally {
     historyLoading.value = false
   }
+}
+
+// 检查任务是否需要轮询
+const shouldPollTask = (task: ExecuteResponse): boolean => {
+  if (!task.created_at) return false
+  
+  const createdAt = new Date(task.created_at).getTime()
+  const now = Date.now()
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+  
+  // 超过3天的任务不需要轮询
+  if (now - createdAt >= threeDaysMs) {
+    return false
+  }
+  
+  // 对 running 或 pending 状态的任务进行轮询
+  return task.status === 'running' || task.status === 'pending'
+}
+
+
+// 计算基于创建时间的轮询间隔
+const calculatePollingInterval = (createdAt: string): number => {
+  if (!createdAt) return 2000
+  
+  const created = new Date(createdAt).getTime()
+  const now = Date.now()
+  const elapsedMs = now - created
+  
+  // 阶段1：任务刚开始（0-30秒），频繁轮询
+  if (elapsedMs < 30000) {
+    return 1000 // 1秒
+  }
+  
+  // 阶段2：任务进行中（30秒-5分钟），中等频率
+  if (elapsedMs < 300000) {
+    return 2000 // 2秒
+  }
+  
+  // 阶段3：任务持续中（5-30分钟）
+  if (elapsedMs < 1800000) {
+    return 5000 // 5秒
+  }
+  
+  // 阶段4：长时间运行（30分钟-2小时）
+  if (elapsedMs < 7200000) {
+    return 10000 // 10秒
+  }
+  
+  // 阶段5：超长时间（2-4小时）
+  if (elapsedMs < 14400000) {
+    return 30000 // 30秒
+  }
+  
+  // 阶段6：极端长时间（4小时以上）
+  return 60000 // 60秒
+}
+
+// 开始任务状态轮询
+const startTaskPolling = async (taskId: string) => {
+  if (pollingTasks.value.has(taskId)) {
+    return
+  }
+  
+  try {
+    // 获取任务信息
+    const response = await testApi.getExecuteStatus(taskId)
+    const task = response  // 直接使用响应，因为后端返回的是单个对象
+    
+    if (task) {
+      // 更新任务状态到历史记录
+      updateTaskInHistory(taskId, task)
+      
+      // 如果任务已经完成，不需要轮询
+      if (task.status !== 'running' && task.status !== 'pending') {
+        console.log(`任务 ${taskId} 状态为 ${task.status}，不启动轮询`)
+        return
+      }
+      
+      // 计算基于创建时间的初始间隔
+      const initialInterval = calculatePollingInterval(task.created_at)
+      pollingIntervals.value.set(taskId, initialInterval)
+      
+      // 开始轮询
+      const poll = async () => {
+        try {
+          const pollResponse = await testApi.getExecuteStatus(taskId)
+          const polledTask = pollResponse
+          
+          if (polledTask) {
+            // 更新任务状态
+            updateTaskInHistory(taskId, polledTask)
+            
+            // 如果任务状态不再是 running 或 pending，停止轮询
+            if (polledTask.status !== 'running' && polledTask.status !== 'pending') {
+              console.log(`任务 ${taskId} 状态变为 ${polledTask.status}，停止轮询`)
+              stopTaskPolling(taskId)
+              return
+            }
+          }
+          
+          // 重新计算间隔（基于创建时间）
+          const currentInterval = calculatePollingInterval(
+            executeHistory.value.find(t => t.id === taskId)?.created_at || '',
+          )
+          pollingIntervals.value.set(taskId, currentInterval)
+          
+          // 设置下一次轮询
+          const timer = setTimeout(poll, currentInterval)
+          pollingTasks.value.set(taskId, timer)
+          
+        } catch (error) {
+          console.error(`轮询任务 ${taskId} 失败:`, error)
+          handlePollingError(taskId, poll)
+        }
+      }
+      
+      // 开始第一次轮询
+      const timer = setTimeout(poll, initialInterval)
+      pollingTasks.value.set(taskId, timer)
+      
+    } else {
+      console.warn(`未获取到任务 ${taskId} 的信息`)
+    }
+  } catch (error) {
+    console.error(`获取任务 ${taskId} 初始信息失败:`, error)
+    // 如果获取失败，使用默认间隔
+    startPollingWithDefaultInterval(taskId)
+  }
+}
+
+const updateTaskInHistory = (taskId: string, task: any) => {
+  const index = executeHistory.value.findIndex(t => t.id === taskId)
+  
+  if (index !== -1) {
+    // 如果任务已存在，更新它
+    executeHistory.value[index] = {
+      ...executeHistory.value[index],
+      ...task,
+      status: task.status || executeHistory.value[index].status,
+      executed: task.executed || executeHistory.value[index].executed
+    }
+  } else {
+    // 如果任务不存在，添加到历史记录
+    executeHistory.value.unshift(task)
+  }
+  
+  // 强制触发 Vue 响应式更新
+  executeHistory.value = [...executeHistory.value]
+}
+
+const handlePollingError = (taskId: string, pollFunction: Function) => {
+  // 发生错误时使用当前间隔的1.5倍，但不超过30分钟
+  const currentInterval = pollingIntervals.value.get(taskId) || 1000
+  const newInterval = Math.min(currentInterval * 1.5, 1800000)
+  pollingIntervals.value.set(taskId, newInterval)
+  
+  // 设置下一次轮询
+  const timer = setTimeout(pollFunction, newInterval)
+  pollingTasks.value.set(taskId, timer)
+}
+
+// 辅助函数：使用默认间隔开始轮询
+const startPollingWithDefaultInterval = (taskId: string) => {
+  const defaultInterval = 1000
+  pollingIntervals.value.set(taskId, defaultInterval)
+  
+  const poll = async () => {
+    try {
+      const pollResponse = await testApi.getExecuteStatus(taskId)
+      const task = pollResponse
+      
+      if (task) {
+        updateTaskInHistory(taskId, task)
+        
+        if (task.status !== 'running' && task.status !== 'pending') {
+          console.log(`任务 ${taskId} 状态变为 ${task.status}，停止轮询`)
+          stopTaskPolling(taskId)
+          return
+        }
+        
+        // 更新创建时间，重新计算间隔
+        if (task.created_at) {
+          const currentInterval = calculatePollingInterval(task.created_at)
+          pollingIntervals.value.set(taskId, currentInterval)
+          
+          const newTimer = setTimeout(poll, currentInterval)
+          pollingTasks.value.set(taskId, newTimer)
+          return
+        }
+      }
+      
+      handlePollingError(taskId, poll)
+      
+    } catch (pollError) {
+      console.error(`轮询任务 ${taskId} 失败:`, pollError)
+      handlePollingError(taskId, poll)
+    }
+  }
+  
+  const timer = setTimeout(poll, defaultInterval)
+  pollingTasks.value.set(taskId, timer)
+}
+
+// 停止任务状态轮询
+const stopTaskPolling = (taskId: string) => {
+  const timer = pollingTasks.value.get(taskId)
+  if (timer) {
+    clearTimeout(timer)
+    pollingTasks.value.delete(taskId)
+    pollingIntervals.value.delete(taskId)
+  }
+}
+
+// 停止所有轮询（组件卸载时调用）
+const stopAllPolling = () => {
+  pollingTasks.value.forEach((timer, taskId) => {
+    clearTimeout(timer)
+  })
+  pollingTasks.value.clear()
+  pollingIntervals.value.clear()
+}
+
+// 获取状态显示文本
+const getStatusText = (status: string): string => {
+  switch (status) {
+    case 'pending':
+      return '等待中'
+    case 'running':
+      return '执行中'
+    case 'success':
+      return '执行成功'
+    case 'failed':
+      return '执行失败'
+    default:
+      return status || '未知'
+  }
+}
+
+// 获取状态标签类型
+const getStatusType = (status: string): string => {
+  switch (status) {
+    case 'pending':
+      return 'warning'
+    case 'running':
+      return 'primary'
+    case 'success':
+      return 'success'
+    case 'failed':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+// 获取状态提示信息
+const getStatusTooltip = (row: ExecuteResponse): string => {
+  const baseInfo = `状态: ${getStatusText(row.status)}`
+  
+  if (row.executed) {
+    const [executed, total] = row.executed.split('/')
+    return `${baseInfo}\n已执行: ${executed}/${total} 个用例`
+  }
+  
+  return baseInfo
+}
+
+// 获取执行代码列的提示内容（HTML格式）
+const getCodeTooltipContent = (row: ExecuteResponse): string => {
+  return `
+    <div style="text-align: left; line-height: 1.5;">
+      <strong>分支/标签:</strong> ${row.current || '未知'}<br>
+      <strong>Commit:</strong> ${row.latest_commit || '未知'}
+    </div>
+  `
 }
 
 // 用例集合相关方法
@@ -2585,7 +2905,7 @@ const loadAvailableServers = async () => {
   }
 }
 
-// 确认执行
+// 修改确认执行方法中的轮询部分
 const handleExecuteConfirm = async () => {
   try {
     executeLoading.value = true
@@ -2626,6 +2946,7 @@ const handleExecuteConfirm = async () => {
       }
     })
     
+    
     const request: ExecuteRequest = {
       cases: selectedCases,
       servers: servers.length > 0 ? servers : undefined
@@ -2634,32 +2955,38 @@ const handleExecuteConfirm = async () => {
     console.log('执行请求数据:', request)
     
     // 调用执行接口
-    const loadingMessage = ElMessage.success('开始运行测试用例...')
+    const response: ExecuteTaskResponse = await testApi.executeTestCasesWithResponse(request)
+    const taskId = response.id
     
-    const response: ExecuteResponse = await testApi.executeTestCasesWithResponse(request)
+    // 显示成功消息
+    ElMessage.success('测试任务已开始执行')
     
-    // 关闭加载消息
-    loadingMessage.close()
+    // 立即关闭对话框
+    serverDialogVisible.value = false
     
-    // 显示执行结果
-    if (response.url) {
-      ElMessage.success({
-        message: `测试执行成功！执行时间: ${response.time || '未知'}`,
-        duration: 5000,
-        showClose: true
-      })
-      
-      // 执行成功后刷新历史记录
-      await loadExecuteHistory()
-    } else {
-      ElMessage.success('测试用例执行请求已发送')
+    // 创建本地任务记录
+    const newTask: ExecuteResponse = {
+      id: taskId,
+      status: 'pending', // 初始状态设为 pending
+      created_at: new Date().toISOString(),
+      current: selectedBranch.value || selectedTag.value || currentBranch.value || currentTag.value || '未知',
+      latest_commit: latestCommit.value || '未知',
+      executed: `0/${selectedCases.length}`,
+      topo: '',
+      log: '',
+      user: authStore.username || '未知',
+      url: '',
+      end_time: ''
     }
     
-    // 关闭对话框
-    serverDialogVisible.value = false
+    // 添加到历史记录顶部
+    executeHistory.value.unshift(newTask)
+    startTaskPolling(taskId)
+
     
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '执行测试用例失败')
+    executeLoading.value = false
   } finally {
     executeLoading.value = false
   }
@@ -2669,6 +2996,11 @@ onMounted(() => {
   loadBranchAndTag()
   loadExecuteHistory()
   loadCombinations()
+})
+
+// 组件卸载时停止所有轮询
+onUnmounted(() => {
+  stopAllPolling()
 })
 </script>
 
@@ -2742,6 +3074,34 @@ onMounted(() => {
   color: #374151;
   background: #f9fafb;
   transform: translateY(-1px);
+}
+
+/* 代码显示样式 */
+.code-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.code-tag {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-hash-small {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 10px;
+  color: #909399;
+}
+
+/* 状态标签样式 */
+.status-tag {
+  font-weight: 500;
+  min-width: 60px;
+  text-align: center;
 }
 
 /* 占用新服务器按钮样式 */

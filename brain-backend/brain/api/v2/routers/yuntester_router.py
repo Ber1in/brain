@@ -3,6 +3,7 @@
 
 import asyncio
 from contextlib import contextmanager
+import subprocess
 from typing import Dict, List
 from datetime import datetime
 import os
@@ -12,8 +13,7 @@ import gitlab
 import git
 import logging
 import yaml
-import pytest
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
@@ -178,57 +178,75 @@ async def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest,
     return {"cases": commands}
 
 
-async def execute_test_task(task_id: str, cases: list, 
+def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path):
+    """Execute pytest using subprocess and redirect terminal output to log file"""
+    @contextmanager
+    def working_directory(path: str):
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(path)
+            yield
+        finally:
+            os.chdir(original_cwd)
+
+    executed_cases = 0
+    all_cases = len(cases)
+
+    with working_directory(test_base_dir):
+        # Ensure log directory exists
+        os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
+
+        for idx, case in enumerate(cases, 1):
+            LOG.info(f"Executing test case {idx}/{all_cases}: {case}")
+
+            # Construct pytest command
+            cmd = ["pytest", "-q", "-s", case, "--env", env_topo_path]
+
+            try:
+                with open(log_path, 'a', encoding='utf-8') as log_file:
+                    subprocess.run(
+                        cmd,
+                        stdout=log_file,
+                        stderr=subprocess.STDOUT,  # merge stderr to stdout
+                        text=True,
+                        encoding='utf-8',
+                        cwd=test_base_dir,
+                        timeout=7200  # 2 hour timeout
+                    )
+
+            except subprocess.TimeoutExpired:
+                LOG.error(f"Test case {case} execution timeout")
+            except Exception as e:
+                LOG.error(f"Error executing test case {case}: {e}")
+
+            executed_cases += 1
+
+            # Update execution progress to database
+            try:
+                db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, 
+                          {"executed": f"{executed_cases}/{all_cases}"})
+            except Exception as e:
+                LOG.error(f"Failed to update database: {e}")
+
+
+async def execute_test_task(task_id: str, cases: list, user: str,
                             env_topo_path: str, log_path: str):
 
     try:
-        db.update(
-            TEST_HISTORY_COLLECTION,
-            {"id": task_id},
-            {"status": "running"}
-        )
-
-        @contextmanager
-        def working_directory(path: str):
-            original_cwd = os.getcwd()
-            try:
-                os.chdir(path)
-                yield
-            finally:
-                os.chdir(original_cwd)
-
-        test_base_dir = os.path.dirname(env_topo_path)
+        db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": "running"})
+        test_base_dir = await get_user_repo_dir(user)
 
         if not os.path.exists(test_base_dir):
             raise Exception(f"Test directory not found: {test_base_dir}")
 
-        executed_cases = 0
-        all_cases = len(cases)
-        with working_directory(test_base_dir):
-            for case in cases:
-                args = ["-s", "-v", case, "--log-file", log_path, 
-                        "--log-file-mode", "a", "--env", env_topo_path]
-
-                LOG.info(f"Executing test case: {case}")
-                exit_code = pytest.main(args=args)
-
-                if exit_code != 0:
-                    LOG.warning(f"Test case {case} failed with exit code: {exit_code}")
-
-                executed_cases += 1
-
-                db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, 
-                          {"executed": f"{executed_cases}/{all_cases}"})
+        await asyncio.to_thread(
+            run_sync_pytest,
+            task_id, cases, test_base_dir, log_path, env_topo_path
+        )
 
         end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.update(
-            TEST_HISTORY_COLLECTION,
-            {"id": task_id},
-            {
-                "status": "success",
-                "end_time": end_time
-            }
-        )
+            TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": "success", "end_time": end_time})
 
         LOG.info(f"Test task {task_id} completed successfully")
 
@@ -236,14 +254,7 @@ async def execute_test_task(task_id: str, cases: list,
         end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         db.update(
-            TEST_HISTORY_COLLECTION,
-            {"id": task_id},
-            {
-                "status": "failed",
-                "end_time": end_time
-            }
-        )
-
+            TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": "failed", "end_time": end_time})
         LOG.error(f"Test task {task_id} failed: {str(e)}")
 
 
@@ -304,7 +315,9 @@ async def prepare_test_environment(data, user, dt):
 
 
 @router.post("/yuntester/execute-cases", response_model=yuntester_schemas.ExecuteResponse)
-async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
+async def execute_cases(data: yuntester_schemas.ExecuteRequest,
+                        background: BackgroundTasks,
+                        user=Depends(authenticate_user)):
     task_id = str(uuid4())
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -334,12 +347,14 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(aut
 
     db.insert(TEST_HISTORY_COLLECTION, task_record)
 
-    asyncio.create_task(execute_test_task(
+    background.add_task(
+        execute_test_task,
         task_id=task_id,
         cases=data.cases,
+        user=user,
         env_topo_path=env_topo_path,
         log_path=log_path
-    ))
+    )
 
     LOG.info(f"Test task {task_id} submitted for user {user}")
 
@@ -356,7 +371,8 @@ async def get_task_status(task_id: str, user=Depends(authenticate_user)):
     return task
 
 
-@router.get("/yuntester/execute-history", response_model=List[yuntester_schemas.ExecuteHistoryResponse])
+@router.get("/yuntester/execute-history",
+            response_model=List[yuntester_schemas.ExecuteHistoryResponse])
 async def execute_history(user=Depends(authenticate_user)):
     """Retrieve execution history for the authenticated user."""
 

@@ -65,7 +65,7 @@ class ExecuteHistoryResponse(BaseModel):
     topo: str
     log: str
     user: str
-    executed: int
+    executed: str
     status: str
 
 
