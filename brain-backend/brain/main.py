@@ -22,7 +22,7 @@ LOG_FILE = "/var/log/brain/brain.log"
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
-TEST_CASE_COLLECTION = "test_cases"
+TEST_DATA_DIR = "/opt/yunTesterData"
 
 
 class FsyncFileHandler(logging.FileHandler):
@@ -142,8 +142,8 @@ async def startup_event():
 
 
 # app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
-os.makedirs(TEST_CASE_COLLECTION, exist_ok=True)
-app.mount("/qa-auto-files", StaticFiles(directory=TEST_CASE_COLLECTION), name="qa-auto-files")
+os.makedirs(TEST_DATA_DIR, exist_ok=True)
+app.mount("/qa-auto-files", StaticFiles(directory=TEST_DATA_DIR), name="qa-auto-files")
 
 
 def main():
