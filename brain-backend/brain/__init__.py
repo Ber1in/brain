@@ -45,8 +45,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # 允许前端访问的源
 origins = [
-    "http://10.0.3.206:8000",  # 你前端地址
-    "http://localhost:8000",
+    "http://localhost:8099",
 ]
 
 app.add_middleware(

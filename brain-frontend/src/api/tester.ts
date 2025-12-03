@@ -55,4 +55,10 @@ export const testApi = {
   getDirectoryTree(): Promise<{ tree: any[] }> {
     return apiClient.get('/api/yuntester/directory-tree')
   },
+
+  shareCustomCombination: (combinationId: string, username: string) => {
+    return apiClient.post(`/api/yuntester/custom-combinations/${combinationId}`, {
+      share_user: username
+    })
+  }
 }

@@ -14,7 +14,7 @@ from brain import app
 from brain.config import settings
 from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
-from brain.middleware import RequestIdLogFilter, RequestIdMiddleware, QAAutoFileAccessMiddleware
+from brain.middleware import RequestIdLogFilter, RequestIdMiddleware
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.task_scheduler import init_server_warning, task_scheduler
 

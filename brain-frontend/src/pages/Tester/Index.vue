@@ -241,23 +241,20 @@
               <el-table-column prop="log" label="执行日志" width="100">
                 <template #default="{ row }">
                   <el-link 
-                    v-if="row.log" 
-                    :href="generateFileUrl(row.log)" 
-                    target="_blank" 
-                    type="success"
+                    @click="viewLog(row)"
+                    :type="row.status === 'running' ? 'warning' : 'success'"
                     :underline="false"
                     class="log-link"
                   >
                     <el-icon><Document /></el-icon>
-                    查看日志
+                    {{ row.status === 'running' ? '实时日志' : '查看日志' }}
                   </el-link>
-                  <span v-else class="no-data">-</span>
                 </template>
               </el-table-column>
               <el-table-column prop="url" label="测试报告" width="100">
                 <template #default="{ row }">
                   <el-link 
-                    v-if="row.url" 
+                    v-if="row.status === 'success' && row.url" 
                     :href="generateFileUrl(row.url)" 
                     target="_blank" 
                     type="primary"
@@ -342,35 +339,66 @@
                       :value="combination.id"
                     >
                       <div class="combination-option">
-                        <span>{{ combination.name }}</span>
-                        <el-tag size="small" type="info" class="case-count">
-                          {{ combination.cases?.length || 0 }} 用例
-                        </el-tag>
-                        <span class="create-time">{{ combination.created_at }}</span>
+                        <span class="combination-name">{{ combination.name }}</span>
+                        
+                        <div class="combination-actions">
+                          <!-- 用例数量 -->
+                          <el-tag 
+                            v-if="combination.cases?.length > 0"
+                            size="small" 
+                            type="info" 
+                            class="case-count"
+                          >
+                            {{ combination.cases?.length || 0 }}用例
+                          </el-tag>
+                          
+                          <!-- 创建时间 -->
+                          <span class="create-time">
+                            {{ formatCombinationTime(combination.created_at) }}
+                          </span>
+                          
+                          <!-- 新增：加载图标 -->
+                          <el-tooltip content="加载此集合" placement="top">
+                            <el-button 
+                              link 
+                              type="success" 
+                              size="small"
+                              class="load-btn"
+                              @click.stop="loadCombinationToRight(combination.id)"
+                            >
+                              <el-icon><Download /></el-icon>
+                            </el-button>
+                          </el-tooltip>
+                          
+                          <!-- 分享按钮 -->
+                          <el-tooltip content="分享给其他用户" placement="top">
+                            <el-button 
+                              link 
+                              type="primary" 
+                              size="small"
+                              class="share-btn"
+                              @click.stop="shareCombination(combination)"
+                            >
+                              <el-icon><Share /></el-icon>
+                            </el-button>
+                          </el-tooltip>
+                          
+                          <!-- 删除按钮 -->
+                          <el-tooltip content="删除集合" placement="top">
+                            <el-button 
+                              link 
+                              type="danger" 
+                              size="small"
+                              class="delete-btn"
+                              @click.stop="confirmDeleteCombination(combination)"
+                            >
+                              <el-icon><Delete /></el-icon>
+                            </el-button>
+                          </el-tooltip>
+                        </div>
                       </div>
                     </el-option>
                   </el-select>
-                  
-                  <div class="combination-buttons">
-                    <el-button 
-                      type="success" 
-                      @click="loadCombinationToRight"
-                      :disabled="!selectedCombinationId"
-                      style="width: 100%"
-                    >
-                      <el-icon><Lightning /></el-icon>
-                      加载集合
-                    </el-button>
-                    <el-button 
-                      type="danger" 
-                      @click="deleteCombination"
-                      :disabled="!selectedCombinationId"
-                      style="width: 100%"
-                    >
-                      <el-icon><Delete /></el-icon>
-                      删除集合
-                    </el-button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -408,14 +436,14 @@
               <div class="panel-header">
                 <h4>所有测试用例 ({{ leftTotalCount }})</h4>
                 <div class="filter-input">
-                    <el-input
+                  <el-input
                     v-model="leftFilterText"
-                    placeholder="过滤用例..."
+                    placeholder="过滤用例（多个关键字用空格隔开）..."
                     clearable
                     size="small"
-                    style="width: 150px"
+                    style="width: 220px"
                     :prefix-icon="Search"
-                    />
+                  />
                 </div>
                 <span class="count-info">已选择: {{ leftSelectedCount }} 个</span>
               </div>
@@ -494,14 +522,14 @@
               <div class="panel-header">
                 <h4>已添加用例 ({{ rightTestCases.length }})</h4>
                 <div class="filter-input">
-                    <el-input
+                  <el-input
                     v-model="rightFilterText"
-                    placeholder="过滤用例..."
+                    placeholder="过滤用例（多个关键字用空格隔开）..."
                     clearable
                     size="small"
-                    style="width: 150px"
+                    style="width: 220px"
                     :prefix-icon="Search"
-                    />
+                  />
                 </div>
                 <span class="count-info">已选择: {{ rightSelectedCount }} 个</span>
               </div>
@@ -563,6 +591,40 @@
         </div>
       </div>
     </el-card>
+
+    <el-dialog
+      v-model="shareDialogVisible"
+      :title="`分享测试用例集合 `"
+      width="400px"
+    >
+      <el-form :model="shareForm" label-width="90px">
+        <el-form-item label="集合名称:">
+          <div>{{ currentSharingCombination.name }}</div>
+        </el-form-item>
+        <el-form-item label="用例数量:">
+          <div>{{ currentSharingCombination.cases?.length || 0 }}个</div>
+        </el-form-item>
+        <el-form-item label="目标用户:" required>
+          <el-input 
+            v-model="shareForm.username" 
+            placeholder="请输入要分享的用户名"
+            clearable
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="shareDialogVisible = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="confirmShareCombination"
+          :disabled="!shareForm.username"
+          :loading="shareLoading"
+        >
+          确认分享
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 目录选择器对话框 -->
     <el-dialog
@@ -1032,7 +1094,9 @@ import {
   Lightning,
   View,
   CircleClose,
-  QuestionFilled
+  QuestionFilled,
+  Download,
+  Share
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
@@ -2237,18 +2301,43 @@ const filterNode = (value: string, data: any) => {
   return data.label.toLowerCase().includes(value.toLowerCase())
 }
 
-// 过滤树数据方法
+// 支持多关键字过滤的树数据方法
 const filterTreeData = (treeData: any[], filterText: string): any[] => {
-  if (!filterText) return treeData
+  if (!filterText.trim()) return treeData
+  
+  // 按分号分割并清理关键字
+  const keywords = filterText
+    .split(' ')
+    .map(k => k.trim().toLowerCase())
+    .filter(k => k.length > 0)
+  
+  if (keywords.length === 0) return treeData
+  
+  // 检查节点是否匹配所有关键字
+  const matchesAllKeywords = (nodeLabel: string): boolean => {
+    const label = nodeLabel.toLowerCase()
+    return keywords.every(keyword => label.includes(keyword))
+  }
+  
+  // 检查节点是否匹配任意关键字
+  const matchesAnyKeyword = (nodeLabel: string): boolean => {
+    const label = nodeLabel.toLowerCase()
+    return keywords.some(keyword => label.includes(keyword))
+  }
   
   const filter = (nodes: any[]): any[] => {
     return nodes
       .map(node => ({ ...node }))
       .filter(node => {
-        // 如果节点本身匹配，保留整个节点
-        if (node.label.toLowerCase().includes(filterText.toLowerCase())) {
+        // 如果节点本身匹配所有关键字，保留整个节点
+        if (matchesAllKeywords(node.label)) {
           return true
         }
+        
+        // 如果节点匹配任意关键字，也保留（根据需求选择）
+        // if (matchesAnyKeyword(node.label)) {
+        //   return true
+        // }
         
         // 如果子节点有匹配的，保留该节点并过滤子节点
         if (node.children && node.children.length > 0) {
@@ -2264,6 +2353,328 @@ const filterTreeData = (treeData: any[], filterText: string): any[] => {
   }
   
   return filter(treeData)
+}
+
+const viewLog = (row: ExecuteResponse) => {
+  if (row.status === 'running') {
+    // 如果是running状态，在新标签页打开实时日志查看器
+    openSmartLogViewer(row)
+  } else {
+    // 如果是非running状态，直接打开静态日志文件
+    window.open(generateFileUrl(row.log), '_blank')
+  }
+}
+
+// 更高级的版本：使用fetch + 增量更新
+const openSmartLogViewer = (row: ExecuteResponse) => {
+  const newWindow = window.open('', `log-${row.id}`)
+  
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>智能日志查看器 - 任务 ${row.id}</title>
+    <style>
+        body { 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+            margin: 0; 
+            padding: 0;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+        }
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #252526;
+            padding: 8px 16px;
+            border-bottom: 1px solid #3e3e3e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .status-running { color: #e6a23c; }
+        .status-success { color: #67c23a; }
+        .status-failed { color: #f56c6c; }
+        .controls {
+            display: flex;
+            gap: 6px;
+        }
+        .btn {
+            background: #3e3e3e;
+            color: white;
+            border: 1px solid #4e4e4e;
+            padding: 4px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #4e4e4e;
+        }
+        .log-content {
+            margin-top: 45px;
+            padding: 16px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: calc(100vh - 45px);
+        }
+        .log-line {
+            margin-bottom: 2px;
+        }
+        .log-line.error { color: #f56c6c; }
+        .log-line.warning { color: #e6a23c; }
+        .log-line.success { color: #67c23a; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <span id="statusText" class="status status-running">🔄 正在获取日志...</span>
+            <span style="margin-left: 20px; color: #888;">任务ID: ${row.id}</span>
+        </div>
+        <div class="controls">
+            <button class="btn" onclick="fetchLog()" id="refreshBtn">🔄 刷新</button>
+            <button class="btn" onclick="toggleAutoFetch()" id="autoBtn">⏸️ 暂停自动</button>
+            <button class="btn" onclick="changeInterval(-1)">⚡ 加快</button>
+            <button class="btn" onclick="changeInterval(1)">⏱️ 减慢</button>
+            <button class="btn" onclick="scrollToBottom()">⬇️ 到底部</button>
+            <button class="btn" onclick="window.close()">❌ 关闭</button>
+        </div>
+    </div>
+    <div id="logContent" class="log-content">
+        正在加载日志...
+    </div>
+    
+    <script>
+        let autoFetch = true;
+        let fetchInterval = 2000; // 2秒
+        let fetchTimer = null;
+        let lastContent = '';
+        let lastModified = '';
+        
+        // 获取日志内容
+        async function fetchLog() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const oldText = refreshBtn.textContent;
+            refreshBtn.textContent = '⏳ 刷新中...';
+            refreshBtn.disabled = true;
+            
+            try {
+                // 添加时间戳避免缓存
+                const url = '${generateFileUrl(row.log)}?t=' + Date.now();
+                const response = await fetch(url, {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                if (response.ok) {
+                    const content = await response.text();
+                    const currentModified = response.headers.get('last-modified');
+                    
+                    // 只更新变化的部分
+                    if (content !== lastContent) {
+                        updateLogContent(content);
+                        lastContent = content;
+                    }
+                    
+                    // 检查任务状态
+                    await checkTaskStatus();
+                    
+                    // 根据文件修改时间调整刷新频率
+                    if (currentModified === lastModified) {
+                        // 文件没变化，可以降低频率
+                        fetchInterval = Math.min(fetchInterval * 1.2, 10000); // 最大10秒
+                    } else {
+                        // 文件有变化，保持或提高频率
+                        fetchInterval = Math.max(1000, fetchInterval * 0.8); // 最小1秒
+                        lastModified = currentModified;
+                    }
+                    
+                } else {
+                    console.error('获取日志失败:', response.status);
+                    updateStatus('error', '获取日志失败');
+                }
+                
+            } catch (error) {
+                console.error('获取日志出错:', error);
+                updateStatus('error', '连接失败');
+                // 出错时增加间隔
+                fetchInterval = Math.min(fetchInterval * 1.5, 30000); // 最大30秒
+            } finally {
+                refreshBtn.textContent = oldText;
+                refreshBtn.disabled = false;
+                
+                // 安排下一次获取
+                if (autoFetch) {
+                    clearTimeout(fetchTimer);
+                    fetchTimer = setTimeout(fetchLog, fetchInterval);
+                }
+            }
+        }
+        
+        // 更新日志内容
+        function updateLogContent(content) {
+            const logContent = document.getElementById('logContent');
+            
+            // 简单的语法高亮
+            const lines = content.split('\\n');
+            let html = '';
+            
+            lines.forEach((line, index) => {
+                let lineClass = 'log-line';
+                if (line.includes('ERROR') || line.includes('FAILED')) {
+                    lineClass += ' error';
+                } else if (line.includes('WARNING')) {
+                    lineClass += ' warning';
+                } else if (line.includes('PASSED') || line.includes('SUCCESS')) {
+                    lineClass += ' success';
+                }
+                
+                html += \`<div class="\${lineClass}">\${line}</div>\`;
+            });
+            
+            logContent.innerHTML = html;
+            
+            // 如果自动滚动开启，滚动到底部
+            if (window.autoScroll !== false) {
+                scrollToBottom();
+            }
+        }
+        
+        // 检查任务状态
+        async function checkTaskStatus() {
+            try {
+                const response = await fetch('${window.location.origin}/api/api/yuntester/task/${row.id}');
+                const data = await response.json();
+                
+                if (data.status !== 'running') {
+                    // 任务完成
+                    updateStatus(data.status, '任务完成');
+                    autoFetch = false;
+                    clearTimeout(fetchTimer);
+                    document.title = \`日志 - 任务\${data.status === 'success' ? '成功' : '失败'}\`;
+                } else {
+                    updateStatus('running', '正在执行...');
+                }
+            } catch (error) {
+                // 忽略状态检查错误
+            }
+        }
+        
+        // 更新状态显示
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('statusText');
+            statusEl.className = 'status status-' + status;
+            
+            const icons = {
+                'running': '🔄',
+                'success': '✅',
+                'failed': '❌',
+                'error': '⚠️'
+            };
+            
+            statusEl.textContent = \`\${icons[status] || 'ℹ️'} \${text}\`;
+        }
+        
+        // 切换自动获取
+        function toggleAutoFetch() {
+            autoFetch = !autoFetch;
+            const btn = document.getElementById('autoBtn');
+            
+            if (autoFetch) {
+                btn.textContent = '⏸️ 暂停自动';
+                fetchLog(); // 立即获取一次
+            } else {
+                btn.textContent = '▶️ 开始自动';
+                clearTimeout(fetchTimer);
+            }
+        }
+        
+        // 调整间隔
+        function changeInterval(delta) {
+            fetchInterval = Math.max(500, Math.min(30000, fetchInterval + delta * 500));
+            
+            if (autoFetch) {
+                clearTimeout(fetchTimer);
+                fetchTimer = setTimeout(fetchLog, fetchInterval);
+            }
+            
+            // 显示当前间隔
+            const statusEl = document.getElementById('statusText');
+            const originalText = statusEl.textContent;
+            const tempText = \`⏱️ 刷新间隔: \${fetchInterval/1000}秒\`;
+            statusEl.textContent = tempText;
+            
+            setTimeout(() => {
+                if (statusEl.textContent === tempText) {
+                    statusEl.textContent = originalText;
+                }
+            }, 1500);
+        }
+        
+        // 滚动到底部
+        function scrollToBottom() {
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        
+        // 页面加载完成
+        window.onload = function() {
+            // 立即获取一次
+            fetchLog();
+            
+            // 监听页面可见性
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden && autoFetch) {
+                    // 页面隐藏时暂停自动获取
+                    const wasAutoFetch = autoFetch;
+                    autoFetch = false;
+                    clearTimeout(fetchTimer);
+                    
+                    // 页面再次可见时恢复
+                    document.addEventListener('visibilitychange', function handler() {
+                        if (!document.hidden && wasAutoFetch) {
+                            autoFetch = true;
+                            fetchLog();
+                            document.removeEventListener('visibilitychange', handler);
+                        }
+                    });
+                }
+            });
+            
+            // 监听滚动，用户手动滚动时关闭自动滚动
+            window.addEventListener('scroll', function() {
+                const scrollTop = window.scrollY;
+                const scrollHeight = document.body.scrollHeight;
+                const clientHeight = window.innerHeight;
+                
+                // 如果用户滚动到接近底部（100px以内），开启自动滚动
+                window.autoScroll = (scrollHeight - scrollTop - clientHeight) < 100;
+            });
+        };
+        
+        // 提供外部控制接口
+        window.stopWatching = function() {
+            autoFetch = false;
+            clearTimeout(fetchTimer);
+        };
+    <\/script>
+</body>
+</html>`;
+  
+  newWindow.document.write(htmlContent)
+  newWindow.document.close()
+  newWindow.focus()
 }
 
 // 加载执行历史
@@ -2288,8 +2699,6 @@ const loadExecuteHistory = async () => {
       if (shouldPollTask(task)) {
         console.log(`任务 ${task.id} 需要轮询，状态: ${task.status}`)
         startTaskPolling(task.id)
-      } else {
-        console.log(`任务 ${task.id} 不需要轮询，状态: ${task.status}`)
       }
     })
   } catch (error) {
@@ -2589,7 +2998,6 @@ const loadCombinations = async () => {
 // 处理集合选择变化
 const handleCombinationChange = (combinationId: string) => {
   if (!combinationId) {
-    // 清空选择
     selectedCombinationId.value = ''
   }
 }
@@ -2654,15 +3062,98 @@ const confirmSaveCombination = async () => {
   }
 }
 
-// 加载集合到右侧
-const loadCombinationToRight = async () => {
-  if (!selectedCombinationId.value) {
-    ElMessage.warning('请先选择用例集合')
+// 新增响应式数据
+const shareDialogVisible = ref(false)
+const currentSharingCombination = ref<CaseCombinationResponse | null>(null)
+const shareForm = ref({
+  combinationId: '',
+  username: ''
+})
+const shareLoading = ref(false)
+
+// 新增计算属性
+const currentCombinationForShare = computed(() => {
+  return combinations.value.find(c => c.id === shareForm.value.combinationId)
+})
+
+// 格式化集合时间显示
+const formatCombinationTime = (timeStr: string): string => {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  
+  // 如果是今天，显示时间；否则显示日期
+  const today = new Date()
+  const isToday = date.getDate() === today.getDate() && 
+                  date.getMonth() === today.getMonth() && 
+                  date.getFullYear() === today.getFullYear()
+  
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } else {
+    return date.toLocaleDateString()
+  }
+}
+
+// 显示分享对话框
+const showShareDialog = () => {
+  shareDialogVisible.value = true
+  shareForm.value = {
+    combinationId: '',
+    username: ''
+  }
+}
+
+// 分享单个集合
+const shareCombination = (combination: CaseCombinationResponse) => {
+  currentSharingCombination.value = combination
+  shareForm.value.username = ''
+  shareDialogVisible.value = true
+}
+
+// 确认分享
+const confirmShareCombination = async () => {
+  if (!currentSharingCombination.value || !shareForm.value.username.trim()) {
+    ElMessage.warning('请输入目标用户名')
     return
   }
   
-  const combination = currentCombination.value
-  if (!combination || !combination.cases || combination.cases.length === 0) {
+  try {
+    shareLoading.value = true
+    
+    await testApi.shareCustomCombination(
+      currentSharingCombination.value.id, 
+      shareForm.value.username.trim()
+    )
+    
+    ElMessage.success('集合分享成功')
+    shareDialogVisible.value = false
+    
+    // 重置状态
+    currentSharingCombination.value = null
+    shareForm.value.username = ''
+    
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '分享失败')
+  } finally {
+    shareLoading.value = false
+  }
+}
+
+// 修改加载集合方法，支持双击
+const loadCombinationToRight = async (combinationId?: string) => {
+  const id = combinationId || selectedCombinationId.value
+  if (!id) {
+    ElMessage.warning('请选择用例集合')
+    return
+  }
+  
+  const combination = combinations.value.find(c => c.id === id)
+  if (!combination) {
+    ElMessage.warning('未找到选择的集合')
+    return
+  }
+  
+  if (!combination.cases || combination.cases.length === 0) {
     ElMessage.warning('该集合没有测试用例')
     return
   }
@@ -2691,9 +3182,58 @@ const loadCombinationToRight = async () => {
     ElMessage.success(`已加载集合 "${combination.name}" 的 ${combination.cases.length} 个测试用例`)
     
   } catch (error) {
+    console.error('加载用例集合失败:', error)
     ElMessage.error('加载用例集合失败')
   }
 }
+
+// 双击选择器加载
+const handleCombinationDoubleClick = () => {
+  if (selectedCombinationId.value) {
+    loadCombinationToRight()
+  }
+}
+
+// 确认删除集合
+const confirmDeleteCombination = (combination: CaseCombinationResponse) => {
+  ElMessageBox.confirm(
+    `确定要删除集合 "${combination.name}" 吗？此操作不可恢复。`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+      customClass: 'delete-confirm-dialog'
+    }
+  ).then(async () => {
+    try {
+      // 调用删除接口
+      await testApi.deleteCustomCombination(combination.id)
+      
+      ElMessage.success('集合删除成功')
+      
+      // 重新加载集合列表
+      await loadCombinations()
+      
+      // 清空选择
+      selectedCombinationId.value = ''
+      
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.detail || '删除集合失败')
+    }
+  }).catch(() => {
+    // 用户取消操作
+  })
+}
+
+watch(shareDialogVisible, (visible) => {
+  if (!visible) {
+    setTimeout(() => {
+      currentSharingCombination.value = null
+      shareForm.value.username = ''
+    }, 300)
+  }
+})
 
 // 删除集合
 const deleteCombination = async () => {
@@ -3546,16 +4086,105 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  padding: 8px 0;
+}
+.combination-name {
+  flex: 1;
+  font-size: 14px;
+  color: #1f2937;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 12px;
+}
+
+.combination-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .case-count {
-  margin-left: 8px;
+  font-size: 11px;
+  padding: 1px 6px;
+  height: 18px;
+  line-height: 16px;
+  margin: 0;
 }
 
 .create-time {
-  font-size: 12px;
+  font-size: 11px;
   color: #909399;
-  margin-left: 8px;
+  min-width: 40px;
+  text-align: right;
+}
+
+.action-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px; /* 减小图标间距 */
+  margin-left: 4px;
+}
+
+.action-icon {
+  width: 20px !important; /* 减小宽度 */
+  height: 20px !important; /* 减小高度 */
+  padding: 0 !important;
+  min-width: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.action-icon .el-icon {
+  font-size: 14px !important; /* 减小图标大小 */
+}
+
+.load-btn:hover {
+  color: #67c23a;
+  background: rgba(103, 194, 58, 0.1);
+  border-radius: 2px;
+}
+
+.share-btn:hover {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 2px;
+}
+
+.delete-btn:hover {
+  color: #f56c6c;
+  background: rgba(245, 108, 108, 0.1);
+  border-radius: 2px;
+}
+
+.share-all-btn .el-icon {
+  margin-right: 4px;
+}
+
+.share-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.share-info {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.6;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.share-info-placeholder {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  padding: 8px;
 }
 
 .case-preview {
@@ -4190,6 +4819,35 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  .combination-actions {
+    gap: 4px;
+  }
+  
+  .action-icons {
+    gap: 1px;
+  }
+  
+  .action-icon {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  
+  .action-icon .el-icon {
+    font-size: 12px !important;
+  }
+  
+  .create-time {
+    font-size: 10px;
+    min-width: 35px;
+  }
+  
+  .case-count {
+    font-size: 10px;
+    padding: 0 4px;
+    height: 16px;
+    line-height: 14px;
+  }
+
   :deep(.navigation-confirm-dialog) {
     width: 90% !important;
     max-width: 400px;

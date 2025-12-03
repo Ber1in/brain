@@ -3,6 +3,7 @@
 
 import asyncio
 from contextlib import contextmanager
+import re
 import subprocess
 from typing import Dict, List
 from datetime import datetime
@@ -13,7 +14,8 @@ import gitlab
 import git
 import logging
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
@@ -21,6 +23,7 @@ from brain.api.v2.schemas import yuntester_schemas
 from brain.json_db import SQLiteDocumentDB
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
+log_router = APIRouter()
 LOG = logging.getLogger(__name__)
 
 IGNORE_DIRS = ["__pycache__", ".pytest_cache", ".git", ".idea"]
@@ -199,7 +202,7 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
         os.makedirs(allure_results_dir, exist_ok=True)
 
         for idx, case in enumerate(cases, 1):
-            LOG.info(f"Executing test case {idx}/{all_cases}: {case}")
+            LOG.debug(f"Executing test case {idx}/{all_cases}: {case}")
 
             # Construct pytest command
             cmd = ["pytest", "-q", "-s", "-v", case, "--env",
@@ -234,11 +237,10 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
         try:
             allure_report_dir = os.path.join(result_dir, "allure-report")
 
-            # 只执行命令，不捕获输出
             subprocess.run(
                 ["allure", "generate", allure_results_dir, "-c", "-o", allure_report_dir],
-                check=True,  # 如果命令失败会抛出异常
-                timeout=300,  # 5分钟应该足够
+                check=True,
+                timeout=600,
                 cwd=test_base_dir
             )
 
@@ -246,7 +248,6 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
 
         except subprocess.CalledProcessError as e:
             LOG.warning(f"Allure report generation failed with exit code {e.returncode}")
-            # 可以继续，不抛出异常，因为测试可能已经成功了
         except subprocess.TimeoutExpired:
             LOG.warning("Allure report generation timeout")
         except Exception as e:
@@ -389,8 +390,8 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
 
 
 @router.get("/yuntester/task/{task_id}", response_model=yuntester_schemas.ExecuteHistoryResponse)
-async def get_task_status(task_id: str, user=Depends(authenticate_user)):
-    task = db.find_one(TEST_HISTORY_COLLECTION, {"id": task_id, "user": user})
+async def get_task_status(task_id: str):
+    task = db.find_one(TEST_HISTORY_COLLECTION, {"id": task_id})
 
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -469,6 +470,27 @@ async def delete_custom_combination(combination_id: str):
     except Exception as e:
         LOG.error("Failed to delete combination id=%s, error=%s", combination_id, e)
         raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")
+
+
+@router.post("/yuntester/custom-combinations/{combination_id}", status_code=204)
+async def copy_custom_combination(combination_id: str, data: yuntester_schemas.combinationShareRequest):
+    """Copy a custom test case combination and share it with another user."""
+
+    try:
+        record = db.find_one(TEST_CASE_COLLECTION, {"id": combination_id})
+    except Exception:
+        LOG.warning("Custom combination not found: id=%s", combination_id)
+        raise HTTPException(status_code=404, detail="Combination not found")
+
+    try:
+        new_id = str(uuid4())
+        record["id"] = new_id
+        record["user"] = data.share_user
+        db.insert(TEST_CASE_COLLECTION, record)
+        LOG.info("Successfully shared combination new_id=%s to user=%s", new_id, data.share_user)
+    except Exception as e:
+        LOG.error("Failed to insert cloned combination new_id=%s, error=%s", new_id, e)
+        raise HTTPException(status_code=500, detail="Failed to save cloned combination")
 
 
 @router.get("/yuntester/directory-tree")

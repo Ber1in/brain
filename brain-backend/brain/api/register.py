@@ -7,6 +7,7 @@ import logging
 import os
 from fastapi import FastAPI
 
+
 LOG = logging.getLogger(__name__)
 
 API_PREFIX = {
@@ -76,6 +77,7 @@ def register_routers(app: FastAPI):
     try:
         auth_module = importlib.import_module("brain.api.auth_router")
         _register_module_router(app, auth_module, "brain.api", "auth_router")
+
     except Exception as e:
         LOG.error(f"Failed loading auth_router: {e}")
 
