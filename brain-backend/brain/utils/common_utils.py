@@ -424,7 +424,7 @@ async def fetch_mcr_package(task_id: str, host: str, user: str, pwd: str, path: 
             await ssh_execute_async(host, check_sshpass_cmd, user, pwd)
         except Exception:
             update_task(task_id, detail="installing sshpass")
-            await ensure_packages_installed(host, user, pwd, ["sshpass"])
+            await ensure_packages_installed(host, user, pwd, ["sshpass", "ipmitool"])
 
         # Step 2-2: Download package
         update_task(task_id, detail="Downloading MCR package from common server")
