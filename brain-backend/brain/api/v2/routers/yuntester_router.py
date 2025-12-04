@@ -287,7 +287,7 @@ async def prepare_test_environment(data, user, dt):
     def normalize_nic_type(t: str) -> str:
         t = t or ""
         if t == "metaScale-200 OCP3.0":
-            return "ms200-ocp3.0"
+            return "MS200-OCP"
         return t.split("-")[0].upper()
 
     clients = {}
@@ -311,7 +311,7 @@ async def prepare_test_environment(data, user, dt):
         nics = []
         for nic in server.nics:
             nic_info = {
-                "ifname": nic.iface,
+                "name": nic.iface,
                 "bdf": nic.bdf,
                 "type": normalize_nic_type(nic.type),
                 "mac": nic.mac
