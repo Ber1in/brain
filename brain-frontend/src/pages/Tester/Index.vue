@@ -186,6 +186,20 @@
                   {{ formatTime(row.created_at) }}
                 </template>
               </el-table-column>
+
+              <el-table-column 
+                v-if="authStore.username === 'admin'"
+                prop="user" 
+                label="执行人" 
+                width="90"
+              >
+                <template #default="{ row }">
+                  <el-tag size="small" type="info">
+                    {{ row.user || '未知' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              
               <el-table-column prop="current" label="测试代码" width="200">
                 <template #default="{ row }">
                   <el-tooltip 
@@ -201,6 +215,7 @@
                   </el-tooltip>
                 </template>
               </el-table-column>
+              
               <!-- 执行状态列 -->
               <el-table-column prop="status" label="执行状态" width="120">
                 <template #default="{ row }">
@@ -220,6 +235,7 @@
                   </el-tooltip>
                 </template>
               </el-table-column>
+              
               <!-- 新增拓扑列 -->
               <el-table-column prop="topo" label="拓扑信息" width="105">
                 <template #default="{ row }">
@@ -237,6 +253,7 @@
                   <span v-else class="no-data">-</span>
                 </template>
               </el-table-column>
+              
               <!-- 新增日志列 -->
               <el-table-column prop="log" label="执行日志" width="100">
                 <template #default="{ row }">
@@ -251,6 +268,7 @@
                   </el-link>
                 </template>
               </el-table-column>
+              
               <el-table-column prop="url" label="测试报告" width="100">
                 <template #default="{ row }">
                   <el-link 
