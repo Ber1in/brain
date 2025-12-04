@@ -225,7 +225,7 @@
                 <template #default="{ row }">
                   <el-link 
                     v-if="row.topo" 
-                    :href="generateFileUrl(row.topo)" 
+                    :href="row.topo" 
                     target="_blank" 
                     type="primary"
                     :underline="false"
@@ -255,7 +255,7 @@
                 <template #default="{ row }">
                   <el-link 
                     v-if="row.status === 'success' && row.url" 
-                    :href="generateFileUrl(row.url)" 
+                    :href="row.url" 
                     target="_blank" 
                     type="primary"
                     :underline="false"
@@ -2358,10 +2358,11 @@ const filterTreeData = (treeData: any[], filterText: string): any[] => {
 const viewLog = (row: ExecuteResponse) => {
   if (row.status === 'running') {
     // 如果是running状态，在新标签页打开实时日志查看器
-    openSmartLogViewer(row)
+    // openSmartLogViewer(row)
+    window.open(row.log, '_blank')
   } else {
     // 如果是非running状态，直接打开静态日志文件
-    window.open(generateFileUrl(row.log), '_blank')
+    window.open(row.log, '_blank')
   }
 }
 

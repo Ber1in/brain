@@ -3,7 +3,6 @@
 
 import asyncio
 from contextlib import contextmanager
-import re
 import subprocess
 from typing import Dict, List
 from datetime import datetime
@@ -14,9 +13,9 @@ import gitlab
 import git
 import logging
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
+from brain.config import settings
 from brain.auth import authenticate_user
 from brain.utils.collect_cases import collect_tests_with_detailed_report
 from brain.api.v2.schemas import yuntester_schemas
@@ -348,13 +347,14 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
 
     dt = start_time.replace("-", "").replace(" ", "_").replace(":", "")
 
-    env_topo_path = await prepare_test_environment(data, user, dt)
+    env_topo_filename = await prepare_test_environment(data, user, dt)
 
     log_filename = dt + ".log"
     log_dir = await get_user_log_dir(user)
     log_path = os.path.join(log_dir, log_filename)
     result_base_dir = await get_user_result_dir(user)
     result_dir = os.path.join(result_base_dir, dt)
+    env_topo_filename = f'{dt}.yaml'
 
     current, latest_commit = await get_current_code_and_commit(user,)
 
@@ -367,9 +367,9 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
         "created_at": start_time,
         "executed": "",
         "end_time": "",
-        "url": f"/qa-auto-files/{user}/results/{dt}/allure-report/index.html",
-        "topo": f"/qa-auto-files/{user}/topo/{os.path.basename(env_topo_path)}",
-        "log": f"/qa-auto-files/{user}/logs/{log_filename}",
+        "url": f"{settings.file_server}/qa-auto-files/{user}/results/{dt}/allure-report/index.html",
+        "topo": f"{settings.file_server}/qa-auto-files/{user}/topo/{env_topo_filename}",
+        "log": f"{settings.file_server}/qa-auto-files/{user}/logs/{log_filename}",
     }
 
     db.insert(TEST_HISTORY_COLLECTION, task_record)
@@ -379,7 +379,7 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
         task_id=task_id,
         cases=data.cases,
         user=user,
-        env_topo_path=env_topo_path,
+        env_topo_path=env_topo_filename,
         log_path=log_path,
         result_dir=result_dir
     )
@@ -473,7 +473,8 @@ async def delete_custom_combination(combination_id: str):
 
 
 @router.post("/yuntester/custom-combinations/{combination_id}", status_code=204)
-async def copy_custom_combination(combination_id: str, data: yuntester_schemas.combinationShareRequest):
+async def copy_custom_combination(combination_id: str,
+                                  data: yuntester_schemas.combinationShareRequest):
     """Copy a custom test case combination and share it with another user."""
 
     try:

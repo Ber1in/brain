@@ -80,5 +80,6 @@ class CaseCombinationsRequest(BaseModel):
     name: str
     cases: List[str] = None
 
+
 class combinationShareRequest(BaseModel):
     share_user: str
