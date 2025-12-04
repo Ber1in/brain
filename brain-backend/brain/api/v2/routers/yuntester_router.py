@@ -347,7 +347,7 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
 
     dt = start_time.replace("-", "").replace(" ", "_").replace(":", "")
 
-    env_topo_filename = await prepare_test_environment(data, user, dt)
+    env_topo_path = await prepare_test_environment(data, user, dt)
 
     log_filename = dt + ".log"
     log_dir = await get_user_log_dir(user)
@@ -379,7 +379,7 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
         task_id=task_id,
         cases=data.cases,
         user=user,
-        env_topo_path=env_topo_filename,
+        env_topo_path=env_topo_path,
         log_path=log_path,
         result_dir=result_dir
     )
