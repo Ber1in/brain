@@ -609,8 +609,14 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             update_task(task_id, stage="reboot", detail="The server is undergoing a cold restart")
             ipmi_power_action(ipmi, "cycle")
 
-            # Finished
-            update_task(task_id, status="finished", detail="MCR update completed")
+            success = await wait_for_server_reboot(host)
+            if success:
+                update_task(task_id, status="finished", detail="MCR update completed")
+                LOG.info(f"[{task_id}] Reset Fw task finished successfully")
+            else:
+                LOG.error(f"{host} did not come online within timeout")
+                update_task(task_id, status="reboot_timeout", detail="Server restart timeout")
+
             LOG.info(f"[{task_id}] MCR update task finished successfully")
 
     except Exception as e:
