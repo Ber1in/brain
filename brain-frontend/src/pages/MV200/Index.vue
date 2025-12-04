@@ -1030,6 +1030,7 @@ const loadData = async () => {
     if (!serversResponse || serversResponse.length === 0) {
       servers.value = []
       allDevices.value = []
+      loading.value = false
       return
     }
     

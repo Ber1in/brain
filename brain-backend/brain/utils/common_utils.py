@@ -606,6 +606,9 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             await ssh_execute_async(host, install_cmd, user, pwd)
             LOG.info(f"[{task_id}] New MCR installed successfully")
 
+            update_task(task_id, stage="reboot", detail="The server is undergoing a cold restart")
+            ipmi_power_action(ipmi, "cycle")
+
             # Finished
             update_task(task_id, status="finished", detail="MCR update completed")
             LOG.info(f"[{task_id}] MCR update task finished successfully")
