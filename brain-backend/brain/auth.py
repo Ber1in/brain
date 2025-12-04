@@ -8,8 +8,9 @@ import jwt
 from datetime import datetime, timedelta
 from fastapi import status
 
+from brain.config import settings
+
 # LDAP config
-LDAP_SERVER = 'ldaps://it-srv-idc001.yunsilicon.com:636'
 LDAP_DN_SUFFIX = "@yunsilicon.com"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -52,7 +53,7 @@ def ldap_authenticate(username: str, password: str) -> bool:
 
     try:
         user_dn = f"{username}{LDAP_DN_SUFFIX}"
-        server = Server(LDAP_SERVER, use_ssl=True)
+        server = Server(settings.ldap_server, use_ssl=True)
 
         # Establish connection and authenticate
         with Connection(server, user=user_dn, password=password) as conn:

@@ -1,0 +1,12 @@
+webhook_url: "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/51053ced-7d61-4645-95df-f0c6ac3f67a7"
+
+smtp:
+  host: "smtp.feishu.cn"
+  port: 465
+  user: "yuntester@yunsilicon.com"
+  password: "VIgB7YFDX9Y3g7Dw"
+
+yuntester_platform: "https://yuntester.yunsilicon.com"
+file_server: "https://yuntester-api.yunsilicon.com"
+
+ldap_server: "ldaps://it-srv-idc001.yunsilicon.com:636"

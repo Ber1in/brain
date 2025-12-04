@@ -162,14 +162,14 @@ task_scheduler = GenericTaskScheduler()
 
 
 async def init_warning(ip, user, pwd):
-    init_command = '''
+    init_command = f'''
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
 cat >> /etc/profile << 'EOF'
 # WARNING_MESSAGE_START
 echo "-----------------------------------------------------------------------------"
 echo "提示：当前服务器无人使用！"
-echo "请先登录: https://yuntester.yunsilicon.com/devices 在[服务器管理]完成'占用服务器'后继续使用"
+echo "请先登录: {settings.yuntester_platform}/devices 在[服务器管理]完成'占用服务器'后继续使用"
 echo "-----------------------------------------------------------------------------"
 # WARNING_MESSAGE_END
 EOF
@@ -196,7 +196,7 @@ echo "🚫 服务器已被占用！请立即退出！ 🚫"
 echo "================================================"
 echo "👤 使用人: {occupy_user}"
 echo "⏰ 占用截止: {end_time}"
-echo "🔗 管理页面: https://yuntester.yunsilicon.com/devices"
+echo "🔗 管理页面: {settings.yuntester_platform}/devices"
 echo ""
 echo "💡 可登录管理页面，在[服务器管理]中查看其余可用服务器"
 echo "================================================"

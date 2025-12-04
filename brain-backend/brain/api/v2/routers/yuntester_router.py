@@ -240,7 +240,8 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
                 ["allure", "generate", allure_results_dir, "-c", "-o", allure_report_dir],
                 check=True,
                 timeout=600,
-                cwd=test_base_dir
+                cwd=test_base_dir,
+                stdout=subprocess.DEVNULL,
             )
 
             LOG.info(f"Allure report generated at {allure_report_dir}")
