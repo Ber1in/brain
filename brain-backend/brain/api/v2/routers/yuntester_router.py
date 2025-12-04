@@ -405,7 +405,10 @@ async def execute_history(user=Depends(authenticate_user)):
     """Retrieve execution history for the authenticated user."""
 
     LOG.info(f"Fetching execution history for user={user}")
-    history = db.find(TEST_HISTORY_COLLECTION, {"user": user})
+    if user == "admin":
+        history = db.find(TEST_HISTORY_COLLECTION)
+    else:
+        history = db.find(TEST_HISTORY_COLLECTION, {"user": user})
 
     LOG.info(f"Fetched {len(history)} execution history records for user={user}")
     return history
@@ -418,7 +421,10 @@ async def list_custom_combinations_of_test_cases(user=Depends(authenticate_user)
     is used to query these combinations."""
 
     LOG.info(f"Fetching all custom test case combinations for user={user}")
-    all_combinations = db.find(TEST_CASE_COLLECTION, {"user": user})
+    if user == "admin":
+        all_combinations = db.find(TEST_CASE_COLLECTION)
+    else:
+        all_combinations = db.find(TEST_CASE_COLLECTION, {"user": user})
 
     LOG.info(f"Fetched {len(all_combinations)} combinations")
     return all_combinations
@@ -447,7 +453,7 @@ async def save_custom_combinations_of_test_cases(
 
 
 @router.delete("/yuntester/custom-combinations/{combination_id}", status_code=204)
-async def delete_custom_combination(combination_id: str):
+async def delete_custom_combination(combination_id: str, user=Depends(authenticate_user)):
     """
     Delete a user-defined combination of test cases by its ID.
 
@@ -465,8 +471,8 @@ async def delete_custom_combination(combination_id: str):
 
     try:
         db.delete(TEST_CASE_COLLECTION, {"id": combination_id})
-        LOG.info(
-            f"Custom combination deleted successfully: id={combination_id}, name={record['name']}")
+        LOG.info(f"Custom combination deleted by {user} successfully"
+                 f": id={combination_id}, name={record['name']}")
     except Exception as e:
         LOG.error("Failed to delete combination id=%s, error=%s", combination_id, e)
         raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")

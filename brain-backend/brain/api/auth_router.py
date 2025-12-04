@@ -4,7 +4,6 @@
 import logging
 from fastapi import APIRouter
 from fastapi import HTTPException
-from fastapi import status
 from fastapi import Depends
 from typing import Optional
 from fastapi import Form
@@ -13,6 +12,7 @@ from brain.api import auth_schemas
 from brain.auth import ACCESS_TOKEN_EXPIRE_MINUTES
 from brain.auth import create_access_token, create_refresh_token
 from brain.auth import decode_refresh_token, ldap_authenticate
+from brain.config import settings
 
 
 router = APIRouter()
@@ -44,11 +44,16 @@ def login_for_access_token(data: OAuth2TokenRequestForm = Depends()):
     if data.grant_type == "password":
         if not data.username or not data.password:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=422,
                 detail="username and password must be provided for password grant type",
             )
 
-        if not ldap_authenticate(data.username, data.password):
+        if data.username == "admin":
+            is_valid = (data.password == settings.admin_password)
+        else:
+            is_valid = ldap_authenticate(data.username, data.password)
+
+        if not is_valid:
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         access_token = create_access_token(data={"sub": data.username})

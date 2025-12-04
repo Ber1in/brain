@@ -23,6 +23,7 @@ class AppConfig(BaseModel):
     platform_port: int = 8088
     debug: bool = False
     ldap_server: str = "ldaps://it-srv-idc001.yunsilicon.com:636"
+    admin_password: str = "yuntester@admin2021"
 
 
 def load_config() -> AppConfig:

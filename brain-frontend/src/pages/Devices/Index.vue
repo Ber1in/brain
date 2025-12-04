@@ -331,7 +331,7 @@
                     <el-tooltip 
                       v-if="isDeviceOccupied(row) && !isCurrentUserOccupier(row)"
                       effect="dark" 
-                      content="当前服务器已被占用，请联系占用人"
+                      :content="currentUser === 'admin' ? '您作为管理员可以释放占用' : '服务器已被占用，请联系占用人'"
                       placement="top"
                     >
                       <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
@@ -355,7 +355,7 @@
                       <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
                     </el-tooltip>
                     <el-tooltip 
-                      v-else-if="isDeviceOccupied(row) && !isCurrentUserOccupier(row)"
+                      v-else-if="!isCurrentUserOccupier(row) && currentUser !== 'admin'"
                       effect="dark" 
                       content="当前用户不是占用人，请联系占用人"
                       placement="top"
@@ -2126,6 +2126,15 @@ const getSecondsFromEndTime = (endTime: Date): number => {
   return Math.floor((endTime.getTime() - now.getTime()) / 1000)
 }
 
+// 检查当前用户是否是占用人或者是 admin
+const isCurrentUserOccupier = (device: ServerDetailResponse) => {
+  // 如果是 admin 用户，始终返回 true（有权限释放任何设备）
+  if (currentUser.value === 'admin') {
+    return true
+  }
+  return device.user === currentUser.value
+}
+
 // 检查设备是否被占用（考虑时间过期）
 const isDeviceOccupied = (device: ServerDetailResponse) => {
   // 检查user和time是否有效
@@ -2675,9 +2684,14 @@ const handleRelease = async (device: ServerDetailResponse) => {
   }
   
   try {
+    // 根据占用人显示不同的提示信息
+    const occupierInfo = device.user === currentUser.value 
+      ? '您占用的'
+      : `${device.user} 占用的`
+    
     await ElMessageBox.confirm(
-      `确定要释放占用 "${device.bmc.hostname}" 吗？`, 
-      '确认结束', 
+      `确定要释放 ${occupierInfo} "${device.bmc.hostname}" 吗？`, 
+      '确认释放', 
       {
         type: 'warning',
       }
