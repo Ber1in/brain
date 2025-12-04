@@ -2126,15 +2126,6 @@ const getSecondsFromEndTime = (endTime: Date): number => {
   return Math.floor((endTime.getTime() - now.getTime()) / 1000)
 }
 
-// 检查当前用户是否是占用人或者是 admin
-const isCurrentUserOccupier = (device: ServerDetailResponse) => {
-  // 如果是 admin 用户，始终返回 true（有权限释放任何设备）
-  if (currentUser.value === 'admin') {
-    return true
-  }
-  return device.user === currentUser.value
-}
-
 // 检查设备是否被占用（考虑时间过期）
 const isDeviceOccupied = (device: ServerDetailResponse) => {
   // 检查user和time是否有效
@@ -2169,8 +2160,12 @@ const formatDateTime = (date: Date): string => {
   return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`
 }
 
-// 检查当前用户是否是占用人
+// 检查当前用户是否是占用人或者是 admin
 const isCurrentUserOccupier = (device: ServerDetailResponse) => {
+  // 如果是 admin 用户，始终返回 true（有权限释放任何设备）
+  if (currentUser.value === 'admin') {
+    return true
+  }
   return device.user === currentUser.value
 }
 

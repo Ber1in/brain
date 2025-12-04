@@ -354,7 +354,7 @@
                           
                           <!-- 创建时间 -->
                           <span class="create-time">
-                            {{ formatCombinationTime(combination.created_at) }}
+                            {{ combination.created_at }}
                           </span>
                           
                           <!-- 新增：加载图标 -->
