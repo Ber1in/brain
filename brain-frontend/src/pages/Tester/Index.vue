@@ -342,6 +342,15 @@
                         <span class="combination-name">{{ combination.name }}</span>
                         
                         <div class="combination-actions">
+                          <el-tag 
+                            v-if="authStore.username === 'admin'"
+                            size="small" 
+                            type="primary" 
+                            class="user-tag"
+                          >
+                            {{ combination.user || "asdasd"}}
+                          </el-tag>
+                          
                           <!-- 用例数量 -->
                           <el-tag 
                             v-if="combination.cases?.length > 0"
@@ -356,49 +365,46 @@
                           <span class="create-time">
                             {{ combination.created_at }}
                           </span>
-                          
-                          <!-- 新增：加载图标 -->
-                          <el-tooltip content="加载此集合" placement="top">
-                            <el-button 
-                              link 
-                              type="success" 
-                              size="small"
-                              class="load-btn"
-                              @click.stop="loadCombinationToRight(combination.id)"
-                            >
-                              <el-icon><Download /></el-icon>
-                            </el-button>
-                          </el-tooltip>
-                          
-                          <!-- 分享按钮 -->
-                          <el-tooltip content="分享给其他用户" placement="top">
-                            <el-button 
-                              link 
-                              type="primary" 
-                              size="small"
-                              class="share-btn"
-                              @click.stop="shareCombination(combination)"
-                            >
-                              <el-icon><Share /></el-icon>
-                            </el-button>
-                          </el-tooltip>
-                          
-                          <!-- 删除按钮 -->
-                          <el-tooltip content="删除集合" placement="top">
-                            <el-button 
-                              link 
-                              type="danger" 
-                              size="small"
-                              class="delete-btn"
-                              @click.stop="confirmDeleteCombination(combination)"
-                            >
-                              <el-icon><Delete /></el-icon>
-                            </el-button>
-                          </el-tooltip>
                         </div>
                       </div>
                     </el-option>
                   </el-select>
+                </div>
+                
+                <!-- 新增：按钮区域 -->
+                <div class="combination-action-buttons" v-if="selectedCombinationId">
+                  <el-button 
+                    type="success" 
+                    size="small"
+                    @click="loadSelectedCombination"
+                    class="load-btn"
+                    :disabled="!selectedCombinationId"
+                  >
+                    <el-icon><Download /></el-icon>
+                    加载集合
+                  </el-button>
+                  
+                  <el-button 
+                    type="primary" 
+                    size="small"
+                    @click="shareSelectedCombination"
+                    class="share-btn"
+                    :disabled="!selectedCombinationId"
+                  >
+                    <el-icon><Share /></el-icon>
+                    分享集合
+                  </el-button>
+                  
+                  <el-button 
+                    type="danger" 
+                    size="small"
+                    @click="confirmDeleteSelectedCombination"
+                    class="delete-btn"
+                    :disabled="!selectedCombinationId"
+                  >
+                    <el-icon><Delete /></el-icon>
+                    删除集合
+                  </el-button>
                 </div>
               </div>
             </div>
@@ -599,10 +605,10 @@
     >
       <el-form :model="shareForm" label-width="90px">
         <el-form-item label="集合名称:">
-          <div>{{ currentSharingCombination.name }}</div>
+          <div>{{ currentSharingCombination?.name || '' }}</div>
         </el-form-item>
         <el-form-item label="用例数量:">
-          <div>{{ currentSharingCombination.cases?.length || 0 }}个</div>
+          <div>{{ currentSharingCombination?.cases?.length || 0 }}个</div>
         </el-form-item>
         <el-form-item label="目标用户:" required>
           <el-input 
@@ -3104,10 +3110,46 @@ const showShareDialog = () => {
   }
 }
 
+const shareSelectedCombination = () => {
+  if (!selectedCombinationId.value) {
+    ElMessage.warning('请先选择一个集合')
+    return
+  }
+  
+  const combination = combinations.value.find(c => c.id === selectedCombinationId.value)
+  if (!combination) {
+    ElMessage.warning('未找到选择的集合')
+    return
+  }
+  
+  shareCombination(combination)
+}
+
+// 确认删除选中的集合
+const confirmDeleteSelectedCombination = () => {
+  if (!selectedCombinationId.value) {
+    ElMessage.warning('请先选择一个集合')
+    return
+  }
+  
+  const combination = combinations.value.find(c => c.id === selectedCombinationId.value)
+  if (!combination) {
+    ElMessage.warning('未找到选择的集合')
+    return
+  }
+  
+  confirmDeleteCombination(combination)
+}
+
 // 分享单个集合
 const shareCombination = (combination: CaseCombinationResponse) => {
+  // 重置所有分享相关的状态
   currentSharingCombination.value = combination
-  shareForm.value.username = ''
+  shareForm.value = {
+    username: '',
+    combinationId: combination.id
+  }
+  shareLoading.value = false
   shareDialogVisible.value = true
 }
 
@@ -3140,17 +3182,34 @@ const confirmShareCombination = async () => {
   }
 }
 
-// 修改加载集合方法，支持双击
-const loadCombinationToRight = async (combinationId?: string) => {
-  const id = combinationId || selectedCombinationId.value
-  if (!id) {
-    ElMessage.warning('请选择用例集合')
+const loadSelectedCombination = () => {
+  console.log('加载集合:', selectedCombinationId.value)
+  
+  if (!selectedCombinationId.value) {
+    ElMessage.warning('请先选择一个集合')
     return
   }
   
+  // 直接调用 loadCombinationToRight，但传递正确的参数
+  loadCombinationToRight(selectedCombinationId.value)
+}
+
+// 加载集合方法
+const loadCombinationToRight = async (combinationId?: string) => {
+  // 如果没有传入ID，使用当前选中的ID
+  const id = combinationId || selectedCombinationId.value
+  
+  if (!id) {
+    ElMessage.warning('请先选择用例集合')
+    return
+  }
+  
+  // 尝试从组合列表中查找
   const combination = combinations.value.find(c => c.id === id)
+  
   if (!combination) {
-    ElMessage.warning('未找到选择的集合')
+    ElMessage.warning('未找到选择的集合，请刷新后重试')
+    console.error('未找到集合，ID:', id, '组合列表长度:', combinations.value.length)
     return
   }
   
@@ -3229,10 +3288,13 @@ const confirmDeleteCombination = (combination: CaseCombinationResponse) => {
 
 watch(shareDialogVisible, (visible) => {
   if (!visible) {
-    setTimeout(() => {
-      currentSharingCombination.value = null
-      shareForm.value.username = ''
-    }, 300)
+    // 重置所有分享相关的状态
+    currentSharingCombination.value = null
+    shareForm.value = {
+      username: '',
+      combinationId: ''
+    }
+    shareLoading.value = false
   }
 })
 
@@ -4089,6 +4151,7 @@ onUnmounted(() => {
   width: 100%;
   padding: 8px 0;
 }
+
 .combination-name {
   flex: 1;
   font-size: 14px;
@@ -4103,8 +4166,19 @@ onUnmounted(() => {
 .combination-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px; /* 增加间距 */
   flex-shrink: 0;
+}
+
+.user-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  height: 18px;
+  line-height: 16px;
+  margin-right: 4px;
+  background-color: #f0f9ff;
+  border-color: #a0cfff;
+  color: #409eff;
 }
 
 .case-count {
@@ -4143,22 +4217,53 @@ onUnmounted(() => {
   font-size: 14px !important; /* 减小图标大小 */
 }
 
+.combination-action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #e2e8f0;
+  justify-content: flex-start;
+}
+
+.combination-action-buttons .el-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.load-btn {
+  background: #67c23a;
+  border-color: #67c23a;
+  color: white;
+}
+
 .load-btn:hover {
-  color: #67c23a;
-  background: rgba(103, 194, 58, 0.1);
-  border-radius: 2px;
+  background: #5ca935;
+  border-color: #5ca935;
+}
+
+.share-btn {
+  background: #409eff;
+  border-color: #409eff;
+  color: white;
 }
 
 .share-btn:hover {
-  color: #409eff;
-  background: rgba(64, 158, 255, 0.1);
-  border-radius: 2px;
+  background: #337ecc;
+  border-color: #337ecc;
+}
+
+.delete-btn {
+  background: #f56c6c;
+  border-color: #f56c6c;
+  color: white;
 }
 
 .delete-btn:hover {
-  color: #f56c6c;
-  background: rgba(245, 108, 108, 0.1);
-  border-radius: 2px;
+  background: #d95353;
+  border-color: #d95353;
 }
 
 .share-all-btn .el-icon {

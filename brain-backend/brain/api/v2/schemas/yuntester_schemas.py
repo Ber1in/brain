@@ -74,6 +74,7 @@ class CaseCombinationsResponse(BaseModel):
     name: str
     created_at: str
     cases: List[str] = None
+    user: str
 
 
 class CaseCombinationsRequest(BaseModel):
