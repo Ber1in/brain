@@ -232,8 +232,7 @@ async def update_mv_server(server_id: str, update_data: mv200_schemas.MVServerUp
             )
 
     # Update server information (excluding ID field)
-    update_dict = {k: v for k, v in update_data.dict(
-        exclude_unset=True).items() if v is not None}
+    update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
 
     if update_dict.pop("auto"):
         LOG.info(f"Automatic updating mv200: {server_id}")
