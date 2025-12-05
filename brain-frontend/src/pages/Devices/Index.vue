@@ -1949,7 +1949,11 @@ const getNicSummary = (device: ServerDetailResponse) => {
     if (nic.type) {
       // 通过第一个-切割，取左边的部分
       let displayType = nic.type.split('-')[0].trim()
-      
+
+      if (displayType.toLowerCase() === "metascale") {
+        displayType = "MS200-OCP"
+      }
+
       // 预先为这个类型分配颜色（确保颜色一致性）
       nicColorManager.getColor(displayType)
       
