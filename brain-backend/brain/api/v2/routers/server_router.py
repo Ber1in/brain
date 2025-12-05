@@ -267,8 +267,8 @@ async def update_device(
                 else:
                     LOG.info(f"Failed to cancell cleanup task {task_id}")
 
-                task_scheduler.send_server_reminder(server, True)
-                task_scheduler.send_feishu_group_message(server, True)
+                await task_scheduler.send_server_reminder(server, True)
+                await task_scheduler.send_feishu_group_message(server, True)
                 server["user"] = ""
 
     server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

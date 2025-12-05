@@ -222,8 +222,8 @@ async def init_server_warning(device_id: str, now=False):
         ssh_pass = server["device"].get("password", "")
 
         # Update database state
-        send_server_reminder(server, now)
-        send_feishu_group_message(server, now)
+        await send_server_reminder(server, now)
+        await send_feishu_group_message(server, now)
         if now:
             await init_warning(ip, ssh_user, ssh_pass)
             server["time"] = 0
@@ -271,7 +271,7 @@ async def setup_server_occupancy(device_id: str, user: str, duration: int):
         return False
 
 
-def send_feishu_group_message(server_info, now=False):
+async def send_feishu_group_message(server_info, now=False):
     """
     Send Feishu group reminder message.
     The message content remains in Chinese (intended for end users).
@@ -378,7 +378,7 @@ def send_feishu_group_message(server_info, now=False):
         return False
 
 
-def create_server_reminder_email(server_info, current_recipient, now=False):
+async def create_server_reminder_email(server_info, current_recipient, now=False):
     """
     Create personalized email reminder for server expiration.
     Email content remains Chinese because it's user-facing.
@@ -559,7 +559,7 @@ def create_server_reminder_email(server_info, current_recipient, now=False):
     return msg
 
 
-def send_server_reminder(server_info, now=False):
+async def send_server_reminder(server_info, now=False):
     """
     Send server expiration reminder emails to all recipients.
     """
@@ -573,7 +573,7 @@ def send_server_reminder(server_info, now=False):
 
         try:
             # Create personalized email for each recipient
-            msg = create_server_reminder_email(server_info, recipient, now)
+            msg = await create_server_reminder_email(server_info, recipient, now)
 
             # Send via SMTP
             with smtplib.SMTP_SSL(settings.smtp.host, settings.smtp.port) as server_smtp:
