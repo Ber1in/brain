@@ -64,7 +64,7 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
         LOG.error(e)
         raise HTTPException(status_code=509, detail=f"{e}")
     except Exception as e:
-        LOG.error(f"SSH execution failed on {host}: {e}")
+        LOG.error(f"SSH execution {command} failed on {host}: {e}")
         raise HTTPException(status_code=500, detail=f"SSH execution failed on {host}: {e}")
 
 

@@ -952,12 +952,24 @@
                     v-for="nic in getTestableNics(server)" 
                     :key="nic?.sn || nic?.type"
                     class="nic-item"
-                    :class="{'mv200-nic': isMv200Nic(nic.type)}"
-                  >
+                    :class="{
+                      'mv200-nic': isMv200Nic(nic.type),
+                      'unmatched': isMv200Nic(nic.type) && !nic.mv200Matched
+                    }"
+>
                     <div class="nic-header">
                       <div class="nic-info">
                         <span class="nic-type">{{ formatNicType(nic.type) || '未知类型' }}</span>
                         <span class="nic-sn">SN: {{ nic.sn || '未知SN' }}</span>
+
+                        <el-tag 
+                          v-if="isMv200Nic(nic.type) && !nic.mv200Matched" 
+                          size="small" 
+                          type="danger"
+                          class="mv200-unmatched-tag"
+                        >
+                          SOC尚未录入
+                        </el-tag>
 
                         <el-tag v-if="nic.nic_info && !isMv200Nic(nic.type)" size="small" type="primary">
                           {{ nic.nic_info.length }} 个网口
@@ -1141,6 +1153,7 @@ import {
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
+import { mv200Api } from '@/api/mv200'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import type { 
@@ -1197,6 +1210,9 @@ const selectedServers = ref<string[]>([])
 const serverDialogVisible = ref(false)
 const executeLoading = ref(false)
 const serverUpdatingStatus = ref<Record<string, boolean>>({})
+
+// 新增：MV200服务器数据
+const mv200Servers = ref<MVServer[]>([])
 
 // 新增：任务状态轮询相关
 const pollingTasks = ref<Map<string, any>>(new Map()) // 存储轮询中的任务
@@ -1779,9 +1795,11 @@ const canExecute = computed(() => {
   for (const server of selectedServersWithNics.value) {
     if (server.nics) {
       for (const nic of server.nics) {
-        if (isMv200Nic(nic.type) && nic.selected) {
+        // MV200网卡：如果已匹配且选中就允许执行
+        if (isMv200Nic(nic.type) && nic.mv200Matched && nic.selected) {
           return true
         }
+        // 非MV200网卡：有选中的网口就允许执行
         if (nic.nic_info && nic.nic_info.some((info: any) => info.selected)) {
           return true
         }
@@ -1803,9 +1821,6 @@ const getTestableNics = (server: ServerDetailResponse): any[] => {
   
   return server.nics.filter(nic => {
     // 如果是MV200网卡，只要有类型信息就显示
-    if (isMv200Nic(nic.type)) {
-      return nic.type !== undefined
-    }
     // 非MV200网卡需要有网口信息才显示
     return nic.nic_info && nic.nic_info.length > 0
   })
@@ -1814,6 +1829,13 @@ const getTestableNics = (server: ServerDetailResponse): any[] => {
 // 处理MV200网卡选择
 const handleMv200NicSelection = (nic: any, checked: boolean) => {
   if (checked) {
+    // 检查MV200是否已匹配
+    if (!nic.mv200Matched) {
+      ElMessage.warning('此MV200网卡尚未录入，无法选择')
+      nic.selected = false
+      return
+    }
+    
     // 选择MV200网卡：直接标记为已选择，不需要网口
     nic.selected = true
   } else {
@@ -3521,11 +3543,73 @@ const loadAndUpdateServers = async () => {
       return
     }
     
+    // 同时加载MV200服务器信息
+    await loadMv200Servers()
+    
     // 更新所有服务器的硬件信息
     await updateAllServersHardwareInfo()
     
+    // 验证并匹配MV200网卡
+    await validateAndMatchMv200Nics()
+    
   } catch (error) {
     ElMessage.error('加载服务器列表失败')
+  }
+}
+
+// 新增：加载MV200服务器信息
+const loadMv200Servers = async () => {
+  try {
+    mv200Servers.value = await mv200Api.getAll()
+  } catch (error) {
+    console.error('加载MV200服务器信息失败:', error)
+    ElMessage.warning('加载MV200服务器信息失败，可能影响MV200网卡的选择')
+  }
+}
+
+// 新增：验证并匹配MV200网卡
+const validateAndMatchMv200Nics = async () => {
+  let matchedCount = 0
+  let unmatchedCount = 0
+  
+  availableServers.value.forEach(server => {
+    if (server.nics) {
+      server.nics.forEach(nic => {
+        if (isMv200Nic(nic.type)) {
+          // 为MV200网卡添加匹配状态和匹配的服务器信息
+          nic.mv200Matched = false
+          nic.mv200ServerInfo = null
+          
+          if (nic.sn) {
+            // 尝试匹配MV200服务器
+            const matchedMv200 = mv200Servers.value.find(mv200 => 
+              mv200.nic_sn === nic.sn || mv200.sn === nic.sn
+            )
+            
+            if (matchedMv200) {
+              nic.mv200Matched = true
+              nic.mv200ServerInfo = matchedMv200
+              matchedCount++
+              
+              // 如果有IP地址，也记录到nic_info中（如果有的话）
+              if (nic.nic_info && nic.nic_info.length > 0) {
+                nic.nic_info[0].soc_ip = matchedMv200.ip_address
+              }
+            } else {
+              unmatchedCount++
+              console.warn(`服务器 ${server.bmc.hostname} 的MV200网卡SN: ${nic.sn} 未找到匹配的MV200服务器`)
+            }
+          } else {
+            unmatchedCount++
+            console.warn(`服务器 ${server.bmc.hostname} 的MV200网卡缺少SN信息`)
+          }
+        }
+      })
+    }
+  })
+  
+  if (unmatchedCount > 0) {
+    console.log(`MV200网卡匹配结果: ${matchedCount}个已匹配，${unmatchedCount}个未匹配`)
   }
 }
 
@@ -3622,6 +3706,33 @@ const handleExecuteConfirm = async () => {
   try {
     executeLoading.value = true
     
+    // 检查是否有未录入的MV200被选中
+    let hasUnmatchedMv200 = false
+    let unmatchedMv200Info = []
+    
+    selectedServersWithNics.value.forEach(server => {
+      if (server.nics) {
+        server.nics.forEach(nic => {
+          if (isMv200Nic(nic.type) && nic.selected && !nic.mv200Matched) {
+            hasUnmatchedMv200 = true
+            unmatchedMv200Info.push({
+              server: server.bmc.hostname,
+              sn: nic.sn || '未知SN'
+            })
+          }
+        })
+      }
+    })
+    
+    if (hasUnmatchedMv200) {
+      const errorMsg = `存在未录入的MV200网卡被选中，请检查：\n${unmatchedMv200Info.map(info => 
+        `服务器: ${info.server}, SN: ${info.sn}`
+      ).join('\n')}`
+      ElMessage.warning(errorMsg)
+      executeLoading.value = false
+      return
+    }
+    
     // 构建请求数据
     const selectedCases = rightTestCases.value.map(item => item.fullPath)
     
@@ -3633,11 +3744,11 @@ const handleExecuteConfirm = async () => {
         server.nics.forEach(nic => {
           if (isMv200Nic(nic.type)) {
             // MV200网卡：如果选中，创建一个特殊的CaseNicInfo
-            if (nic.selected) {
+            if (nic.selected && nic.mv200Matched && nic.mv200ServerInfo) {
               const caseNicInfo: CaseNicInfo = {
                 type: nic.type,
-                mac: '', // MV200没有单独的网口MAC
-                soc: nic.sn || '' // 使用SN作为soc（根据后端需求可能需要调整）
+                mac: nic.mac || '', // MV200没有单独的网口MAC
+                soc: nic.mv200ServerInfo.ip_address || '' // 使用MV200服务器的IP地址作为soc
               }
               selectedNics.push(caseNicInfo)
             }
@@ -3666,12 +3777,21 @@ const handleExecuteConfirm = async () => {
       }
     })
     
-    const request: ExecuteRequest = {
-      cases: selectedCases,
-      servers: servers.length > 0 ? servers : undefined
+    // 过滤掉没有任何网卡的服务器（理论上不应该发生，但安全起见）
+    const filteredServers = servers.filter(server => 
+      server.nics && server.nics.length > 0
+    )
+    
+    if (filteredServers.length === 0) {
+      ElMessage.warning('请至少选择一个有效的网卡')
+      executeLoading.value = false
+      return
     }
     
-    console.log('执行请求数据:', JSON.stringify(request, null, 2))
+    const request: ExecuteRequest = {
+      cases: selectedCases,
+      servers: filteredServers.length > 0 ? filteredServers : undefined
+    }
     
     // 调用执行接口
     const response: ExecuteTaskResponse = await testApi.executeTestCasesWithResponse(request)
@@ -3701,7 +3821,6 @@ const handleExecuteConfirm = async () => {
     // 添加到历史记录顶部
     executeHistory.value.unshift(newTask)
     startTaskPolling(taskId)
-
     
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '执行测试用例失败')
@@ -4906,6 +5025,13 @@ onUnmounted(() => {
   background: #9ca3af;
 }
 
+.mv200-unmatched-tag {
+  background: linear-gradient(45deg, #f56c6c, #d95353);
+  color: white;
+  border: none;
+  font-weight: bold;
+}
+
 .mv200-nic {
   background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
   border: 2px solid #ff9966;
@@ -4913,6 +5039,17 @@ onUnmounted(() => {
 
 .mv200-nic .nic-header {
   background: rgba(255, 153, 102, 0.1);
+}
+
+.mv200-nic.unmatched {
+  opacity: 0.6;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+  border: 2px solid #c0c4cc;
+  cursor: not-allowed;
+}
+
+.mv200-nic.unmatched .nic-header {
+  background: rgba(192, 196, 204, 0.1);
 }
 
 .nic-item {

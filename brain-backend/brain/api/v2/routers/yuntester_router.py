@@ -305,12 +305,16 @@ async def prepare_test_environment(data: yuntester_schemas.ExecuteRequest, user,
 
         nics = []
         for nic in server.nics:
-            nic_info = {
-                "name": nic.iface,
-                "bdf": nic.bdf,
-                "type": nic.type,
-                "mac": nic.mac
-            }
+            nic_info = {"type": nic.type}
+            if nic.iface:
+                nic_info["name"] = nic.iface
+            if nic.bdf:
+                nic_info["bdf"] = nic.bdf
+            if nic.mac:
+                nic_info["mac"] = nic.mac
+            if nic.soc:
+                nic_info["soc_ip"] = nic.soc
+
             nics.append(nic_info)
         if nics:
             client_info["nics"] = nics
