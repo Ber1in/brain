@@ -47,7 +47,7 @@ class ExecuteNicInfo(BaseModel):
     iface: str = None
     bdf: str = None
     type: str
-    mac: str
+    mac: str = None
     soc: str = None
 
     @validator("type", pre=True)
@@ -72,6 +72,8 @@ class ExecuteNicInfo(BaseModel):
             # When type is NOT MV200 → iface and bdf required
             if not values.get("iface"):
                 raise ValueError("Field 'iface' is required when type is not MV200")
+            if not values.get("mac"):
+                raise ValueError("Field 'mac' is required when type is not MV200")
             if not values.get("bdf"):
                 raise ValueError("Field 'bdf' is required when type is not MV200")
 

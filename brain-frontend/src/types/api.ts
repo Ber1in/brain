@@ -377,7 +377,7 @@ export interface CasesResponse {
 
 export interface CaseNicInfo {
   iface?: string
-  bdf: string
+  bdf?: string
   type: string
   mac?: string
   soc?: string

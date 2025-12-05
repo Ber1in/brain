@@ -224,7 +224,11 @@
         <!-- 网卡详细信息 - 3/5宽度 -->
         <el-card header="网卡信息" class="nic-card" v-if="deviceData.nics && deviceData.nics.length > 0">
           <el-table :data="processedNics" class="compact-table">
-            <el-table-column prop="type" label="类型" width="110" />
+            <el-table-column prop="type" label="类型" width="110">
+              <template #default="{ row }">
+                <span>{{ formatNicTypeForDisplay(row.type) }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="sn" label="序列号" width="170"/>
             <!-- BDF列移到MAC地址前面 -->
             <el-table-column label="BDF" width="80">
@@ -1054,6 +1058,21 @@ const powerDialogTitle = computed(() => {
   const typeText = powerType.value === 'cycle' ? '冷重启' : '热重启'
   return `${typeText}服务器`
 })
+
+// 格式化网卡类型显示（适用于服务器详情页面）
+const formatNicTypeForDisplay = (type: string | undefined): string => {
+  if (!type) return '未知类型'
+  
+  const typeLower = type.toLowerCase()
+  
+  // 特殊处理：metaScale-200 OCP3.0 -> MS200-OCP
+  if (typeLower.includes('metascale-200') && typeLower.includes('ocp3.0')) {
+    return 'MS200-OCP'
+  }
+  
+  // 其他类型按原样显示
+  return type
+}
 
 // 格式化时间显示
 const formatTime = (timeStr: string) => {
