@@ -947,29 +947,45 @@
                 </div>
                 
                 <div class="nics-list">
-                  <!-- 显示可测试的非MV200网卡 -->
+                  <!-- 在 nic-item 中修改，处理MV200的特殊情况 -->
                   <div 
                     v-for="nic in getTestableNics(server)" 
                     :key="nic?.sn || nic?.type"
                     class="nic-item"
+                    :class="{'mv200-nic': isMv200Nic(nic.type)}"
                   >
                     <div class="nic-header">
                       <div class="nic-info">
-                        <span class="nic-type">{{ nic.type || '未知类型' }}</span>
+                        <span class="nic-type">{{ formatNicType(nic.type) || '未知类型' }}</span>
                         <span class="nic-sn">SN: {{ nic.sn || '未知SN' }}</span>
-                        <el-tag v-if="nic.nic_info" size="small" type="primary">
+
+                        <el-tag v-if="nic.nic_info && !isMv200Nic(nic.type)" size="small" type="primary">
                           {{ nic.nic_info.length }} 个网口
                         </el-tag>
+                        
+                        <!-- 选择状态标记 -->
                         <el-tag 
-                          v-if="getSelectedInterfaceCountForNic(nic) > 0" 
+                          v-if="isNicSelected(nic)" 
                           size="small" 
                           type="success"
                         >
-                          已选 {{ getSelectedInterfaceCountForNic(nic) }} 个
+                          已选择
                         </el-tag>
                       </div>
+                      
                       <div class="nic-select-all">
+                        <!-- MV200网卡使用单独的复选框 -->
                         <el-checkbox
+                          v-if="isMv200Nic(nic.type)"
+                          v-model="nic.selected"
+                          @change="handleMv200NicSelection(nic, $event)"
+                        >
+                          选择此网卡
+                        </el-checkbox>
+                        
+                        <!-- 非MV200网卡使用网口全选 -->
+                        <el-checkbox
+                          v-else
                           :indeterminate="isNicPartiallySelected(nic)"
                           v-model="nic.allInterfacesSelected"
                           @change="handleNicAllInterfacesChange(nic)"
@@ -979,8 +995,11 @@
                       </div>
                     </div>
                     
-                    <!-- 网口选择区域 -->
-                    <div class="nic-interfaces-selection" v-if="nic.nic_info && nic.nic_info.length > 0">
+                    <!-- 非MV200网卡显示网口选择区域 -->
+                    <div 
+                      class="nic-interfaces-selection" 
+                      v-if="!isMv200Nic(nic.type) && nic.nic_info && nic.nic_info.length > 0"
+                    >
                       <div class="interfaces-list">
                         <div 
                           v-for="(nicInfo, index) in nic.nic_info" 
@@ -994,6 +1013,7 @@
                             <div class="interface-info">
                               <span class="iface-name">{{ nicInfo.iface || `网口${index + 1}` }}</span>
                               <span class="bdf">{{ nicInfo.bdf || '未知BDF' }}</span>
+                              <span class="mac">{{ nicInfo.mac || '未知MAC' }}</span>
                             </div>
                           </el-checkbox>
                         </div>
@@ -1029,9 +1049,6 @@
           <div class="footer-stats">
             <el-tag type="primary">
               已选择 {{ selectedServers.length }} 台服务器
-            </el-tag>
-            <el-tag type="success">
-              已选择 {{ getTotalSelectedInterfaces() }} 个网口
             </el-tag>
           </div>
           <div class="footer-buttons">
@@ -1725,18 +1742,54 @@ const getSelectedInterfaceCountForNic = (nic: any): number => {
   return nic.nic_info.filter((info: any) => info.selected).length
 }
 
-// 获取总共选择的网口数量
+
+// 获取总共选择的网口和MV200网卡数量
 const getTotalSelectedInterfaces = (): number => {
   let total = 0
+  
   selectedServersWithNics.value.forEach(server => {
-    total += getSelectedInterfaceCount(server)
+    if (server.nics) {
+      server.nics.forEach(nic => {
+        // MV200网卡：如果选中就计数为1
+        if (isMv200Nic(nic.type) && nic.selected) {
+          total += 1
+        } 
+        // 非MV200网卡：统计选中的网口数量
+        else if (nic.nic_info) {
+          nic.nic_info.forEach(nicInfo => {
+            if (nicInfo.selected) {
+              total += 1
+            }
+          })
+        }
+      })
+    }
   })
+  
   return total
 }
 
 // 在 canExecute 计算属性中使用新的统计方法
 const canExecute = computed(() => {
-  return selectedServers.value.length > 0 && getTotalSelectedInterfaces() > 0
+  if (selectedServers.value.length === 0) {
+    return false
+  }
+  
+  // 检查是否有至少一个网卡被选择（MV200或非MV200的网口）
+  for (const server of selectedServersWithNics.value) {
+    if (server.nics) {
+      for (const nic of server.nics) {
+        if (isMv200Nic(nic.type) && nic.selected) {
+          return true
+        }
+        if (nic.nic_info && nic.nic_info.some((info: any) => info.selected)) {
+          return true
+        }
+      }
+    }
+  }
+  
+  return false
 })
 
 // 获取可测试网卡数量
@@ -1744,17 +1797,31 @@ const getTestableNicCount = (server: ServerDetailResponse): number => {
   return getTestableNics(server).length
 }
 
-// 获取可测试的网卡（非MV200且有网口信息）
+// 获取可测试的网卡（包括MV200，但MV200不需要网口信息）
 const getTestableNics = (server: ServerDetailResponse): any[] => {
   if (!server.nics) return []
   
   return server.nics.filter(nic => {
-    // 跳过MV200网卡
-    if (isMv200Nic(nic.type)) return false
-    // 只显示有网口信息的网卡
+    // 如果是MV200网卡，只要有类型信息就显示
+    if (isMv200Nic(nic.type)) {
+      return nic.type !== undefined
+    }
+    // 非MV200网卡需要有网口信息才显示
     return nic.nic_info && nic.nic_info.length > 0
   })
 }
+
+// 处理MV200网卡选择
+const handleMv200NicSelection = (nic: any, checked: boolean) => {
+  if (checked) {
+    // 选择MV200网卡：直接标记为已选择，不需要网口
+    nic.selected = true
+  } else {
+    // 取消选择MV200网卡
+    nic.selected = false
+  }
+}
+
 
 // 检查网卡是否部分选中
 const isNicPartiallySelected = (nic: any): boolean => {
@@ -1881,7 +1948,40 @@ const loadBranchAndTag = async () => {
 const isMv200Nic = (nicType: string | undefined): boolean => {
   if (!nicType) return false
   const typeLower = nicType.toLowerCase()
-  return typeLower.includes('mv200') || typeLower.includes('marvell') || typeLower.includes('88e')
+  // 这里可以根据实际的MV200标识来调整
+  return typeLower.includes('mv200') || typeLower === 'mv200'
+}
+
+// 检查网卡是否被选择（包括MV200和非MV200）
+const isNicSelected = (nic: any): boolean => {
+  if (isMv200Nic(nic.type)) {
+    return nic.selected === true
+  }
+  
+  // 非MV200网卡：如果有选中的网口就认为是选择了
+  if (nic.nic_info && nic.nic_info.length > 0) {
+    return nic.nic_info.some((info: any) => info.selected)
+  }
+  
+  return false
+}
+
+// 格式化网卡类型显示
+const formatNicType = (type: string | undefined): string => {
+  if (!type) return '未知类型'
+  
+  // 特殊处理metaScale-200 OCP3.0
+  if (type.toLowerCase().includes('metascale-200') && type.toLowerCase().includes('ocp3.0')) {
+    return 'MS200-OCP'
+  }
+  
+  // 其他类型
+  const parts = type.split('-')
+  if (parts.length > 0) {
+    return parts[0].toUpperCase()
+  }
+  
+  return type
 }
 
 const hasSkippedMv200Nics = (server: ServerDetailResponse): boolean => {
@@ -3525,46 +3625,53 @@ const handleExecuteConfirm = async () => {
     // 构建请求数据
     const selectedCases = rightTestCases.value.map(item => item.fullPath)
     
-    // 构建服务器配置 - 按网口级别选择，使用 device_id
+    // 构建服务器配置
     const servers: Server[] = selectedServersWithNics.value.map(server => {
       const selectedNics: CaseNicInfo[] = []
       
       if (server.nics) {
         server.nics.forEach(nic => {
-          // 跳过MV200网卡
-          if (isMv200Nic(nic.type)) return
-          
-          // 处理非MV200网卡的每个网口
-          if (nic.nic_info) {
-            nic.nic_info.forEach(nicInfo => {
-              // 只添加被选中的网口
-              if (nicInfo.selected) {
-                const caseNicInfo: CaseNicInfo = {
-                  iface: nicInfo.iface,
-                  bdf: nicInfo.bdf,
-                  type: nic.type,
-                  mac: nicInfo.mac
-                }
-                selectedNics.push(caseNicInfo)
+          if (isMv200Nic(nic.type)) {
+            // MV200网卡：如果选中，创建一个特殊的CaseNicInfo
+            if (nic.selected) {
+              const caseNicInfo: CaseNicInfo = {
+                type: nic.type,
+                mac: '', // MV200没有单独的网口MAC
+                soc: nic.sn || '' // 使用SN作为soc（根据后端需求可能需要调整）
               }
-            })
+              selectedNics.push(caseNicInfo)
+            }
+          } else {
+            // 非MV200网卡：处理每个被选中的网口
+            if (nic.nic_info) {
+              nic.nic_info.forEach(nicInfo => {
+                if (nicInfo.selected) {
+                  const caseNicInfo: CaseNicInfo = {
+                    iface: nicInfo.iface,
+                    bdf: nicInfo.bdf,
+                    type: nic.type,
+                    mac: nicInfo.mac
+                  }
+                  selectedNics.push(caseNicInfo)
+                }
+              })
+            }
           }
         })
       }
       
       return {
-        device_id: server.id!, // 使用 device_id
+        device_id: server.id!,
         nics: selectedNics.length > 0 ? selectedNics : undefined
       }
     })
-    
     
     const request: ExecuteRequest = {
       cases: selectedCases,
       servers: servers.length > 0 ? servers : undefined
     }
     
-    console.log('执行请求数据:', request)
+    console.log('执行请求数据:', JSON.stringify(request, null, 2))
     
     // 调用执行接口
     const response: ExecuteTaskResponse = await testApi.executeTestCasesWithResponse(request)
@@ -4799,12 +4906,22 @@ onUnmounted(() => {
   background: #9ca3af;
 }
 
+.mv200-nic {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  border: 2px solid #ff9966;
+}
+
+.mv200-nic .nic-header {
+  background: rgba(255, 153, 102, 0.1);
+}
+
 .nic-item {
   padding: 12px;
   background: #f8fafc;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
 }
+
 
 .nic-header {
   display: flex;
@@ -4914,6 +5031,12 @@ onUnmounted(() => {
   font-family: 'Monaco', 'Consolas', monospace;
   font-size: 10px;
   color: #64748b;
+}
+
+.mac {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 9px;
+  color: #9ca3af;
 }
 
 :deep(.nic-interface .el-checkbox) {

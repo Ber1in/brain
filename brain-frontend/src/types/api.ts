@@ -376,10 +376,11 @@ export interface CasesResponse {
 }
 
 export interface CaseNicInfo {
-  iface: string
+  iface?: string
   bdf: string
-  type?: string
+  type: string
   mac?: string
+  soc?: string
 }
 
 export interface Server {
