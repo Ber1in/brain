@@ -264,7 +264,8 @@
                     class="log-link"
                   >
                     <el-icon><Document /></el-icon>
-                    {{ row.status === 'running' ? '实时日志' : '查看日志' }}
+                    <!-- {{ row.status === 'running' ? '实时日志' : '查看日志' }} -->
+                    查看日志
                   </el-link>
                 </template>
               </el-table-column>
