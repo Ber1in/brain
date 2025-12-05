@@ -47,7 +47,7 @@ class ExecuteNicInfo(BaseModel):
         if not isinstance(v, str):
             return v
         clean = v.strip()
-        if clean.lower() == "metascale-200 ocp3.0":
+        if "metascale-200" in clean.lower():
             return "MS200-OCP"
         return clean.split("-")[0].upper()
 
