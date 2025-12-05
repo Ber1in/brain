@@ -50,12 +50,12 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
         ssh.close()
 
         if err:
-            LOG.error(f"Command error on {host}: {err.strip()}")
+            LOG.error(f"Command {command} error on {host}: {err.strip()}")
         if exit_code != 0:
-            LOG.debug(f"Command failed on {host} (exit {exit_code}): {out.strip()}")
+            LOG.debug(f"Command {command} failed on {host} (exit {exit_code}): {out.strip()}")
             raise HTTPException(status_code=500, detail=f"SSH command failed: {out.strip()}")
 
-        LOG.debug(f"SSH command completed on {host}")
+        LOG.debug(f"SSH command {command} completed on {host}")
         return out.strip()
     except (ssh_exception.NoValidConnectionsError, TimeoutError) as e:
         LOG.error(e)
