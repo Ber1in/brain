@@ -185,23 +185,6 @@ def parse_bdf_mac(output: str) -> Dict[str, str]:
 
 
 def get_boot_entries(host_ip, user, pwd):
-    # efiboot_output = ssh_execute(host_ip, "efibootmgr -v", user, pwd).splitlines()
-    # lsblk_output = ssh_execute(
-    #     host_ip, "lsblk -rno NAME,PKNAME,PTTYPE,PARTUUID", user, pwd).splitlines()
-
-    # uuid_to_disk = {}
-    # for line in lsblk_output:
-    #     parts = line.strip().split()
-    #     if len(parts) == 4:
-    #         name, parent, pttype, partuuid = parts
-    #         partuuid = partuuid.lower() if partuuid != "-" else ""
-    #         if pttype == "gpt" and partuuid:
-    #             uuid_to_disk[partuuid] = parent or name
-    #         elif pttype in ("dos", "mbr") and partuuid:
-    #             disk_sig = partuuid.split("-")[0]
-    #             uuid_to_disk[partuuid] = parent or name
-    #             uuid_to_disk[disk_sig] = parent or name
-
     efiboot_output = ssh_execute(host_ip, "efibootmgr -v", user, pwd).splitlines()
     lsblk_output = ssh_execute(
         host_ip, "lsblk -rno NAME,PKNAME,PARTUUID", user, pwd).splitlines()
