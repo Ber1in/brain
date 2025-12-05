@@ -222,8 +222,8 @@ async def init_server_warning(device_id: str, now=False):
         ssh_pass = server["device"].get("password", "")
 
         # Update database state
-        send_feishu_group_message(server, now)
         send_server_reminder(server, now)
+        send_feishu_group_message(server, now)
         if now:
             await init_warning(ip, ssh_user, ssh_pass)
             server["time"] = 0
@@ -568,6 +568,9 @@ def send_server_reminder(server_info, now=False):
 
     # Send email to each recipient
     for recipient in server_info.get("recipients", []):
+        if recipient == "admin":
+            continue
+
         try:
             # Create personalized email for each recipient
             msg = create_server_reminder_email(server_info, recipient, now)
