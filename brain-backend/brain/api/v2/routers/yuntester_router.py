@@ -283,12 +283,7 @@ async def execute_test_task(task_id: str, cases: list, user: str,
         LOG.error(f"Test task {task_id} failed: {str(e)}")
 
 
-async def prepare_test_environment(data, user, dt):
-    def normalize_nic_type(t: str) -> str:
-        t = t or ""
-        if t == "metaScale-200 OCP3.0":
-            return "MS200-OCP"
-        return t.split("-")[0].upper()
+async def prepare_test_environment(data: yuntester_schemas.ExecuteRequest, user, dt):
 
     clients = {}
 
@@ -313,7 +308,7 @@ async def prepare_test_environment(data, user, dt):
             nic_info = {
                 "name": nic.iface,
                 "bdf": nic.bdf,
-                "type": normalize_nic_type(nic.type),
+                "type": nic.type,
                 "mac": nic.mac
             }
             nics.append(nic_info)

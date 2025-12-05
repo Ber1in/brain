@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from pydantic import BaseModel, validator, root_validator
 from typing import List
 from pydantic import BaseModel, root_validator
 
@@ -35,10 +36,46 @@ class CasesResponse(BaseModel):
 
 
 class ExecuteNicInfo(BaseModel):
-    iface: str
-    bdf: str
+    iface: str = None
+    bdf: str = None
     type: str
     mac: str
+    soc: str = None
+
+
+class ExecuteNicInfo(BaseModel):
+    iface: str = None
+    bdf: str = None
+    type: str
+    mac: str
+    soc: str = None
+
+    @validator("type", pre=True)
+    def normalize_type(cls, v):
+        """Normalize the NIC type string."""
+        if not isinstance(v, str):
+            return v
+        clean = v.strip()
+        if clean.lower() == "metascale-200 ocp3.0":
+            return "MS200-OCP"
+        return clean.split("-")[0].upper()
+
+    @root_validator
+    def validate_required_fields(cls, values):
+        t = values.get("type")
+
+        # When type is MV200
+        if t == "MV200":
+            if not values.get("soc"):
+                raise ValueError("Field 'soc' is required when type is MV200")
+        else:
+            # When type is NOT MV200 → iface and bdf required
+            if not values.get("iface"):
+                raise ValueError("Field 'iface' is required when type is not MV200")
+            if not values.get("bdf"):
+                raise ValueError("Field 'bdf' is required when type is not MV200")
+
+        return values
 
 
 class Server(BaseModel):
