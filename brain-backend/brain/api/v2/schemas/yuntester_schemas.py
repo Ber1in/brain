@@ -3,7 +3,6 @@
 
 from pydantic import BaseModel, validator, root_validator
 from typing import List
-from pydantic import BaseModel, root_validator
 
 
 class CheckoutRequest(BaseModel):
@@ -33,14 +32,6 @@ class DirNeedCollectRequest(BaseModel):
 
 class CasesResponse(BaseModel):
     cases: List[str] = None
-
-
-class ExecuteNicInfo(BaseModel):
-    iface: str = None
-    bdf: str = None
-    type: str
-    mac: str
-    soc: str = None
 
 
 class ExecuteNicInfo(BaseModel):

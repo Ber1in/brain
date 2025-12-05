@@ -85,8 +85,6 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
     await ssh_execute_async(host, cmd, user, pwd)
 
 
-
-
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
     """
     Parse yuncli lspci output and return a list of devices.

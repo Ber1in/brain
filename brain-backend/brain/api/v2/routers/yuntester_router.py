@@ -237,7 +237,8 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
             allure_report_dir = os.path.join(result_dir, "allure-report")
 
             subprocess.run(
-                ["allure", "generate", allure_results_dir, "-c", "-o", allure_report_dir],
+                ["/usr/local/allure/bin/allure", "generate", 
+                 allure_results_dir, "-c", "-o", allure_report_dir],
                 check=True,
                 timeout=600,
                 cwd=test_base_dir,
