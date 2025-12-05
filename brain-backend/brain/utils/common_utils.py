@@ -28,9 +28,11 @@ db = SQLiteDocumentDB()
 
 async def ensure_packages_installed(host: str, user: str, pwd: str, packages: list):
     """
-    Ensure the given packages are installed on the remote host.
-    Supports Debian / RHEL / Fedora / SUSE. Executes one SSH command.
+    Ensure packages (interpreted as commands) exist on remote host.
+    If not, install corresponding packages (assumed same as names).
+    Supports Debian / RHEL / Fedora / SUSE.
     """
+
     pkg_str = " ".join(packages)
 
     cmd = f"""
@@ -51,15 +53,21 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
         fi
 
         if echo "$OS" | grep -qi "debian"; then
-            apt install -y ${{MISSING[@]}}
+            echo "Installing packages on Debian-based system..."
+            apt-get update -y
+            apt-get install -y ${{MISSING[@]}}
+
         elif echo "$OS" | grep -qi "rhel"; then
             yum install -y ${{MISSING[@]}}
+
         elif echo "$OS" | grep -qi "fedora"; then
             dnf install -y ${{MISSING[@]}}
+
         elif echo "$OS" | grep -qi "suse"; then
             zypper install -y ${{MISSING[@]}}
+
         else
-            echo "Unsupported Linux distro: $OS"
+            echo "Unsupported distro: $OS"
             exit 1
         fi
     else
@@ -69,6 +77,7 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
 
     LOG.info(f"Ensuring packages are installed on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
+
 
 
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
