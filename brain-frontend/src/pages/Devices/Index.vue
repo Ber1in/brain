@@ -1033,7 +1033,7 @@ const getStageText = (stage: string) => {
     'installing_mcr': '安装新MCR',
     'upgrading_fw': '升级固件',    // 新增阶段
     'erasing_bdf': '擦拭设备',      // 新增阶段
-    'reboot': '热重启',              // 新增阶段
+    'reboot': '重启',              // 新增阶段
     'waiting': '等待中'
   }
   return stageMap[stage] || stage
