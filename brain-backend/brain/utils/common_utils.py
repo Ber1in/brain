@@ -47,7 +47,13 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
         echo "Packages not found: ${{MISSING[@]}}, installing..."
         if [ -f /etc/os-release ]; then
             . /etc/os-release
-            OS=$ID_LIKE
+
+            # Prefer ID_LIKE, fallback to ID
+            if [ -n "$ID_LIKE" ]; then
+                OS="$ID_LIKE"
+            else
+                OS="$ID"
+            fi
         else
             OS=$(uname -s)
         fi
@@ -77,6 +83,7 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
 
     LOG.info(f"Ensuring packages are installed on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
+
 
 
 
