@@ -3133,7 +3133,7 @@ const getStatusType = (status: string): string => {
     case 'failed':
       return 'danger'
     case 'cancelled':
-      return 'info'
+      return 'warning'
     default:
       return 'info'
   }
