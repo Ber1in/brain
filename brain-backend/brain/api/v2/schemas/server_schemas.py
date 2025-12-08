@@ -96,3 +96,7 @@ class ServerUpdateRequest(BaseModel):
 
 class FocusRequest(BaseModel):
     focus: bool
+
+
+class ServerOccupyRequest(BaseModel):
+    time: Optional[str] = None

@@ -71,5 +71,9 @@ export const deviceApi = {
 
   focusServer(serverId: string, focus: boolean): Promise<void> {
     return apiClient.patch(`/api/servers/${serverId}/focus`, { focus })
+  },
+
+  occupyServer(serverId: string, time: number): Promise<ServerDetailResponse> {
+    return apiClient.patch(`/api/servers/${serverId}/occupy`, { time })
   }
 }

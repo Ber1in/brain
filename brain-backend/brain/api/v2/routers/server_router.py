@@ -167,8 +167,9 @@ async def update_device(
 ):
     LOG.info(f"Updating device, ID: {device_id}, auto: {data.auto}, user: {user}")
 
-    server = db.find_one(SERVER_COLLECTION, {"id": device_id})
-    if not server:
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": device_id})
+    except Exception:
         LOG.warning(f"Device not found, ID: {device_id}")
         raise HTTPException(status_code=404, detail="Device not found")
 
@@ -198,85 +199,110 @@ async def update_device(
         if data.notes is not None:
             server["notes"] = data.notes
 
-        if data.time is not None:
-            server["time"] = data.time
-            server["start"] = datetime.now().timestamp()
-            ip = server["device"]["ip"]
-            ssh_user = server["device"].get("username", "")
-            ssh_pass = server["device"].get("password", "")
-            time = int(data.time)
-            if time > 0:
-                server["user"] = user
-                server["recipients"] = list(
-                    set(server.get("recipients", []) + [user])
-                )
-
-                end_timestamp = server["start"] + time
-                end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
-
-                await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
-
-                warn_delay = max(time - 300, 0)
-
-                if warn_delay > 0:
-                    warn_task_id = f"device_warn_{ip.replace('.', '_')}"
-                    warn_success = await scheduler.schedule_task(
-                        task_id=warn_task_id,
-                        delay_seconds=warn_delay,
-                        task_func=task_scheduler.init_server_warning,
-                        device_id=device_id,
-                    )
-                    if warn_success:
-                        LOG.info(
-                            f"Scheduled warning task {warn_task_id} "
-                            f"(delay={warn_delay}s)"
-                        )
-                    else:
-                        LOG.error(f"Failed to schedule warning task {warn_task_id}")
-
-                task_id = f"device_cleanup_{ip.replace('.', '_')}"
-                success = await scheduler.schedule_task(
-                    task_id=task_id,
-                    delay_seconds=time,
-                    task_func=task_scheduler.init_server_warning,
-                    device_id=device_id,
-                    now=True
-                )
-
-                if success:
-                    LOG.info(
-                        f"Scheduled cleanup task {warn_task_id} "
-                        f"(delay={time}s)"
-                    )
-                else:
-                    LOG.error(f"Failed to schedule auto cleanup task {task_id}")
-
-            else:
-
-                await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
-
-                warn_task_id = f"device_warn_{ip.replace('.', '_')}"
-                warn_success = await scheduler.cancel_task(warn_task_id)
-                if warn_success:
-                    LOG.info(f"Cancelled warning task {warn_task_id}")
-                else:
-                    LOG.info(f"Failed to cancell warning task {warn_task_id}")
-                task_id = f"device_cleanup_{ip.replace('.', '_')}"
-                success = await scheduler.cancel_task(task_id)
-                if success:
-                    LOG.info(f"Cancelled cleanup task {task_id}")
-                else:
-                    LOG.info(f"Failed to cancell cleanup task {task_id}")
-
-                await task_scheduler.send_server_reminder(server, True)
-                await task_scheduler.send_feishu_group_message(server, True)
-                server["user"] = ""
-
     server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
     LOG.info(f"Device updated, ID: {device_id}, user: {user}, time: {server.get('time', 0)}")
+    return server
+
+
+@router.patch("/servers/{server_id}/occupy", response_model=server_schemas.ServerDetailResponse)
+async def occupy_server(
+    server_id: str, 
+    data: server_schemas.ServerOccupyRequest,
+    user: str = Depends(authenticate_user)
+) -> dict:
+    """
+    Occupy or release a server.
+
+    If `data.time > 0`, mark the server as occupied by the current user for the specified time,
+    schedule warnings and auto-cleanup tasks.  
+    If `data.time <= 0`, release the server and cancel any scheduled tasks.
+
+    Args:
+        server_id: The ID of the server to occupy/release.
+        data: ServerOccupyRequest containing the occupy time in seconds.
+        user: The authenticated username (injected by Depends).
+
+    Returns:
+        The updated server record as a dict.
+    """
+    LOG.info(f"occupy_server called: server_id={server_id}, user={user}, time={data.time}")
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.warning(f"Device not found, ID: {server_id}")
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    server["time"] = data.time
+    server["start"] = datetime.now().timestamp()
+    ip: str = server["device"]["ip"]
+    ssh_user = server["device"].get("username", "")
+    ssh_pass = server["device"].get("password", "")
+    time = int(data.time)
+
+    if time > 0:
+        server["user"] = user
+        server["recipients"] = list(set(server.get("recipients", []) + [user]))
+
+        end_timestamp = server["start"] + time
+        end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+
+        await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
+
+        warn_delay = max(time - 300, 0)
+        if warn_delay > 0:
+            warn_task_id = f"device_warn_{ip.replace('.', '_')}"
+            warn_success = await scheduler.schedule_task(
+                task_id=warn_task_id,
+                delay_seconds=warn_delay,
+                task_func=task_scheduler.init_server_warning,
+                device_id=server_id,
+            )
+            if warn_success:
+                LOG.info(f"Scheduled warning task {warn_task_id} (delay={warn_delay}s)")
+            else:
+                LOG.error(f"Failed to schedule warning task {warn_task_id}")
+
+        task_id = f"device_cleanup_{ip.replace('.', '_')}"
+        success = await scheduler.schedule_task(
+            task_id=task_id,
+            delay_seconds=time,
+            task_func=task_scheduler.init_server_warning,
+            device_id=server_id,
+            now=True
+        )
+        if success:
+            LOG.info(f"Scheduled cleanup task {task_id} (delay={time}s)")
+        else:
+            LOG.error(f"Failed to schedule auto cleanup task {task_id}")
+
+    else:
+        await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
+
+        warn_task_id = f"device_warn_{ip.replace('.', '_')}"
+        warn_success = await scheduler.cancel_task(warn_task_id)
+        if warn_success:
+            LOG.info(f"Cancelled warning task {warn_task_id}")
+        else:
+            LOG.info(f"Failed to cancel warning task {warn_task_id}")
+
+        task_id = f"device_cleanup_{ip.replace('.', '_')}"
+        success = await scheduler.cancel_task(task_id)
+        if success:
+            LOG.info(f"Cancelled cleanup task {task_id}")
+        else:
+            LOG.info(f"Failed to cancel cleanup task {task_id}")
+
+        await task_scheduler.send_server_reminder(server, True)
+        await task_scheduler.send_feishu_group_message(server, True)
+        server["user"] = ""
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+    LOG.info("occupy_server finished.")
     return server
 
 
