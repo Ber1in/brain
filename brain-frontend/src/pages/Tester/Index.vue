@@ -294,7 +294,7 @@
               <el-table-column prop="url" label="测试报告" width="100">
                 <template #default="{ row }">
                   <el-link 
-                    v-if="row.status === 'success' && row.url" 
+                    v-if="row.status === 'success' || row.status === 'cancelled'"
                     :href="row.url" 
                     target="_blank" 
                     type="primary"
@@ -1970,6 +1970,9 @@ const handleCheckoutConfirm = async () => {
 
 const loadBranchAndTag = async () => {
   try {
+    branchLoading.value = true
+    tagLoading.value = true
+    
     const data: BranchAndTagResponse = await testApi.getBranchAndTag()
     branchList.value = data.branchs || []
     tagList.value = data.tags || []
@@ -1983,9 +1986,22 @@ const loadBranchAndTag = async () => {
         currentTag.value = data.current
         currentBranch.value = ''
       }
+      
+      // 设置选中状态
+      if (currentBranch.value) {
+        selectedBranch.value = currentBranch.value
+        checkoutMode.value = 'branch'
+      } else if (currentTag.value) {
+        selectedTag.value = currentTag.value
+        checkoutMode.value = 'tag'
+      }
     }
+    
   } catch (error) {
     ElMessage.error('加载分支标签列表失败')
+  } finally {
+    branchLoading.value = false
+    tagLoading.value = false
   }
 }
 
@@ -3910,11 +3926,39 @@ const handleExecuteConfirm = async () => {
   }
 }
 
-onMounted(() => {
-  loadBranchAndTag()
+onMounted(async () => {
+  // 首先加载分支和标签信息
+  await loadBranchAndTag()
+  
+  // 然后自动同步当前代码版本
+  await autoSyncCurrentVersion()
+  
+  // 加载其他数据
   loadExecuteHistory()
   loadCombinations()
 })
+
+const autoSyncCurrentVersion = async () => {
+  try {
+    // 如果当前有分支或标签信息，就同步到后端
+    if (currentBranch.value || currentTag.value) {
+      const request: CheckoutRequest = {
+        branch: currentBranch.value || null,
+        tag: currentTag.value || null
+      }
+      
+      // 调用接口同步当前版本
+      await testApi.switchBranchOrTag(request)
+      
+      console.log(`已自动同步代码版本: ${currentBranch.value || currentTag.value || '未知'}`)
+    } else {
+      console.log('未检测到当前代码版本，跳过自动同步')
+    }
+  } catch (error: any) {
+    console.warn('自动同步代码版本失败:', error.response?.data?.detail || error.message)
+    // 这里不显示错误提示，因为用户可能没有进行任何操作
+  }
+}
 
 // 组件卸载时停止所有轮询
 onUnmounted(() => {
