@@ -40,6 +40,10 @@ export const testApi = {
     return apiClient.get('/api/yuntester/execute-history')
   },
 
+  cancelExecute(task_id: string): Promise<void> {
+    return apiClient.post(`/api/yuntester/task/${task_id}/cancel`)
+  },
+
   getCustomCombinations(): Promise<CaseCombinationsResponse[]> {
     return apiClient.get('/api/yuntester/custom-combinations')
   },

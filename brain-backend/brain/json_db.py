@@ -307,7 +307,8 @@ class SQLiteDocumentDB:
             "url": "",
             "topo": "",
             "log": "",
-            "executed": ""
+            "executed": "",
+            "cancel": 0
         }, 
         TASK_POOL_COLLECTION: {
             "id": "",

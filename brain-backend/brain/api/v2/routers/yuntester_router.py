@@ -181,7 +181,7 @@ async def get_test_cases(data: yuntester_schemas.DirNeedCollectRequest,
 
 
 def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, result_dir):
-    """Execute pytest using subprocess and redirect terminal output to log file"""
+    """Return True if task completed normally, False if cancelled"""
     @contextmanager
     def working_directory(path: str):
         original_cwd = os.getcwd()
@@ -201,6 +201,11 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
         os.makedirs(allure_results_dir, exist_ok=True)
 
         for idx, case in enumerate(cases, 1):
+            task = db.find_one(TEST_HISTORY_COLLECTION, {"id": task_id})
+            if task.get("cancel", 0) == 1:
+                LOG.warning(f"Task {task_id} cancelled before executing case {case}")
+                break
+
             LOG.debug(f"Executing test case {idx}/{all_cases}: {case}")
 
             # Construct pytest command
@@ -226,12 +231,8 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
 
             executed_cases += 1
 
-            # Update execution progress to database
-            try:
-                db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, 
-                          {"executed": f"{executed_cases}/{all_cases}"})
-            except Exception as e:
-                LOG.error(f"Failed to update database: {e}")
+            db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, 
+                      {"executed": f"{executed_cases}/{all_cases}"})
 
         try:
             allure_report_dir = os.path.join(result_dir, "allure-report")
@@ -252,7 +253,15 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
         except subprocess.TimeoutExpired:
             LOG.warning("Allure report generation timeout")
         except Exception as e:
-            LOG.warning(f"Error generating Allure report: {e}")
+            LOG.warning(f"Allure report generation error: {e}")
+
+    end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    status = "cancelled" if task.get("cancel", 0) == 1 else "success"
+    db.update(
+        TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": status, "end_time": end_time})
+
+    LOG.info(f"Task {task_id} finished with status: {status}")
 
 
 async def execute_test_task(task_id: str, cases: list, user: str,
@@ -270,12 +279,6 @@ async def execute_test_task(task_id: str, cases: list, user: str,
             run_sync_pytest,
             task_id, cases, test_base_dir, log_path, env_topo_path, result_dir
         )
-
-        end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        db.update(
-            TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": "success", "end_time": end_time})
-
-        LOG.info(f"Test task {task_id} completed successfully")
 
     except Exception as e:
         end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -370,6 +373,7 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(aut
         "url": f"{settings.file_server}/qa-auto-files/{user}/results/{dt}/allure-report/index.html",
         "topo": f"{settings.file_server}/qa-auto-files/{user}/topo/{env_topo_filename}",
         "log": f"{settings.file_server}/qa-auto-files/{user}/logs/{log_filename}",
+        "cancel": 0
     }
 
     db.insert(TEST_HISTORY_COLLECTION, task_record)
@@ -398,6 +402,21 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return task
+
+
+@router.post("/yuntester/task/{task_id}/cancel")
+async def cancel_task(task_id: str):
+    try:
+        task = db.find_one(TEST_HISTORY_COLLECTION, {"id": task_id})
+    except Exception:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.get("cancel", 0) == 1:
+        return {"message": "Task already requested to cancel", "task_id": task_id}
+
+    db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, {"cancel": True})
+    LOG.info(f"Cancel requested for task {task_id}")
+    return {"message": "Task cancellation requested", "task_id": task_id}
 
 
 @router.get("/yuntester/execute-history",

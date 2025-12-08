@@ -181,7 +181,7 @@
               style="width: 100%"
               :max-height="400"
             >
-              <el-table-column prop="created_at" label="执行时间" width="170" sortable>
+              <el-table-column prop="created_at" label="执行时间" width="155" sortable>
                 <template #default="{ row }">
                   {{ formatTime(row.created_at) }}
                 </template>
@@ -219,20 +219,41 @@
               <!-- 执行状态列 -->
               <el-table-column prop="status" label="执行状态" width="120">
                 <template #default="{ row }">
-                  <el-tooltip 
-                    placement="top" 
-                    :content="getStatusTooltip(row)"
-                  >
-                    <div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <!-- 状态标签 -->
+                    <el-tooltip 
+                      placement="top" 
+                      :content="getStatusTooltip(row)"
+                    >
                       <el-tag 
                         :type="getStatusType(row.status)" 
                         size="small"
                         class="status-tag"
+                        style="min-width: 60px; justify-content: center;"
                       >
                         {{ getStatusText(row.status) }}
                       </el-tag>
-                    </div>
-                  </el-tooltip>
+                    </el-tooltip>
+                    
+                    <!-- 取消执行按钮 - 仅显示在运行中或等待中的任务 -->
+                    <el-tooltip 
+                      v-if="row.status === 'running' || row.status === 'pending'"
+                      content="取消任务" 
+                      placement="top"
+                    >
+                      <el-button 
+                        @click="cancelTask(row)"
+                        type="danger"
+                        :loading="cancellingTasks[row.id]"
+                        class="cancel-task-btn"
+                        :icon="CircleClose"
+                        size="small"
+                        link
+                        circle
+                        style="padding: 0; width: 20px; height: 20px;"
+                      />
+                    </el-tooltip>
+                  </div>
                 </template>
               </el-table-column>
               
@@ -1188,6 +1209,7 @@ const rightFilterText = ref('')
 const directories = ref<string[]>([])
 const topoDialogVisible = ref(false)
 const currentTopo = ref<any>({})
+const cancellingTasks = ref<Record<string, boolean>>({})
 
 // 测试用例相关数据
 const collectedCases = ref<string[]>([]) // 所有收集到的用例
@@ -2988,7 +3010,12 @@ const updateTaskInHistory = (taskId: string, task: any) => {
   const index = executeHistory.value.findIndex(t => t.id === taskId)
   
   if (index !== -1) {
-    // 如果任务已存在，更新它
+    // 如果任务状态变为 cancelled，停止轮询
+    if (task.status === 'cancelled') {
+      stopTaskPolling(taskId)
+    }
+    
+    // 更新任务信息
     executeHistory.value[index] = {
       ...executeHistory.value[index],
       ...task,
@@ -3087,6 +3114,8 @@ const getStatusText = (status: string): string => {
       return '执行成功'
     case 'failed':
       return '执行失败'
+    case 'cancelled':
+      return '已取消'
     default:
       return status || '未知'
   }
@@ -3103,8 +3132,58 @@ const getStatusType = (status: string): string => {
       return 'success'
     case 'failed':
       return 'danger'
+    case 'cancelled':
+      return 'info'
     default:
       return 'info'
+  }
+}
+
+// 取消任务方法
+const cancelTask = async (row: ExecuteResponse) => {
+  try {
+    // 显示确认对话框
+    await ElMessageBox.confirm(
+      `确定要提前取消测试任务的执行吗？`,
+      '取消确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+        customClass: 'cancel-confirm-dialog'
+      }
+    )
+    
+    // 设置取消中状态
+    cancellingTasks.value[row.id] = true
+    
+    // 调用取消接口
+    await testApi.cancelExecute(row.id)
+    
+    // 更新任务状态为 cancelled
+    const taskIndex = executeHistory.value.findIndex(t => t.id === row.id)
+    if (taskIndex !== -1) {
+      executeHistory.value[taskIndex].status = 'cancelled'
+      
+      // 更新其他相关信息
+      executeHistory.value[taskIndex].end_time = new Date().toISOString()
+      executeHistory.value[taskIndex].executed = row.executed || '0/0'
+      
+      // 停止该任务的轮询
+      stopTaskPolling(row.id)
+    }
+    
+    ElMessage.success('任务已取消')
+    
+  } catch (error) {
+    if (error === 'cancel') {
+      // 用户取消操作
+      return
+    }
+    ElMessage.error('取消任务失败')
+  } finally {
+    // 清除取消中状态
+    delete cancellingTasks.value[row.id]
   }
 }
 
@@ -3924,10 +4003,11 @@ onUnmounted(() => {
 }
 
 .code-tag {
-  max-width: 120px;
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: inline-block;
 }
 
 .commit-hash-small {
@@ -4845,6 +4925,72 @@ onUnmounted(() => {
     background: #f8fafc !important;
     flex-shrink: 0 !important;
   }
+}
+
+.cancel-task-btn {
+  font-size: 12px;
+  padding: 4px 8px;
+  height: 24px;
+  line-height: 20px;
+}
+
+.cancel-task-btn .el-icon {
+  margin-right: 2px;
+  font-size: 12px;
+}
+
+.cancel-task-btn:hover {
+  background-color: #f56c6c;
+  border-color: #f56c6c;
+  color: white;
+}
+
+:deep(.cancel-confirm-dialog) {
+  border-radius: 8px;
+}
+
+:deep(.cancel-confirm-dialog .el-message-box__header) {
+  background: #fef0f0;
+  border-bottom: 1px solid #fde2e2;
+  border-radius: 8px 8px 0 0;
+  padding: 16px 20px;
+}
+
+:deep(.cancel-confirm-dialog .el-message-box__title) {
+  color: #f56c6c;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+:deep(.cancel-confirm-dialog .el-message-box__status) {
+  color: #f56c6c;
+}
+
+:deep(.cancel-confirm-dialog .el-message-box__content) {
+  padding: 20px;
+  color: #f56c6c;
+  font-size: 14px;
+}
+
+:deep(.cancel-confirm-dialog .el-message-box__btns) {
+  padding: 0 20px 20px;
+}
+
+:deep(.cancel-confirm-dialog .el-button--primary) {
+  background: #f56c6c;
+  border-color: #f56c6c;
+}
+
+:deep(.cancel-confirm-dialog .el-button--primary:hover) {
+  background: #d95353;
+  border-color: #d95353;
+}
+
+/* 已取消状态的样式 */
+.status-tag.cancelled {
+  background-color: #f4f4f5;
+  border-color: #e4e7ed;
+  color: #909399;
 }
 
 .dialog-content {

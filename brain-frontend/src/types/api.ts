@@ -173,7 +173,7 @@ export interface MCRRequest {
 export interface TaskStatusResponse {
   id: string
   server_id: string
-  status: 'pending' | 'running' | 'finished' | 'failed'
+  status: 'pending' | 'running' | 'finished' | 'failed' | 'cancelled'
   stage: string
   detail: string
   timestamp: string
