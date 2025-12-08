@@ -33,7 +33,8 @@ async def ssh_execute_async(host: str, command: str, user: str, pwd: str) -> str
         raise
     except Exception as e:
         LOG.error(f"Async SSH execution {command} failed on {host}: {e}")
-        raise HTTPException(status_code=500, detail=f"SSH execution {command} failed on {host}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"SSH execution {command} failed on {host}: {e}")
 
 
 def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
@@ -65,7 +66,8 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
         raise HTTPException(status_code=509, detail=f"{e}")
     except Exception as e:
         LOG.error(f"SSH execution {command} failed on {host}: {e}")
-        raise HTTPException(status_code=500, detail=f"SSH execution {command} failed on {host}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"SSH execution {command} failed on {host}: {e}")
 
 
 class AsyncRemoteFS:

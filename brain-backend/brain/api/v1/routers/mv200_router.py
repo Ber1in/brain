@@ -1,7 +1,8 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 import logging
 import uuid
@@ -345,7 +346,7 @@ async def delete_mv_server(server_id: str):
 
 
 @router.post("/mv-servers/{server_id}/update_mcr", status_code=202)
-async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
+async def update_mcr(server_id: str, data: common_schemas.MCRRequest):
     LOG.info("Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")
 
@@ -369,9 +370,11 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background
 
     host_ipmi = ""
     # Run background task
-    background.add_task(
-        common_utils.run_mcr_update_task, task_id, server["ip_address"],
-        MV200_OS_USER, MV200_OS_PASSWORD, host_ipmi, data, aidpu=True)
+    asyncio.create_task(
+        common_utils.run_mcr_update_task(
+            task_id, server["ip_address"],
+            MV200_OS_USER, MV200_OS_PASSWORD, host_ipmi, data, aidpu=True)
+    )
     LOG.info(f"Background task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}

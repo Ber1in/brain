@@ -13,7 +13,7 @@ import gitlab
 import git
 import logging
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 
 from brain.config import settings
 from brain.auth import authenticate_user
@@ -265,6 +265,7 @@ async def execute_test_task(task_id: str, cases: list, user: str,
         if not os.path.exists(test_base_dir):
             raise Exception(f"Test directory not found: {test_base_dir}")
 
+        # The synchronous blocking task Pytest is executed in a thread pool.
         await asyncio.to_thread(
             run_sync_pytest,
             task_id, cases, test_base_dir, log_path, env_topo_path, result_dir
@@ -340,9 +341,7 @@ async def prepare_test_environment(data: yuntester_schemas.ExecuteRequest, user,
 
 
 @router.post("/yuntester/execute-cases", response_model=yuntester_schemas.ExecuteResponse)
-async def execute_cases(data: yuntester_schemas.ExecuteRequest,
-                        background: BackgroundTasks,
-                        user=Depends(authenticate_user)):
+async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(authenticate_user)):
     task_id = str(uuid4())
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -375,14 +374,15 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest,
 
     db.insert(TEST_HISTORY_COLLECTION, task_record)
 
-    background.add_task(
-        execute_test_task,
-        task_id=task_id,
-        cases=data.cases,
-        user=user,
-        env_topo_path=env_topo_path,
-        log_path=log_path,
-        result_dir=result_dir
+    asyncio.create_task(
+        execute_test_task(
+            task_id=task_id,
+            cases=data.cases,
+            user=user,
+            env_topo_path=env_topo_path,
+            log_path=log_path,
+            result_dir=result_dir
+        )
     )
 
     LOG.info(f"Test task {task_id} submitted for user {user}")

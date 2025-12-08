@@ -1,10 +1,11 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import asyncio
 from datetime import datetime
 import re
 from uuid import uuid4
-from fastapi import APIRouter, Depends, status, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, status, HTTPException, Query
 import logging
 
 from brain.auth import authenticate_user
@@ -422,7 +423,7 @@ async def power_reset_server(server_id: str):
 
 
 @router.post("/servers/{server_id}/update_mcr", status_code=202)
-async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background: BackgroundTasks):
+async def update_mcr(server_id: str, data: common_schemas.MCRRequest):
     LOG.info("Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")
 
@@ -444,10 +445,17 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest, background
     server["task_id"] = task_id
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
-    # Run background task
-    background.add_task(
-        common_utils.run_mcr_update_task, task_id, server["device"]["ip"],
-        server["device"]["username"], server["device"]["password"], server["bmc"]["ip"], data)
-    LOG.info(f"Background task {task_id} started for server {server_id}")
+    asyncio.create_task(
+        common_utils.run_mcr_update_task(
+            task_id,
+            server["device"]["ip"],
+            server["device"]["username"],
+            server["device"]["password"],
+            server["bmc"]["ip"],
+            data
+        )
+    )
+
+    LOG.info(f"Async MCR update task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}

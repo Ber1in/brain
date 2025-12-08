@@ -295,7 +295,7 @@ async def update_automatic_async(ip, user, password):
     try:
         mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password)
     except Exception as e:
-        LOG.warning("ailed to retrieve MAC information")
+        LOG.warning(f"failed to retrieve MAC information, error: {e}")
         mac_res = ""
     
     macs = parse_bdf_mac(mac_res)
