@@ -22,6 +22,10 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
+ALIAS_NAMES = {
+    "metaConnect-400S 400GbE, Single-port QSFP112, PCIe 5.0 x16": "MC400S",
+    "metaScale-200 100GbE OCP3.0, Dual-port DSFP, Multi Host, PCIe 4.0 x16": "MS200-OCP"
+}
 
 
 @router.post("/servers", response_model=server_schemas.ServerDetailResponse)
@@ -150,6 +154,8 @@ async def get_all_devices():
             passed = int(now - start)
             remaining = i["time"] - passed
             i["time"] = max(remaining, 0)
+        for nic in i.get("nics", []):
+            nic["type"] = ALIAS_NAMES.get(nic.get("type", ""), nic.get("type", ""))
     LOG.info(f"Total devices fetched: {len(devices)}")
     return devices
 
