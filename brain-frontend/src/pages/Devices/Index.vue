@@ -2159,13 +2159,9 @@ const getNicSummary = (device: ServerDetailResponse) => {
   
   device.nics.forEach(nic => {
     if (nic.type) {
-      // 通过第一个-切割，取左边的部分
-      let displayType = nic.type.split('-')[0].trim()
-
-      if (displayType.toLowerCase() === "metascale") {
-        displayType = "MS200-OCP"
-      }
-
+      // 直接使用后端处理好的type，不需要再处理
+      const displayType = nic.type
+      
       // 预先为这个类型分配颜色（确保颜色一致性）
       nicColorManager.getColor(displayType)
       

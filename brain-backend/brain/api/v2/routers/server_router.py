@@ -155,7 +155,7 @@ async def get_all_devices():
             remaining = i["time"] - passed
             i["time"] = max(remaining, 0)
         for nic in i.get("nics", []):
-            nic["type"] = ALIAS_NAMES.get(nic.get("type", ""), nic.get("type", ""))
+            nic["type"] = ALIAS_NAMES.get(nic.get("type", ""), nic.get("type", "").split("-")[0])
     LOG.info(f"Total devices fetched: {len(devices)}")
     return devices
 
