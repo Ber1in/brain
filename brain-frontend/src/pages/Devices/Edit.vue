@@ -204,15 +204,42 @@
             <!-- SOC IP列 -->
             <el-table-column label="SOC IP" width="150">
               <template #default="{ row }">
-                <div v-if="getMv200ForNic(row.sn)" class="soc-ip-link">
-                  <el-link 
-                    type="primary" 
-                    @click="handleMv200Detail(getMv200ForNic(row.sn))"
-                    class="underlined-link"
-                    :underline="false"
+                <div v-if="getMv200StatusForNic(row.sn)" class="soc-ip-status">
+                  <!-- 匹配异常状态 -->
+                  <div 
+                    v-if="getMv200StatusForNic(row.sn).status === 'multiple_matched'" 
+                    class="error-info"
                   >
-                    {{ getMv200ForNic(row.sn)?.ip_address }}
-                  </el-link>
+                    <el-tooltip 
+                      effect="dark" 
+                      :content="getMultipleMv200Tooltip(getMv200StatusForNic(row.sn))" 
+                      placement="top"
+                    >
+                      <div class="error-message">
+                        <el-icon><Warning /></el-icon>
+                        <span>匹配异常</span>
+                        <span class="match-count">({{ getMv200StatusForNic(row.sn).devices.length }}张)</span>
+                      </div>
+                    </el-tooltip>
+                  </div>
+                  
+                  <!-- 正常匹配状态 -->
+                  <div 
+                    v-else-if="getMv200StatusForNic(row.sn).status === 'matched'" 
+                    class="soc-ip-link"
+                  >
+                    <el-link 
+                      type="primary" 
+                      @click="handleMv200Detail(getMv200StatusForNic(row.sn).data)"
+                      class="underlined-link"
+                      :underline="false"
+                    >
+                      {{ getMv200StatusForNic(row.sn).data.ip_address }}
+                    </el-link>
+                  </div>
+                  
+                  <!-- 未匹配状态 -->
+                  <span v-else class="empty-text">-</span>
                 </div>
                 <span v-else class="empty-text">-</span>
               </template>
@@ -231,7 +258,7 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Check, Loading } from '@element-plus/icons-vue'
+import { Refresh, Check, Loading, Warning } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { tagApi } from '@/api/common'
 import { mv200Api } from '@/api/mv200'
@@ -280,6 +307,56 @@ const form = reactive<ServerUpdateRequest>({
 
 const availableTags = ref<TagResponse[]>([])
 
+// 添加根据网卡序列号获取对应的MV200匹配状态函数
+const getMv200StatusForNic = (nicSn: string): any => {
+  if (!nicSn || !allMv200s.value.length) {
+    return {
+      status: 'not_matched',
+      message: '未找到匹配的MV200'
+    }
+  }
+  
+  // 查找所有匹配的MV200（可能有多个）
+  const matchedMv200s = allMv200s.value.filter(mv200 => mv200.nic_sn === nicSn)
+  
+  // 根据匹配到的MV200数量返回不同状态
+  if (matchedMv200s.length === 0) {
+    return {
+      status: 'not_matched',
+      message: '未找到匹配的MV200'
+    }
+  } else if (matchedMv200s.length === 1) {
+    return {
+      status: 'matched',
+      data: matchedMv200s[0],
+      message: null
+    }
+  } else {
+    // 匹配到多张MV200的情况
+    return {
+      status: 'multiple_matched',
+      devices: matchedMv200s.map(mv200 => ({
+        name: mv200.name,
+        ip_address: mv200.ip_address,
+        id: mv200.id
+      })),
+      message: `匹配到 ${matchedMv200s.length} 张MV200`,
+      count: matchedMv200s.length
+    }
+  }
+}
+
+// 添加获取多匹配提示信息的函数
+const getMultipleMv200Tooltip = (mv200Info: any) => {
+  if (mv200Info.status !== 'multiple_matched') return ''
+  
+  const mv200List = mv200Info.devices.map((device: any, index: number) => 
+    `${index + 1}. ${device.name} (${device.ip_address})`
+  ).join('\n')
+  
+  return `${mv200Info.message}\n\n:\n${mv200List}`
+}
+
 // 计算是否有服务器信息
 const hasServerInfo = computed(() => {
   return deviceData.value.device?.vendor || deviceData.value.device?.product || deviceData.value.device?.sn
@@ -312,15 +389,6 @@ const processedNics = computed(() => {
 const hasAidpuNics = computed(() => {
   return deviceData.value.nics?.some(nic => 'soc_ip' in nic)
 })
-
-// 根据网卡序列号获取对应的MV200信息
-const getMv200ForNic = (nicSn: string): MVServer | null => {
-  if (!nicSn || !allMv200s.value.length) return null
-  
-  // 查找nic_sn匹配的MV200
-  const matchedMv200 = allMv200s.value.find(mv200 => mv200.nic_sn === nicSn)
-  return matchedMv200 || null
-}
 
 // MV200详情页面跳转
 const handleMv200Detail = (mv200: MVServer | null) => {
@@ -661,26 +729,26 @@ onMounted(() => {
 /* 并排布局样式 - 1:1:3比例 */
 .info-row {
   display: flex;
-  gap: 16px;
+  gap: 3px;
   align-items: flex-start;
 }
 
 .server-info-card {
-  flex: 1.5;
+  flex: 1.2;
   min-width: 0;
-  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+  max-width: calc(20% ); /* 1.2/6 = 20% */
 }
 
 .cpu-info-card {
-  flex: 1.5;
+  flex: 1.4;
   min-width: 0;
-  max-width: calc(25% - 11px); /* 1.5/6 = 25% */
+  max-width: calc(23% + 10px); /* 1.4/6 = 20% */
 }
 
 .nic-card {
-  flex: 3;
+  flex: 3.4;
   min-width: 0;
-  max-width: calc(50% - 11px); /* 3/6 = 50% */
+  max-width: calc(60% - 11px); /* 3.6/6 = 60% */
 }
 
 /* 紧凑信息列表样式 */
@@ -695,7 +763,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px 6px;
   background: #f8fafc;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
@@ -721,7 +789,6 @@ onMounted(() => {
   font-family: 'Monaco', 'Consolas', monospace;
   text-align: right;
   flex: 1;
-  margin-left: 12px;
   word-break: break-all;
 }
 
@@ -780,20 +847,58 @@ onMounted(() => {
   font-style: italic;
 }
 
-/* SOC IP链接样式 */
+/* 添加匹配异常提示的样式 */
+.soc-ip-status {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+/* 错误信息样式 */
+.error-info {
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-radius: 4px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: help;
+  color: #f56c6c;
+  justify-content: center;
+}
+
+.error-message .el-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* 匹配数量标签 */
+.match-count {
+  font-size: 11px;
+  color: #999;
+  margin-left: 2px;
+}
+
+/* SOC IP链接样式改为左对齐 */
 .soc-ip-link {
   display: flex;
   align-items: center;
+  padding: 4px 0;
 }
 
-.soc-ip-link :deep(.el-link) {
-  display: inline-flex;
-  align-items: center;
-  line-height: 1.4;
-  padding: 0;
-  margin: 0;
+/* 提示框样式 */
+:deep(.el-tooltip__popper) {
+  white-space: pre-line;
+  max-width: 400px;
   font-family: 'Monaco', 'Consolas', monospace;
-  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 /* 下划线链接样式 */
@@ -926,6 +1031,23 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .soc-ip-status {
+    min-height: 36px;
+  }
+  
+  .error-message {
+    font-size: 11px;
+    gap: 4px;
+  }
+  
+  .match-count {
+    font-size: 10px;
+  }
+  
+  .soc-ip-link :deep(.el-link) {
+    font-size: 11px;
+  }
+
   .card-header {
     flex-direction: column;
     gap: 16px;

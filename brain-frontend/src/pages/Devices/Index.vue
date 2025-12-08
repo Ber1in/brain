@@ -69,6 +69,7 @@
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @selection-change="handleSelectionChange"
+        :row-class-name="getRowClassName"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
@@ -87,6 +88,14 @@
               :underline="false"
             >
               {{ row.bmc.hostname }}
+              <el-tooltip 
+                v-if="hasDuplicateNicInfo(row)" 
+                effect="dark" 
+                :content="getDuplicateTooltip(row)"
+                placement="top"
+              >
+                <el-icon class="warning-icon"><Warning /></el-icon>
+              </el-tooltip>
             </el-link>
           </template>
         </el-table-column>
@@ -1037,6 +1046,123 @@ const getStageText = (stage: string) => {
     'waiting': '等待中'
   }
   return stageMap[stage] || stage
+}
+
+// 检测服务器是否有重复的网卡信息
+const hasDuplicateNicInfo = (device: ServerDetailResponse): boolean => {
+  if (!device.nics || device.nics.length === 0) return false
+  
+  // 收集所有服务器的网卡信息
+  const allNicInfos = devices.value.flatMap(d => 
+    (d.nics || []).flatMap(nic => {
+      const infos = []
+      
+      // 收集网卡SN
+      if (nic.sn) {
+        infos.push({ type: 'sn', value: nic.sn, deviceId: d.id })
+      }
+      
+      // 收集nic_info中的MAC地址
+      const nicInfo = (nic as any).nic_info || []
+      nicInfo.forEach((info: any) => {
+        // 只收集MAC地址
+        if (info.mac) {
+          infos.push({ type: 'mac', value: info.mac, deviceId: d.id })
+        }
+      })
+      
+      return infos
+    })
+  )
+  
+  // 检查当前设备是否有重复信息
+  return device.nics.some(nic => {
+    // 检查网卡SN是否重复（跨设备）
+    if (nic.sn) {
+      const sameSnCount = allNicInfos.filter(info => 
+        info.type === 'sn' && info.value === nic.sn && info.deviceId !== device.id
+      ).length
+      if (sameSnCount > 0) return true
+    }
+    
+    // 检查nic_info中的MAC地址重复
+    const nicInfo = (nic as any).nic_info || []
+    return nicInfo.some((info: any) => {
+      // 检查MAC地址重复
+      if (info.mac) {
+        const sameMacCount = allNicInfos.filter(nicInfo => 
+          nicInfo.type === 'mac' && nicInfo.value === info.mac && nicInfo.deviceId !== device.id
+        ).length
+        if (sameMacCount > 0) return true
+      }
+      
+      return false
+    })
+  })
+}
+
+// 获取重复信息的详细提示
+const getDuplicateTooltip = (device: ServerDetailResponse): string => {
+  if (!device.nics) return ''
+  
+  const duplicates: string[] = []
+  const allNicInfos = devices.value.flatMap(d => 
+    (d.nics || []).flatMap(nic => {
+      const infos = []
+      
+      if (nic.sn) {
+        infos.push({ type: 'SN', value: nic.sn, deviceId: d.id, deviceName: d.bmc.hostname })
+      }
+      
+      const nicInfo = (nic as any).nic_info || []
+      nicInfo.forEach((info: any) => {
+        if (info.mac) {
+          infos.push({ type: 'MAC', value: info.mac, deviceId: d.id, deviceName: d.bmc.hostname })
+        }
+      })
+      
+      return infos
+    })
+  )
+  
+  device.nics.forEach(nic => {
+    // 检查SN重复
+    if (nic.sn) {
+      const sameSnDevices = allNicInfos.filter(info => 
+        info.type === 'SN' && info.value === nic.sn && info.deviceId !== device.id
+      ).map(info => info.deviceName)
+      
+      if (sameSnDevices.length > 0) {
+        duplicates.push(`SN: ${nic.sn} 在其他服务器重复: ${sameSnDevices.join(', ')}`)
+      }
+    }
+    
+    // 检查MAC地址重复
+    const nicInfo = (nic as any).nic_info || []
+    nicInfo.forEach((info: any) => {
+      if (info.mac) {
+        const sameMacDevices = allNicInfos.filter(nicInfo => 
+          nicInfo.type === 'MAC' && nicInfo.value === info.mac && nicInfo.deviceId !== device.id
+        ).map(nicInfo => nicInfo.deviceName)
+        
+        if (sameMacDevices.length > 0) {
+          duplicates.push(`MAC: ${info.mac} 在其他服务器重复: ${sameMacDevices.join(', ')}`)
+        }
+      }
+    })
+  })
+  
+  return duplicates.length > 0 
+    ? `网卡信息重复:\n${duplicates.join('\n')}`
+    : ''
+}
+
+// 根据是否有重复信息设置行样式
+const getRowClassName = ({ row }: { row: ServerDetailResponse }) => {
+  if (hasDuplicateNicInfo(row)) {
+    return 'warning-row'
+  }
+  return ''
 }
 
 const getMcrStatusType = (device: ServerDetailResponse) => {
@@ -2976,6 +3102,24 @@ onMounted(() => {
 :deep(.update-mcr-item:not(.is-disabled):hover) {
   color: #5f2bc3 !important;
   background-color: #f8f5ff !important;
+}
+
+/* 警告行样式 */
+:deep(.warning-row) {
+  background-color: #fdf6ec !important;
+}
+
+:deep(.warning-row:hover) {
+  background-color: #fdf6ec !important;
+  opacity: 0.9;
+}
+
+/* 警告图标样式 */
+.warning-icon {
+  color: #e6a23c;
+  margin-left: 4px;
+  font-size: 14px;
+  vertical-align: middle;
 }
 
 /* 关注心形按钮样式 */
