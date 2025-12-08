@@ -35,17 +35,57 @@
 
         <!-- 关联服务器信息 -->
         <el-descriptions-item label="关联服务器" :span="2">
-          <div v-if="associatedServer" class="server-info">
-            <el-link 
-              type="primary" 
-              @click="handleServerDetail(associatedServer)"
-              class="hostname-link underlined-link"
-              :underline="false"
-            >
-              {{ associatedServer.hostname }} ({{ associatedServer.ip }})
-            </el-link>
-          </div>
-          <el-tag v-else type="info">服务器尚未纳管</el-tag>
+          <template v-if="associatedServer && associatedServer.status">
+            <!-- 未纳管状态 -->
+            <div v-if="associatedServer.status === 'not_managed'" class="server-info warning-info">
+              <el-tooltip 
+                effect="dark" 
+                :content="associatedServer.message" 
+                placement="top"
+              >
+                <div class="warning-message">
+                  <el-icon><Warning /></el-icon>
+                  <span>服务器未纳管</span>
+                </div>
+              </el-tooltip>
+            </div>
+            
+            <!-- 正确匹配状态 -->
+            <div v-else-if="associatedServer.status === 'matched'" class="server-info">
+              <el-link 
+                type="primary" 
+                @click="handleServerDetail(associatedServer.data)"
+                class="hostname-link underlined-link"
+                :underline="false"
+              >
+                {{ associatedServer.data.hostname }} ({{ associatedServer.data.ip }})
+              </el-link>
+            </div>
+            
+            <!-- 多匹配异常状态 -->
+            <div v-else-if="associatedServer.status === 'multiple_matched'" class="server-info error-info">
+              <el-tooltip 
+                effect="dark" 
+                placement="top"
+                :content="getMultipleMatchTooltip(associatedServer)"
+              >
+                <div class="error-message">
+                  <el-icon><Warning /></el-icon>
+                  <span>匹配异常</span>
+                  <span class="match-count">({{ associatedServer.devices.length }}台)</span>
+                </div>
+              </el-tooltip>
+            </div>
+            
+            <!-- 未知状态 -->
+            <div v-else class="server-info">
+              <el-tag type="info">未知状态</el-tag>
+            </div>
+          </template>
+          
+          <template v-else>
+            <el-tag type="info">服务器尚未纳管</el-tag>
+          </template>
         </el-descriptions-item>
 
         <!-- 云盘启动状态 -->
@@ -88,7 +128,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Refresh, Loading } from '@element-plus/icons-vue'
+import { Edit, Refresh, Loading, Warning } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { deviceApi } from '@/api/device'
 import type { MVServer, ServerDetailResponse, MCRVersionInfo } from '@/types/api'
@@ -115,24 +155,78 @@ const mv200Data = ref<MVServer>({
 
 const allDevices = ref<ServerDetailResponse[]>([])
 
-// 计算关联的服务器信息
-const associatedServer = computed(() => {
-  if (!mv200Data.value.nic_sn || !allDevices.value.length) return null
+// 查找关联的服务器（支持多种状态）
+const findAssociatedServer = (mv200: MVServer, devices: ServerDetailResponse[]) => { 
+  if (!mv200.nic_sn) {
+    return {
+      status: 'not_managed',
+      message: '服务器尚未纳管'
+    }
+  }
   
-  for (const device of allDevices.value) {
+  const matchingDevices: Array<{
+    hostname: string;
+    ip: string;
+    deviceId?: string;
+  }> = []
+  
+  for (const device of devices) {
     if (device.nics && device.nics.length > 0) {
-      const matchingNic = device.nics.find(nic => nic.sn === mv200Data.value.nic_sn)
+      const matchingNic = device.nics.find(nic => nic.sn === mv200.nic_sn)
       if (matchingNic) {
-        return {
+        matchingDevices.push({
           hostname: device.bmc.hostname,
           ip: device.device.ip,
-          deviceId: device.id // 保存设备ID用于跳转
-        }
+          deviceId: device.id
+        })
       }
     }
   }
-  return null
+  
+  // 根据匹配到的服务器数量返回不同状态
+  if (matchingDevices.length === 0) {
+    return {
+      status: 'not_managed',
+      message: '服务器尚未纳管'
+    }
+  } else if (matchingDevices.length === 1) {
+    return {
+      status: 'matched',
+      data: matchingDevices[0],
+      message: null
+    }
+  } else {
+    // 匹配到多台服务器的情况
+    return {
+      status: 'multiple_matched',
+      devices: matchingDevices,
+      message: `匹配到 ${matchingDevices.length} 台服务器`
+    }
+  }
+}
+
+// 计算关联的服务器信息
+const associatedServer = computed(() => {
+  if (!mv200Data.value.nic_sn || !allDevices.value.length) {
+    return {
+      status: 'not_managed',
+      message: '服务器尚未纳管'
+    }
+  }
+  
+  return findAssociatedServer(mv200Data.value, allDevices.value)
 })
+
+// 获取多匹配提示信息的方法
+const getMultipleMatchTooltip = (serverInfo: any) => {
+  if (serverInfo.status !== 'multiple_matched') return ''
+  
+  const devicesList = serverInfo.devices.map((device: any, index: number) => 
+    `${index + 1}. ${device.hostname} (${device.ip})`
+  ).join('\n')
+  
+  return `${serverInfo.message}\n\n匹配到的服务器:\n${devicesList}`
+}
 
 // 计算是否有版本信息
 const hasVersionInfo = computed(() => {
@@ -278,18 +372,68 @@ onMounted(() => {
   gap: 12px;
 }
 
-/* 关联服务器链接样式 */
+/* 服务器信息容器 */
 .server-info {
   display: flex;
   align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  min-height: 40px;
 }
 
+/* 正常匹配状态 */
+.server-info:not(.error-info):not(.warning-info) {
+  background-color: #f0f9ff;
+  border: 1px solid #d1e9ff;
+}
+
+/* 错误信息样式 */
+.error-info {
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
+}
+
+/* 警告信息样式 */
+.warning-info {
+  background-color: #fdf6ec;
+  border: 1px solid #faecd8;
+}
+
+.error-message, .warning-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: help;
+}
+
+.error-message {
+  color: #f56c6c;
+}
+
+.warning-message {
+  color: #e6a23c;
+}
+
+.error-message .el-icon, .warning-message .el-icon {
+  font-size: 16px;
+}
+
+/* 匹配数量标签 */
+.match-count {
+  font-size: 12px;
+  color: #999;
+  margin-left: 4px;
+}
+
+/* 链接样式 */
 .server-info :deep(.el-link) {
   display: inline-flex;
   align-items: center;
   line-height: 1.4;
   padding: 0;
   margin: 0;
+  font-size: 14px;
 }
 
 /* 主机名链接样式 */
@@ -314,10 +458,12 @@ onMounted(() => {
 
 :deep(.el-descriptions__label) {
   font-weight: 600;
+  background-color: #f8fafc;
 }
 
 :deep(.el-descriptions__content) {
   font-family: 'Monaco', 'Consolas', monospace;
+  background-color: #ffffff;
 }
 
 /* 更新按钮加载状态样式 */
@@ -351,6 +497,15 @@ onMounted(() => {
   font-weight: 600;
 }
 
+/* 提示框样式 */
+:deep(.el-tooltip__popper) {
+  white-space: pre-line;
+  max-width: 400px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .card-header {
@@ -378,6 +533,10 @@ onMounted(() => {
       display: block;
       width: calc(100% - 120px);
     }
+  }
+  
+  .error-message, .warning-message {
+    font-size: 12px;
   }
 }
 </style>

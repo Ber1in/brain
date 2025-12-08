@@ -74,17 +74,45 @@
         </el-table-column>
         <el-table-column label="关联服务器" width="150">
           <template #default="{ row }">
-            <div v-if="row.associatedServer" class="server-info">
-              <el-link 
-                type="primary" 
-                @click="handleServerDetail(row.associatedServer)"
-                class="hostname-link underlined-link"
-                :underline="false"
-              >
-                {{ row.associatedServer.ip }}
-              </el-link>
-            </div>
-            <span v-else class="empty-text">服务器尚未纳管</span>
+            <template v-if="!row.associatedServer">
+              <span class="empty-text">-</span>
+            </template>
+            <template v-else>
+              <div v-if="row.associatedServer.status === 'matched'" class="server-info">
+                <el-link 
+                  type="primary" 
+                  @click="handleServerDetail(row.associatedServer.data)"
+                  class="hostname-link underlined-link"
+                  :underline="false"
+                >
+                  {{ row.associatedServer.data.ip }}
+                </el-link>
+              </div>
+              <div v-else-if="row.associatedServer.status === 'not_managed'" class="warning-info">
+                <el-tooltip 
+                  effect="dark" 
+                  :content="row.associatedServer.message" 
+                  placement="top"
+                >
+                  <div class="warning-message">
+                    <el-icon><Warning /></el-icon>
+                    <span>服务器未纳管</span>
+                  </div>
+                </el-tooltip>
+              </div>
+              <div v-else-if="row.associatedServer.status === 'multiple_matched'" class="error-info">
+                <el-tooltip 
+                  effect="dark" 
+                  placement="top"
+                  :content="getMultipleMatchTooltip(row.associatedServer)"
+                >
+                  <div class="error-message">
+                    <el-icon><Warning /></el-icon>
+                    <span>匹配异常</span>
+                  </div>
+                </el-tooltip>
+              </div>
+            </template>
           </template>
         </el-table-column>
         <el-table-column label="MCR版本" width="200">
@@ -952,22 +980,63 @@ const ipSort = (ipA: string, ipB: string) => {
 };
 
 // 新增：根据nic_sn查找关联的服务器
-const findAssociatedServer = (mv200: MVServer, devices: ServerDetailResponse[]) => {
-  if (!mv200.nic_sn) return undefined
+const findAssociatedServer = (mv200: MVServer, devices: ServerDetailResponse[]) => { 
+  if (!mv200.nic_sn) {
+    return {
+      status: 'not_managed',
+      message: '服务器尚未纳管'
+    }
+  }
+  
+  const matchingDevices: Array<{
+    hostname: string;
+    ip: string;
+    deviceId?: string;
+  }> = []
   
   for (const device of devices) {
     if (device.nics && device.nics.length > 0) {
       const matchingNic = device.nics.find(nic => nic.sn === mv200.nic_sn)
       if (matchingNic) {
-        return {
+        matchingDevices.push({
           hostname: device.bmc.hostname,
           ip: device.device.ip,
-          deviceId: device.id // 保存设备ID用于跳转
-        }
+          deviceId: device.id
+        })
       }
     }
   }
-  return undefined
+  
+  // 根据匹配到的服务器数量返回不同状态
+  if (matchingDevices.length === 0) {
+    return {
+      status: 'not_managed',
+      message: '服务器尚未纳管'
+    }
+  } else if (matchingDevices.length === 1) {
+    return {
+      status: 'matched',
+      data: matchingDevices[0],
+      message: null
+    }
+  } else {
+    // 匹配到多台服务器的情况
+    return {
+      status: 'multiple_matched',
+      devices: matchingDevices,
+      message: `匹配到 ${matchingDevices.length} 台服务器`
+    }
+  }
+}
+
+const getMultipleMatchTooltip = (serverInfo: any) => {
+  if (serverInfo.status !== 'multiple_matched') return ''
+  
+  const devicesList = serverInfo.devices.map((device: any, index: number) => 
+    `${index + 1}. ${device.hostname} (${device.ip})`
+  ).join('\n')
+  
+  return `${serverInfo.message}\n\n:\n${devicesList}`
 }
 
 // 处理选择变化
@@ -1317,6 +1386,51 @@ onMounted(() => {
 .loading-spinner {
   animation: spin 1s linear infinite;
   color: #e6a23c;
+}
+
+.error-info, .warning-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.error-info {
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
+}
+
+.warning-info {
+  background-color: #fdf6ec;
+  border: 1px solid #faecd8;
+}
+
+.error-message, .warning-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.error-message {
+  color: #f56c6c;
+}
+
+.warning-message {
+  color: #e6a23c;
+}
+
+.error-message .el-icon, .warning-message .el-icon {
+  font-size: 14px;
+}
+
+:deep(.el-tooltip__popper) {
+  white-space: pre-line;
+  max-width: 400px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 @keyframes spin {
