@@ -53,10 +53,24 @@ async def create_device(data: server_schemas.ServerRequest):
 
     await common_utils.ensure_packages_installed(
         str(data.device.ip), data.device.username, data.device.password, ["ipmitool"])
-    impi_info = await ssh_execute_async(str(data.device.ip), "ipmitool lan print 1",
-                                        data.device.username, data.device.password)
-    match = re.search(r"IP Address\s*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)", impi_info)
-    bmc_ip = match.group(1) if match else None
+    channels = [1, 2, 0]
+
+    for channel in channels:
+        impi_info = await ssh_execute_async(
+            str(data.device.ip), 
+            f"ipmitool lan print {channel}",
+            data.device.username, 
+            data.device.password,
+            check=False
+        )
+
+        match = re.search(r"IP Address\s*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)", impi_info)
+
+        if match:
+            bmc_ip = match.group(1)
+            break
+    else:
+        raise HTTPException(500, detail="Unable to find IMPI address") 
 
     device.update({
         "ip": str(data.device.ip),

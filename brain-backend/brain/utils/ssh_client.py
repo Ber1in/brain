@@ -17,7 +17,7 @@ LOG = logging.getLogger(__name__)
 IGNORE_DIRS = [".", ".."]
 
 
-async def ssh_execute_async(host: str, command: str, user: str, pwd: str) -> str:
+async def ssh_execute_async(host: str, command: str, user: str, pwd: str, check=True) -> str:
     """Execute a command on remote host via SSH asynchronously"""
     loop = asyncio.get_event_loop()
     ctx = contextvars.copy_context()
@@ -26,7 +26,7 @@ async def ssh_execute_async(host: str, command: str, user: str, pwd: str) -> str
         with concurrent.futures.ThreadPoolExecutor() as pool:
             result = await loop.run_in_executor(
                 pool,
-                lambda: ctx.run(ssh_execute, host, command, user, pwd)
+                lambda: ctx.run(ssh_execute, host, command, user, pwd, check)
             )
             return result
     except HTTPException:
@@ -37,7 +37,7 @@ async def ssh_execute_async(host: str, command: str, user: str, pwd: str) -> str
             status_code=500, detail=f"SSH execution {command} failed on {host}: {e}")
 
 
-def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
+def ssh_execute(host: str, command: str, user: str, pwd: str, check=True) -> str:
     """Execute a command on remote host via SSH"""
     LOG.debug(f"Executing SSH command on {host}: {command}")
     try:
@@ -52,7 +52,7 @@ def ssh_execute(host: str, command: str, user: str, pwd: str) -> str:
 
         if err:
             LOG.error(f"Command {command} error on {host}: {err.strip()}")
-        if exit_code != 0:
+        if check and exit_code != 0:
             LOG.debug(f"Command {command} failed on {host} (exit {exit_code}): {out.strip()}")
             raise HTTPException(status_code=500, detail=f"SSH command failed: {out.strip()}")
 
