@@ -294,7 +294,7 @@
               <el-table-column prop="url" label="测试报告" width="100">
                 <template #default="{ row }">
                   <el-link 
-                    v-if="row.status === 'success' && row.url" 
+                    v-if="row.status === 'success' || row.status === 'cancelled'"
                     :href="row.url" 
                     target="_blank" 
                     type="primary"

@@ -69,6 +69,7 @@ async def get_user_result_dir(user: str) -> str:
 async def get_current_code_and_commit(user):
     user_repo_dir = await get_user_repo_dir(user)
     repo = git.Repo(user_repo_dir)
+    repo.git.fetch("--all", "--tags")
 
     if repo.head.is_detached:
         current_commit = repo.head.commit.hexsha
@@ -77,6 +78,7 @@ async def get_current_code_and_commit(user):
         )
         current = matched_tag or current_commit
     else:
+        repo.git.pull()
         current = repo.active_branch.name
 
     latest_commit = repo.head.commit.hexsha
