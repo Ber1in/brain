@@ -1052,20 +1052,58 @@ const getStageText = (stage: string) => {
 const hasDuplicateNicInfo = (device: ServerDetailResponse): boolean => {
   if (!device.nics || device.nics.length === 0) return false
   
-  // 收集所有服务器的网卡信息
+  // 检查内部重复
+  if (hasInternalDuplicate(device)) {
+    return true
+  }
+  
+  // 检查跨服务器重复
+  return hasExternalDuplicate(device)
+}
+
+// 检查内部重复
+const hasInternalDuplicate = (device: ServerDetailResponse): boolean => {
+  if (!device.nics) return false
+  
+  const seenSNs = new Set<string>()
+  const seenMACs = new Set<string>()
+  
+  for (const nic of device.nics) {
+    // 检查SN重复
+    if (nic.sn && seenSNs.has(nic.sn)) {
+      return true
+    }
+    if (nic.sn) {
+      seenSNs.add(nic.sn)
+    }
+    
+    // 检查MAC地址重复
+    const nicInfo = (nic as any).nic_info || []
+    for (const info of nicInfo) {
+      if (info.mac && seenMACs.has(info.mac)) {
+        return true
+      }
+      if (info.mac) {
+        seenMACs.add(info.mac)
+      }
+    }
+  }
+  
+  return false
+}
+
+// 检查跨服务器重复
+const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
   const allNicInfos = devices.value.flatMap(d => 
     (d.nics || []).flatMap(nic => {
       const infos = []
       
-      // 收集网卡SN
       if (nic.sn) {
         infos.push({ type: 'sn', value: nic.sn, deviceId: d.id })
       }
       
-      // 收集nic_info中的MAC地址
       const nicInfo = (nic as any).nic_info || []
       nicInfo.forEach((info: any) => {
-        // 只收集MAC地址
         if (info.mac) {
           infos.push({ type: 'mac', value: info.mac, deviceId: d.id })
         }
@@ -1075,9 +1113,7 @@ const hasDuplicateNicInfo = (device: ServerDetailResponse): boolean => {
     })
   )
   
-  // 检查当前设备是否有重复信息
   return device.nics.some(nic => {
-    // 检查网卡SN是否重复（跨设备）
     if (nic.sn) {
       const sameSnCount = allNicInfos.filter(info => 
         info.type === 'sn' && info.value === nic.sn && info.deviceId !== device.id
@@ -1085,17 +1121,14 @@ const hasDuplicateNicInfo = (device: ServerDetailResponse): boolean => {
       if (sameSnCount > 0) return true
     }
     
-    // 检查nic_info中的MAC地址重复
     const nicInfo = (nic as any).nic_info || []
     return nicInfo.some((info: any) => {
-      // 检查MAC地址重复
       if (info.mac) {
         const sameMacCount = allNicInfos.filter(nicInfo => 
           nicInfo.type === 'mac' && nicInfo.value === info.mac && nicInfo.deviceId !== device.id
         ).length
         if (sameMacCount > 0) return true
       }
-      
       return false
     })
   })
@@ -1110,14 +1143,28 @@ const getDuplicateTooltip = (device: ServerDetailResponse): string => {
     (d.nics || []).flatMap(nic => {
       const infos = []
       
+      // 添加SN信息，包含网卡类型
       if (nic.sn) {
-        infos.push({ type: 'SN', value: nic.sn, deviceId: d.id, deviceName: d.bmc.hostname })
+        infos.push({ 
+          type: 'SN', 
+          value: nic.sn, 
+          deviceId: d.id, 
+          deviceName: d.bmc.hostname,
+          nicType: nic.type || '未知类型'  // 添加网卡类型
+        })
       }
       
+      // 添加MAC信息，包含网卡类型
       const nicInfo = (nic as any).nic_info || []
       nicInfo.forEach((info: any) => {
         if (info.mac) {
-          infos.push({ type: 'MAC', value: info.mac, deviceId: d.id, deviceName: d.bmc.hostname })
+          infos.push({ 
+            type: 'MAC', 
+            value: info.mac, 
+            deviceId: d.id, 
+            deviceName: d.bmc.hostname,
+            nicType: nic.type || '未知类型'  // 添加网卡类型
+          })
         }
       })
       
@@ -1125,36 +1172,88 @@ const getDuplicateTooltip = (device: ServerDetailResponse): string => {
     })
   )
   
-  device.nics.forEach(nic => {
+  // 检查当前设备的网卡信息
+  device.nics.forEach((nic, nicIndex) => {
+    const nicType = nic.type || '未知类型'
+    
     // 检查SN重复
     if (nic.sn) {
-      const sameSnDevices = allNicInfos.filter(info => 
+      const sameSnInfos = allNicInfos.filter(info => 
         info.type === 'SN' && info.value === nic.sn && info.deviceId !== device.id
-      ).map(info => info.deviceName)
+      )
       
-      if (sameSnDevices.length > 0) {
-        duplicates.push(`SN: ${nic.sn} 在其他服务器重复: ${sameSnDevices.join(', ')}`)
+      if (sameSnInfos.length > 0) {
+        const conflictDevices = sameSnInfos.map(info => 
+          `${info.deviceName}(${info.nicType})`
+        )
+        duplicates.push(`SN: ${nic.sn} 在其他服务器重复: ${conflictDevices.join(', ')}`)
       }
     }
     
     // 检查MAC地址重复
     const nicInfo = (nic as any).nic_info || []
-    nicInfo.forEach((info: any) => {
+    nicInfo.forEach((info: any, infoIndex: number) => {
       if (info.mac) {
-        const sameMacDevices = allNicInfos.filter(nicInfo => 
+        const sameMacInfos = allNicInfos.filter(nicInfo => 
           nicInfo.type === 'MAC' && nicInfo.value === info.mac && nicInfo.deviceId !== device.id
-        ).map(nicInfo => nicInfo.deviceName)
+        )
         
-        if (sameMacDevices.length > 0) {
-          duplicates.push(`MAC: ${info.mac} 在其他服务器重复: ${sameMacDevices.join(', ')}`)
+        if (sameMacInfos.length > 0) {
+          const conflictDevices = sameMacInfos.map(conflictInfo => 
+            `${conflictInfo.deviceName}(${conflictInfo.nicType})`
+          )
+          duplicates.push(`MAC: ${info.mac} 在其他服务器重复: ${conflictDevices.join(', ')}`)
         }
       }
     })
   })
   
+  // 检查同一服务器内部的重复
+  const internalDuplicates = checkInternalDuplicates(device)
+  if (internalDuplicates.length > 0) {
+    duplicates.push(...internalDuplicates)
+  }
+  
   return duplicates.length > 0 
-    ? `网卡信息重复:\n${duplicates.join('\n')}`
+    ? `网卡信息冲突:\n${duplicates.join('\n')}`
     : ''
+}
+
+const checkInternalDuplicates = (device: ServerDetailResponse): string[] => {
+  if (!device.nics) return []
+  
+  const duplicates: string[] = []
+  const seenSNs = new Map<string, { type: string, index: number }>()
+  const seenMACs = new Map<string, { type: string, index: number }>()
+  
+  device.nics.forEach((nic, index) => {
+    const nicType = nic.type || '未知类型'
+    
+    // 检查SN重复
+    if (nic.sn) {
+      if (seenSNs.has(nic.sn)) {
+        const prev = seenSNs.get(nic.sn)!
+        duplicates.push(`[内部冲突] [${nicType}#${index+1}] SN: ${nic.sn} 与 [${prev.type}#${prev.index+1}] 重复`)
+      } else {
+        seenSNs.set(nic.sn, { type: nicType, index })
+      }
+    }
+    
+    // 检查MAC地址重复
+    const nicInfo = (nic as any).nic_info || []
+    nicInfo.forEach((info: any, infoIndex: number) => {
+      if (info.mac) {
+        if (seenMACs.has(info.mac)) {
+          const prev = seenMACs.get(info.mac)!
+          duplicates.push(`[内部冲突] [${nicType}#${index+1}.${infoIndex+1}] MAC: ${info.mac} 与 [${prev.type}#${prev.index+1}] 重复`)
+        } else {
+          seenMACs.set(info.mac, { type: nicType, index })
+        }
+      }
+    })
+  })
+  
+  return duplicates
 }
 
 // 根据是否有重复信息设置行样式
