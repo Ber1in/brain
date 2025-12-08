@@ -33,7 +33,7 @@ async def create_image(image_data: image_schemas.ImageCreate):
 
     # Check if name already exists
     existing_image = db.find(IMAGE_COLLECTION, {"name": image_data.name,
-                                                "mon_host": image_data.mon_host})
+                                                "mon_host": str(image_data.mon_host)})
     if existing_image:
         LOG.warning(f"Image name {image_data.name} already exists in cluster "
                     f"{image_data.mon_host}")
@@ -46,7 +46,7 @@ async def create_image(image_data: image_schemas.ImageCreate):
     # Check if ceph location already exists
     existing_location = db.find(IMAGE_COLLECTION, 
                                 {"ceph_location": image_data.ceph_location,
-                                    "mon_host": image_data.mon_host})
+                                    "mon_host": str(image_data.mon_host)})
     if existing_location:
         LOG.warning(f"Ceph location {image_data.ceph_location} already exists "
                     f"in cluster {image_data.mon_host}")
