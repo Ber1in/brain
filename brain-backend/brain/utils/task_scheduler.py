@@ -356,21 +356,44 @@ async def send_feishu_group_message(server_info, now=False):
             }
         }
 
-        # Send Feishu request
-        headers = {'Content-Type': 'application/json'}
-        response = requests.post(
-            settings.webhook_url, headers=headers, data=json.dumps(message_content))
+        def send_feishu(webhook: str, payload: dict, action: str) -> bool:
+            headers = {'Content-Type': 'application/json'}
+            try:
+                resp = requests.post(webhook, headers=headers, data=json.dumps(payload))
+            except Exception as e:
+                LOG.error(f"Feishu request error: {e}")
+                return False
 
-        if response.status_code == 200:
-            result = response.json()
+            if resp.status_code != 200:
+                LOG.error(f"Feishu failed with status code: {resp.status_code}")
+                return False
+
+            result = resp.json()
             if result.get("code") == 0:
-                action = "cleanup" if now else "warning"
                 LOG.info(f"Feishu {action} message sent successfully.")
                 return True
-            LOG.error(f"Feishu message failed: {result}")
-            return False
+            else:
+                LOG.error(f"Feishu message failed: {result}")
+                return False
+        # Send Feishu request
+        release_notices = settings.release_notices
+        action = "cleanup" if now else "warning"
 
-        LOG.error(f"Feishu message failed with status code: {response.status_code}")
+        matched_webhooks = [
+            notice.webhook
+            for notice in release_notices
+            if notice.tag in server_info["tags"]
+        ]
+
+        if not matched_webhooks:
+            matched_webhooks = [settings.default_webhook]
+
+        for webhook in matched_webhooks:
+            if send_feishu(webhook, message_content, action):
+                return True
+
+        LOG.error("No Feishu webhook succeeded.")
+
         return False
 
     except Exception as e:

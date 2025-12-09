@@ -101,11 +101,10 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
 
     ensure_repo
     ensure_packages
-    """
+    """ # noqa
 
     LOG.info(f"Ensuring repo and packages on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
-
 
 
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
@@ -320,7 +319,7 @@ async def update_automatic_async(ip, user, password):
     except Exception as e:
         LOG.warning(f"failed to retrieve MAC information, error: {e}")
         mac_res = ""
-    
+
     macs = parse_bdf_mac(mac_res)
 
     # Remote iface map
