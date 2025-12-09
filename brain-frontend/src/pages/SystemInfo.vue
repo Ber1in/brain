@@ -494,11 +494,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.settings-page {
-  padding: 20px;
-  padding-top: 80px; /* 为固定按钮留出空间 */
-  position: relative;
-}
 
 .card-header {
   display: flex;
