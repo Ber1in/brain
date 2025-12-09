@@ -106,10 +106,10 @@
             <!-- 飞书群消息配置 -->
             <div class="config-section">
               <div class="subsection-header">
-                <h4 class="subsection-title">飞书群消息配置</h4>
+                <h4 class="subsection-title">默认推送飞书群</h4>
                 <el-tooltip
                   effect="dark"
-                  content="服务器释放时推送告警信息的默认群组"
+                  content="服务器释放时推送告警信息的默认群组，如服务器无自定义推送飞书群的标签，则使用推送至此默认飞书群"
                   placement="top"
                 >
                   <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
@@ -146,10 +146,10 @@
               <div class="tag-webhook-section">
                 <div class="subsection-header">
                   <div class="tag-section-title">
-                    <h4 class="tag-subtitle">自定义接收推送的飞书群</h4>
+                    <h4 class="tag-subtitle">自定义推送飞书群</h4>
                     <el-tooltip
                       effect="dark"
-                      content="如果服务器有这个标签，会使用对应的Webhook飞书机器人发送群提醒"
+                      content="如果服务器有这个标签，会优先将提醒消息推送至标签对应的飞书群"
                       placement="top"
                       class="tag-tooltip"
                     >
