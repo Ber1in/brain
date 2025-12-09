@@ -1353,30 +1353,21 @@ const handleOccupy = async () => {
     // 计算持续秒数
     const durationSeconds = getDurationSeconds()
     
-    const updateData = {
-      auto: false,
-      time: durationSeconds, // 传持续秒数
-      // user字段后端会通过token自动获取当前用户
-      device: {
-        ip: deviceData.value.device.ip,
-        username: deviceData.value.device.username,
-        password: '' // 密码不更新
-      },
-      bmc: {
-        hostname: deviceData.value.bmc.hostname,
-        ip: deviceData.value.bmc.ip
-      },
-      tags: deviceData.value.tags || [],
-      notes: deviceData.value.notes || '',
-      os_types: deviceData.value.os_types || []
+    // 检查是否超过3天（259200秒）
+    const maxDuration = 3 * 24 * 60 * 60 // 3天的秒数
+    if (durationSeconds > maxDuration) {
+      ElMessage.error('占用时间不能超过3天')
+      return
     }
     
-    await deviceApi.update(deviceId.value, updateData)
+    // 使用新的 occupy 接口
+    await deviceApi.occupyServer(deviceId.value, durationSeconds)
+    
     ElMessage.success(`已成功${isModifyMode.value ? '修改占用' : '占用'}服务器 ${deviceData.value.bmc.hostname}`)
     occupyDialogVisible.value = false
     loadDeviceDetail() // 重新加载数据
-  } catch (error) {
-    ElMessage.error(`${isModifyMode.value ? '修改占用' : '占用'}服务器失败`)
+  } catch (error: any) {
+    ElMessage.error(`${isModifyMode.value ? '修改占用' : '占用'}服务器失败: ${error.response?.data?.detail || '请求失败'}`)
   } finally {
     occupyLoading.value = false
   }
@@ -1395,33 +1386,22 @@ const handleRelease = async () => {
   }
   
   try {
+    // 根据占用人显示不同的提示信息
+    const occupierInfo = deviceData.value.user === currentUser.value 
+      ? '您占用的'
+      : `${deviceData.value.user} 占用的`
+    
     await ElMessageBox.confirm(
-      `确定要释放占用 "${deviceData.value.bmc.hostname}" 吗？`, 
-      '确认结束', 
+      `确定要释放 ${occupierInfo} "${deviceData.value.bmc.hostname}" 吗？`, 
+      '确认释放', 
       {
         type: 'warning',
       }
     )
 
-    const updateData = {
-      auto: false,
-      time: 0, // 设置为0表示释放占用
-      // user字段后端会自动处理
-      device: {
-        ip: deviceData.value.device.ip,
-        username: deviceData.value.device.username,
-        password: '' // 密码不更新
-      },
-      bmc: {
-        hostname: deviceData.value.bmc.hostname,
-        ip: deviceData.value.bmc.ip
-      },
-      tags: deviceData.value.tags || [],
-      notes: deviceData.value.notes || '',
-      os_types: deviceData.value.os_types || []
-    }
+    // 使用新的 occupy 接口，传 0 表示释放
+    await deviceApi.occupyServer(deviceId.value, 0)
     
-    await deviceApi.update(deviceId.value, updateData)
     ElMessage.success('服务器已释放')
     loadDeviceDetail() // 重新加载数据
   } catch (error) {

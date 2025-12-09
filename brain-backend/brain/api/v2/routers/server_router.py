@@ -173,6 +173,8 @@ async def get_device(device_id: str):
             passed = int(now - start)
             remaining = device["time"] - passed
             device["time"] = max(remaining, 0)
+        for nic in device.get("nics", []):
+            nic["type"] = ALIAS_NAMES.get(nic.get("type", ""), nic.get("type", "").split("-")[0])
     except Exception as e:
         LOG.warning(f"Device not found, {e}")
         raise HTTPException(status_code=404, detail=f"Device not found, {e}")
