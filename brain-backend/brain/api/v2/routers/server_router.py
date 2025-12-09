@@ -24,7 +24,9 @@ db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 ALIAS_NAMES = {
     "metaConnect-400S 400GbE, Single-port QSFP112, PCIe 5.0 x16": "MC400S",
-    "metaScale-200 100GbE OCP3.0, Dual-port DSFP, Multi Host, PCIe 4.0 x16": "MS200-OCP"
+    "metaScale-200 100GbE OCP3.0, Dual-port DSFP, Multi Host, PCIe 4.0 x16": "MS200-OCP",
+    "metaScale-200S 200GbE Single-Port QSFP56, PCIe 4.0 x16": "MS200s",
+    "MS200s-03XX": "MS200s"
 }
 
 

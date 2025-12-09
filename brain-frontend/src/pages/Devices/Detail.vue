@@ -277,41 +277,80 @@
             <!-- SOC IP列 - 已添加匹配异常提示 -->
             <el-table-column label="SOC IP" width="140">
               <template #default="{ row }">
-                <div v-if="getMv200StatusForNic(row.sn)" class="soc-ip-status">
+                <div v-if="getMv200StatusForNic(row)" class="soc-ip-status">
+                  <!-- 非MV200网卡，显示横线 -->
+                  <div 
+                    v-if="getMv200StatusForNic(row).status === 'not_mv200'" 
+                    class="not-mv200-info"
+                  >
+                    <span class="empty-text">-</span>
+                  </div>
+                  
+                  <!-- 尚未录入SOC的提示（仅MV200网卡） -->
+                  <div 
+                    v-else-if="getMv200StatusForNic(row).status === 'not_matched'" 
+                    class="not-matched-info"
+                  >
+                    <el-tooltip 
+                      effect="dark" 
+                      content="该MV200的SOC尚未录入，去纳管" 
+                      placement="top"
+                    >
+                      <el-link 
+                        type="primary" 
+                        @click="navigateToCreateMv200(row.sn)"
+                        class="create-mv200-link"
+                        :underline="false"
+                      >
+                        <el-icon><Plus /></el-icon>
+                        去纳管
+                      </el-link>
+                    </el-tooltip>
+                  </div>
+                  
                   <!-- 匹配异常状态 -->
                   <div 
-                    v-if="getMv200StatusForNic(row.sn).status === 'multiple_matched'" 
+                    v-else-if="getMv200StatusForNic(row).status === 'multiple_matched'" 
                     class="error-info"
                   >
                     <el-tooltip 
                       effect="dark" 
-                      :content="getMultipleMv200Tooltip(getMv200StatusForNic(row.sn))" 
+                      :content="getMultipleMv200Tooltip(getMv200StatusForNic(row))" 
                       placement="top"
                     >
                       <div class="error-message">
                         <el-icon><Warning /></el-icon>
                         <span>匹配异常</span>
-                        <span class="match-count">({{ getMv200StatusForNic(row.sn).devices.length }}张)</span>
+                        <span class="match-count">({{ getMv200StatusForNic(row).devices.length }}张)</span>
                       </div>
                     </el-tooltip>
                   </div>
                   
                   <!-- 正常匹配状态 -->
                   <div 
-                    v-else-if="getMv200StatusForNic(row.sn).status === 'matched'" 
+                    v-else-if="getMv200StatusForNic(row).status === 'matched'" 
                     class="soc-ip-link"
                   >
                     <el-link 
                       type="primary" 
-                      @click="handleMv200Detail(getMv200StatusForNic(row.sn).data)"
+                      @click="handleMv200Detail(getMv200StatusForNic(row).data)"
                       class="underlined-link"
                       :underline="false"
                     >
-                      {{ getMv200StatusForNic(row.sn).data.ip_address }}
+                      {{ getMv200StatusForNic(row).data.ip_address }}
                     </el-link>
                   </div>
                   
-                  <!-- 未匹配状态 -->
+                  <!-- MV200数据未加载状态 -->
+                  <div 
+                    v-else-if="getMv200StatusForNic(row).status === 'mv200_not_loaded'" 
+                    class="loading-info"
+                  >
+                    <el-icon class="is-loading"><Loading /></el-icon>
+                    <span class="loading-text">加载中...</span>
+                  </div>
+                  
+                  <!-- 默认状态 -->
                   <span v-else class="empty-text">-</span>
                 </div>
                 <span v-else class="empty-text">-</span>
@@ -603,7 +642,8 @@ import {
   Watch,
   Check,
   Star,
-  Warning
+  Warning,
+  Plus
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { mv200Api } from '@/api/mv200'
@@ -663,22 +703,36 @@ const isFollowing = computed(() => {
 })
 
 // 根据网卡序列号获取对应的MV200匹配状态（支持多种状态）
-const getMv200StatusForNic = (nicSn: string): any => {
-  if (!nicSn || !allMv200s.value.length) {
+const getMv200StatusForNic = (nic: any): any => {
+  // 首先检查是否是MV200类型的网卡
+  const isMv200Nic = nic.type && (
+    nic.type.toLowerCase().includes('mv200')
+  )
+  
+  // 如果不是MV200网卡，直接返回 null
+  if (!isMv200Nic) {
     return {
-      status: 'not_matched',
-      message: '未找到匹配的MV200'
+      status: 'not_mv200',
+      message: '非MV200网卡'
+    }
+  }
+  
+  if (!allMv200s.value || allMv200s.value.length === 0) {
+    return {
+      status: 'mv200_not_loaded',
+      message: 'MV200数据未加载'
     }
   }
   
   // 查找所有匹配的MV200（可能有多个）
-  const matchedMv200s = allMv200s.value.filter(mv200 => mv200.nic_sn === nicSn)
+  const matchedMv200s = allMv200s.value.filter(mv200 => mv200.nic_sn === nic.sn)
   
   // 根据匹配到的MV200数量返回不同状态
   if (matchedMv200s.length === 0) {
     return {
       status: 'not_matched',
-      message: '未找到匹配的MV200'
+      message: '尚未录入SOC',
+      nicSn: nic.sn
     }
   } else if (matchedMv200s.length === 1) {
     return {
@@ -699,6 +753,10 @@ const getMv200StatusForNic = (nicSn: string): any => {
       count: matchedMv200s.length
     }
   }
+}
+
+const navigateToCreateMv200 = (nicSn: string) => {
+  router.push('/mv200/create')
 }
 
 // 获取多匹配提示信息的方法（用于MV200匹配异常）
@@ -1908,6 +1966,72 @@ onMounted(() => {
     font-size: 11px;
   }
 }
+
+.not-matched-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.create-mv200-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #409eff !important;
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px solid #d4e8ff;
+  border-radius: 4px;
+  background-color: #f0f9ff;
+  transition: all 0.2s ease;
+}
+
+.create-mv200-link:hover {
+  color: #337ecc !important;
+  background-color: #e6f7ff;
+  border-color: #91d5ff;
+  transform: translateY(-1px);
+}
+
+.create-mv200-link .el-icon {
+  font-size: 12px;
+}
+
+.not-mv200-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.no-sn-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+/* 加载中状态 */
+.loading-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+}
+
+.loading-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+.loading-info .el-icon {
+  color: #e6a23c;
+}
+
+
 
 /* 对话框样式 - 从列表页面复制过来的样式 */
 .occupy-dialog,

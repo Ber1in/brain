@@ -36,31 +36,52 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
     pkg_str = " ".join(packages)
 
     cmd = f"""
-    MISSING=()
-    for pkg in {pkg_str}; do
-        if ! command -v $pkg >/dev/null 2>&1; then
-            MISSING+=($pkg)
-        fi
-    done
-
-    if [ ${{#MISSING[@]}} -gt 0 ]; then
-        echo "Packages not found: ${{MISSING[@]}}, installing..."
+    detect_os() {{
         if [ -f /etc/os-release ]; then
             . /etc/os-release
-
-            # Prefer ID_LIKE, fallback to ID
             if [ -n "$ID_LIKE" ]; then
-                OS="$ID_LIKE"
+                echo "$ID_LIKE"
             else
-                OS="$ID"
+                echo "$ID"
             fi
         else
-            OS=$(uname -s)
+            echo "$(uname -s)"
+        fi
+    }}
+
+    OS=$(detect_os)
+
+    ensure_repo() {{
+        if echo "$OS" | grep -qi "debian"; then
+            sed -i 's/archive.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
+            sed -i 's/security.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
+            apt-get update -y || true
+
+        elif echo "$OS" | grep -qi "rhel"; then
+            curl -s -o /etc/yum.repos.d/centos7.6.repo http://mirrors.yunsilicon.com/yum.repos.d/centos7.9.repo || true
+            curl -s -o /etc/yum.repos.d/epel.repo http://mirrors.yunsilicon.com/yum.repos.d/epel.repo || true
+            yum clean all || true
+            yum makecache || true
+
+        fi
+    }}
+
+    ensure_packages() {{
+        MISSING=()
+        for pkg in {pkg_str}; do
+            if ! command -v $pkg >/dev/null 2>&1; then
+                MISSING+=($pkg)
+            fi
+        done
+
+        if [ ${{#MISSING[@]}} -eq 0 ]; then
+            echo "All packages already installed"
+            return
         fi
 
+        echo "Installing packages: ${{MISSING[@]}}"
+
         if echo "$OS" | grep -qi "debian"; then
-            echo "Installing packages on Debian-based system..."
-            apt-get update -y
             apt-get install -y ${{MISSING[@]}}
 
         elif echo "$OS" | grep -qi "rhel"; then
@@ -76,13 +97,15 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
             echo "Unsupported distro: $OS"
             exit 1
         fi
-    else
-        echo "All packages already installed"
-    fi
+    }}
+
+    ensure_repo
+    ensure_packages
     """
 
-    LOG.info(f"Ensuring packages are installed on {host}: {packages}")
+    LOG.info(f"Ensuring repo and packages on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
+
 
 
 def parse_nics_info(output: str) -> List[Dict[str, str]]:

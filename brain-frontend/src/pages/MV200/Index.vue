@@ -74,45 +74,68 @@
         </el-table-column>
         <el-table-column label="关联服务器" width="150">
           <template #default="{ row }">
-            <template v-if="!row.associatedServer">
-              <span class="empty-text">-</span>
-            </template>
-            <template v-else>
-              <div v-if="row.associatedServer.status === 'matched'" class="server-info">
-                <el-link 
-                  type="primary" 
-                  @click="handleServerDetail(row.associatedServer.data)"
-                  class="hostname-link underlined-link"
-                  :underline="false"
-                >
-                  {{ row.associatedServer.data.ip }}
-                </el-link>
-              </div>
-              <div v-else-if="row.associatedServer.status === 'not_managed'" class="warning-info">
-                <el-tooltip 
-                  effect="dark" 
-                  :content="row.associatedServer.message" 
-                  placement="top"
-                >
-                  <div class="warning-message">
-                    <el-icon><Warning /></el-icon>
-                    <span>服务器未纳管</span>
-                  </div>
-                </el-tooltip>
-              </div>
-              <div v-else-if="row.associatedServer.status === 'multiple_matched'" class="error-info">
-                <el-tooltip 
-                  effect="dark" 
-                  placement="top"
-                  :content="getMultipleMatchTooltip(row.associatedServer)"
-                >
-                  <div class="error-message">
-                    <el-icon><Warning /></el-icon>
-                    <span>匹配异常</span>
-                  </div>
-                </el-tooltip>
-              </div>
-            </template>
+            <div class="associated-server-cell">
+              <template v-if="!row.associatedServer">
+                <span class="empty-text">-</span>
+              </template>
+              <template v-else>
+                <!-- 正常匹配状态 -->
+                <div v-if="row.associatedServer.status === 'matched'" class="matched-info">
+                  <el-link 
+                    type="primary" 
+                    @click="handleServerDetail(row.associatedServer.data)"
+                    class="server-link underlined-link"
+                    :underline="false"
+                  >
+                    {{ row.associatedServer.data.ip }}
+                  </el-link>
+                </div>
+                
+                <!-- 服务器未纳管状态 - 使用el-tag -->
+                <div v-else-if="row.associatedServer.status === 'not_managed'" class="not-managed-info">
+                  <el-tooltip 
+                    effect="dark" 
+                    content="该MV200所在的服务器尚未纳管，去纳管" 
+                    placement="top"
+                  >
+                    <el-tag 
+                      size="small"
+                      type="primary"
+                      effect="plain"
+                      class="create-device-tag"
+                      @click="navigateToCreateDevice(row.nic_sn)"
+                      style="cursor: pointer;"
+                    >
+                      <el-icon><Plus /></el-icon>
+                      去纳管
+                    </el-tag>
+                  </el-tooltip>
+                </div>
+                
+                <!-- 匹配异常状态 - 使用el-tag -->
+                <div v-else-if="row.associatedServer.status === 'multiple_matched'" class="error-info">
+                  <el-tooltip 
+                    effect="dark" 
+                    placement="top"
+                    :content="getMultipleMatchTooltip(row.associatedServer)"
+                  >
+                    <el-tag 
+                      size="small"
+                      type="danger"
+                      effect="plain"
+                      class="error-tag"
+                      style="cursor: help;"
+                    >
+                      <el-icon><Warning /></el-icon>
+                      匹配异常
+                    </el-tag>
+                  </el-tooltip>
+                </div>
+                
+                <!-- 默认状态 -->
+                <span v-else class="empty-text">-</span>
+              </template>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="MCR版本" width="200">
@@ -475,7 +498,8 @@ import {
   Document,
   ArrowRight,
   QuestionFilled,
-  Monitor
+  Monitor,
+  Plus
 } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { deviceApi } from '@/api/device'
@@ -578,6 +602,9 @@ const getMcrStatusType = (server: MVServer) => {
   return typeMap[status] || 'info'
 }
 
+const navigateToCreateDevice = (nicSn: string) => {
+  router.push('/devices/create')
+}
 
 const getTaskStage = (server: MVServer): string => {
   if (!server.task_id || !taskStatusMap.value[server.task_id]) return ''
@@ -984,7 +1011,7 @@ const findAssociatedServer = (mv200: MVServer, devices: ServerDetailResponse[]) 
   if (!mv200.nic_sn) {
     return {
       status: 'not_managed',
-      message: '服务器尚未纳管'
+      message: '该MV200所在的服务器尚未纳管'
     }
   }
   
@@ -1011,7 +1038,7 @@ const findAssociatedServer = (mv200: MVServer, devices: ServerDetailResponse[]) 
   if (matchingDevices.length === 0) {
     return {
       status: 'not_managed',
-      message: '服务器尚未纳管'
+      message: '该MV200所在的服务器尚未纳管'
     }
   } else if (matchingDevices.length === 1) {
     return {
@@ -1349,6 +1376,7 @@ onMounted(() => {
 })
 </script>
 
+
 <style scoped>
 /* MCR状态样式 */
 .mcr-status {
@@ -1388,22 +1416,42 @@ onMounted(() => {
   color: #e6a23c;
 }
 
-.error-info, .warning-info {
+/* 关键修复：关联服务器单元格样式 */
+.associated-server-cell {
   display: flex;
+  justify-content: flex-start !important;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  width: 100%;
 }
 
-.error-info {
-  background-color: #fef0f0;
-  border: 1px solid #fde2e2;
+/* 覆盖el-table单元格的默认样式 */
+:deep(.el-table__body-wrapper .el-table__cell) {
+  text-align: left !important;
 }
 
-.warning-info {
-  background-color: #fdf6ec;
-  border: 1px solid #faecd8;
+/* 特别针对关联服务器列（第4列） */
+:deep(.el-table__body-wrapper tr td:nth-child(4) .cell) {
+  display: flex !important;
+  justify-content: flex-start !important;
+  padding-left: 12px !important;
+  text-align: left !important;
+}
+
+/* 确保所有状态容器都左对齐 */
+.error-info, .not-managed-info, .matched-info {
+  display: flex;
+  justify-content: flex-start !important;
+  align-items: center;
+  width: 100%;
+}
+
+/* 移除el-tag的默认样式 */
+:deep(.error-tag),
+:deep(.create-device-tag) {
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
 }
 
 .error-message, .warning-message {
@@ -1571,6 +1619,35 @@ onMounted(() => {
   padding: 40px 0;
 }
 
+/* 服务器链接样式 */
+.server-link {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.server-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* 空文本也左对齐 */
+.empty-text {
+  color: #c0c4cc;
+  font-style: italic;
+  font-size: 12px;
+  width: 100%;
+  text-align: left !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start !important;
+}
+
 /* 更新MCR包按钮样式 */
 :deep(.update-mcr-item:not(.is-disabled)) {
   color: #7239ea !important;
@@ -1699,11 +1776,6 @@ onMounted(() => {
   line-height: 1.4;
   padding: 0;
   margin: 0;
-}
-
-.empty-text {
-  color: #c0c4cc;
-  font-style: italic;
 }
 
 /* 云盘状态样式 */
