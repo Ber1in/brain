@@ -2,8 +2,8 @@
 # All rights reserved.
 
 import yaml
-from typing import List
-from pydantic import BaseModel, HttpUrl
+from typing import List, Optional
+from pydantic import BaseModel
 
 CONFIG_FILE = "/etc/yuntester/yuntester.yaml"
 
@@ -17,20 +17,20 @@ class SMTPConfig(BaseModel):
 
 class ReleaseNotice(BaseModel):
     tag: str
-    webhook: HttpUrl
+    webhook: str
 
 
 class AppConfig(BaseModel):
-    default_webhook: HttpUrl = (
+    default_webhook: str = (
         "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/51053ced-7d61-4645-95df-f0c6ac3f67a7")
     smtp: SMTPConfig = SMTPConfig()
-    yuntester_platform: HttpUrl = "https://yuntester.yunsilicon.com"
-    file_server: HttpUrl = "https://yuntester-api.yunsilicon.com"
+    yuntester_platform: str = "https://yuntester.yunsilicon.com"
+    file_server: str = "https://yuntester-api.yunsilicon.com"
     platform_port: int = 8088
     debug: bool = False
     ldap_server: str = "ldaps://it-srv-idc001.yunsilicon.com:636"
     admin_password: str = "yuntester@admin2021"
-    release_notices: List[ReleaseNotice] = None
+    release_notices: Optional[List[ReleaseNotice]] = None
 
 
 def load_config() -> AppConfig:
@@ -48,10 +48,64 @@ def load_config() -> AppConfig:
     return AppConfig(**config_dict)
 
 
-settings = load_config()
+_current_settings: AppConfig = load_config()
 
 
-def reload_settings():
-    """Reload global settings after update."""
-    global settings
-    settings = load_config()
+def reload_settings() -> AppConfig:
+    """Reload global settings after update and return new settings."""
+    global _current_settings
+    _current_settings = load_config()
+    return _current_settings
+
+
+class _SettingsProxy:
+
+    @property
+    def default_webhook(self) -> str:
+        return _current_settings.default_webhook
+
+    @property
+    def smtp(self) -> SMTPConfig:
+        return _current_settings.smtp
+
+    @property
+    def yuntester_platform(self) -> str:
+        return _current_settings.yuntester_platform
+
+    @property
+    def file_server(self) -> str:
+        return _current_settings.file_server
+
+    @property
+    def platform_port(self) -> int:
+        return _current_settings.platform_port
+
+    @property
+    def debug(self) -> bool:
+        return _current_settings.debug
+
+    @property
+    def ldap_server(self) -> str:
+        return _current_settings.ldap_server
+
+    @property
+    def admin_password(self) -> str:
+        return _current_settings.admin_password
+
+    @property
+    def release_notices(self) -> Optional[List[ReleaseNotice]]:
+        return _current_settings.release_notices
+
+    def dict(self):
+        return _current_settings.dict()
+
+    def copy(self):
+        return _current_settings.copy()
+
+    def json(self, **kwargs):
+        return _current_settings.json(**kwargs)
+
+
+_settings_proxy = _SettingsProxy()
+
+settings = _settings_proxy

@@ -404,3 +404,27 @@ export interface CaseCombinationRequest {
   name: string;
   cases?: string[];
 }
+
+export interface SMTPConfig {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+}
+
+export interface ReleaseNotice {
+  tag: string;
+  webhook: string; // HttpUrl → string
+}
+
+export interface AppConfig {
+  default_webhook: string; // HttpUrl
+  smtp: SMTPConfig;
+  yuntester_platform: string; // HttpUrl
+  file_server: string; // HttpUrl
+  platform_port: number;
+  debug: boolean;
+  ldap_server: string;
+  admin_password: string;
+  release_notices: ReleaseNotice[] | null;
+}

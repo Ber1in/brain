@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse } from '@/types/api'
+import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse, AppConfig } from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -29,5 +29,17 @@ export const remotefsApi = {
 export const tasksApi = {
   getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
     return apiClient.get(`/api/tasks/${taskId}`)
+  }
+}
+
+export const settingsApi = {
+  // Get full settings
+  getSettings(): Promise<AppConfig> {
+    return apiClient.get('/api/settings')
+  },
+
+  // Patch partial settings
+  patchSettings(data: AppConfig): Promise<AppConfig> {
+    return apiClient.patch('/api/settings', data)
   }
 }

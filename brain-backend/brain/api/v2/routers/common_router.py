@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import os
 import yaml
 import random
 from typing import List
@@ -86,11 +87,11 @@ async def query_task_status(task_id: str):
 @router.get("/settings", response_model=AppConfig)
 async def get_settings():
     """Return current global configuration."""
-    return settings
+    return settings.dict()
 
 
-@router.patch("/settings", response_model=AppConfig)
-async def patch_settings(partial: dict):
+@router.patch("/settings")
+async def patch_settings(data: AppConfig):
     """
     Partially update configuration.
     """
@@ -110,10 +111,12 @@ async def patch_settings(partial: dict):
             else:
                 original[key] = value
 
-    deep_update(current, partial)
+    deep_update(current, data.dict())
 
     # Save back to YAML
+    os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
     with open(CONFIG_FILE, "w") as f:
         yaml.safe_dump(current, f, allow_unicode=True)
 
-    return reload_settings()
+    reload_settings()
+    return settings.dict()

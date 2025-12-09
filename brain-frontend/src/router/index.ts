@@ -189,6 +189,11 @@ const router = createRouter({
       name: '质量保证平台',
       component: () => import('@/pages/Tester/Index.vue')
     },
+    {
+      path: '/settings',
+      name: '系统设置',
+      component: () => import('@/pages/SystemInfo.vue')
+    },
   ],
 })
 
