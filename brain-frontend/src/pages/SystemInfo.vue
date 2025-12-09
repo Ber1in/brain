@@ -32,7 +32,7 @@
           <div class="reminder-config">
             <!-- SMTP配置 -->
             <div class="config-section">
-              <h4 class="subsection-title">邮件提醒配置</h4>
+              <h4 class="subsection-header">邮件提醒配置</h4>
               <el-form 
                 :model="settingsForm" 
                 label-width="140px" 
@@ -48,12 +48,13 @@
                   <el-input 
                     v-model="settingsForm.smtp.host" 
                     placeholder="smtp.example.com"
-                    clearable
+                    readonly
+                    disabled
                     style="width: 300px;"
                     size="medium"
-                  >
+                    >
                     <template #prefix>
-                      <el-icon><Connection /></el-icon>
+                        <el-icon><Connection /></el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
@@ -69,10 +70,9 @@
                 >
                   <el-input-number
                     v-model="settingsForm.smtp.port"
-                    :min="1"
-                    :max="65535"
-                    controls-position="right"
                     placeholder="端口号"
+                    readonly
+                    disabled
                     style="width: 200px;"
                     size="medium"
                   />
@@ -88,9 +88,10 @@
                   :rules="[{ required: true, message: '请输入SMTP用户名', trigger: 'blur' }]"
                 >
                   <el-input 
-                    v-model="settingsForm.smtp.user" 
+                    v-model="settingsForm.smtp.user"
                     placeholder="用户名"
-                    clearable
+                    readonly
+                    disabled
                     style="width: 300px;"
                     size="medium"
                   >
@@ -125,7 +126,6 @@
                   <el-form-item 
                     label="默认Webhook" 
                     prop="default_webhook"
-                    :rules="[{ required: true, message: '请输入机器人ID', trigger: 'blur' }]"
                   >
                     <div class="webhook-input compact">
                       <span class="webhook-prefix">https://webhook.yunsilicon.com/open-apis/bot/v2/hook/</span>
@@ -207,7 +207,6 @@
                         <div class="webhook-cell">
                           <el-form-item 
                             :prop="`release_notices[${$index}].webhook`"
-                            :rules="[{ required: true, message: '请输入机器人ID', trigger: 'blur' }]"
                             style="margin-bottom: 0;"
                           >
                             <div class="webhook-input compact">
@@ -216,7 +215,7 @@
                                 v-model="tagWebhookIds[$index]"
                                 placeholder="请输入群机器人ID"
                                 clearable
-                                style="width: 200px;"
+                                style="width: 300px;"
                                 size="small"
                                 @input="(value) => updateTagWebhook($index, value)"
                               />
@@ -239,31 +238,17 @@
                         </el-button>
                       </template>
                     </el-table-column>
-                    
-                    <!-- 空表格时的自定义内容 -->
-                    <template #empty>
-                      <div class="empty-table-content" @click="addReleaseNotice" v-if="hasMoreTagsAvailable">
-                        <el-button type="text" class="add-first-row-btn">
-                          <el-icon><Plus /></el-icon>
-                          <span>添加自定义配置</span>
-                        </el-button>
-                      </div>
-                      <div v-else class="no-more-tags-empty">
-                        <el-icon><InfoFilled /></el-icon>
-                        <span>所有标签都已配置完毕</span>
-                      </div>
-                    </template>
                   </el-table>
                   
-                  <!-- 当有数据时显示添加按钮 -->
-                  <div class="add-row" @click="addReleaseNotice" v-if="hasMoreTagsAvailable && settingsForm.release_notices && settingsForm.release_notices.length > 0">
+                  <!-- 添加行按钮 -->
+                  <div class="add-row" @click="addReleaseNotice" v-if="hasMoreTagsAvailable">
                     <el-button type="text" class="add-row-btn">
                       <el-icon><Plus /></el-icon>
                       <span>添加自定义配置</span>
                     </el-button>
                   </div>
                   
-                  <div v-else-if="!hasMoreTagsAvailable && settingsForm.release_notices && settingsForm.release_notices.length > 0" class="no-more-tags">
+                  <div v-else class="no-more-tags">
                     <el-icon><InfoFilled /></el-icon>
                     <span>所有标签都已配置完毕</span>
                   </div>
@@ -511,7 +496,7 @@ onMounted(() => {
 <style scoped>
 .settings-page {
   padding: 20px;
-  padding-top: 20px;
+  padding-top: 80px; /* 为固定按钮留出空间 */
   position: relative;
 }
 
@@ -519,11 +504,20 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1000;
+  padding: 10px 0;
+  margin: -10px 0;
 }
 
 .header-actions {
   display: flex;
   gap: 12px;
+  position: sticky;
+  top: 20px;
+  z-index: 1001;
 }
 
 .save-btn {
@@ -550,16 +544,13 @@ onMounted(() => {
 }
 
 .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 8px 0;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.section-title h3 {
+.section-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
@@ -733,61 +724,15 @@ onMounted(() => {
   padding: 4px 0;
 }
 
-/* 空表格时的添加按钮 */
-.empty-table-content {
-  text-align: center;
-  padding: 40px 0;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.empty-table-content:hover {
-  background-color: #f5f7fa;
-}
-
-.add-first-row-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #409eff;
-  font-size: 14px;
-  height: 32px;
-}
-
-.add-first-row-btn:hover {
-  color: #337ecc;
-}
-
-.add-first-row-btn .el-icon {
-  font-size: 16px;
-}
-
-/* 空表格时的提示信息 */
-.no-more-tags-empty {
-  text-align: center;
-  padding: 40px 0;
-  color: #909399;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.no-more-tags-empty .el-icon {
-  color: #c0c4cc;
-  font-size: 16px;
-}
-
-/* 当有数据时显示添加按钮 */
+/* 添加行按钮 - 更紧凑 */
 .add-row {
   text-align: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-top: 1px solid #ebeef5;
   background: white;
   cursor: pointer;
   transition: all 0.2s ease;
-  height: 48px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -800,10 +745,10 @@ onMounted(() => {
 .add-row-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: #409eff;
-  font-size: 14px;
-  height: 28px;
+  font-size: 13px;
+  height: 24px;
 }
 
 .add-row-btn:hover {
@@ -814,24 +759,37 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
 /* 没有更多标签提示 - 更紧凑 */
 .no-more-tags {
   text-align: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-top: 1px solid #ebeef5;
   background: white;
   color: #909399;
-  font-size: 14px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 48px;
+  gap: 6px;
+  height: 40px;
 }
 
 .no-more-tags .el-icon {
   color: #c0c4cc;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* 操作按钮样式优化 */
