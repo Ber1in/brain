@@ -34,10 +34,7 @@ class AppConfig(BaseModel):
 
 
 def load_config() -> AppConfig:
-    """
-    Load JSON configuration file and create AppConfig instance.
-    Missing fields will use defaults.
-    """
+    """Load YAML configuration file and create AppConfig instance."""
     try:
         with open(CONFIG_FILE, "r") as f:
             config_dict = yaml.safe_load(f) or {}
@@ -52,3 +49,9 @@ def load_config() -> AppConfig:
 
 
 settings = load_config()
+
+
+def reload_settings():
+    """Reload global settings after update."""
+    global settings
+    settings = load_config()

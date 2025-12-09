@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import yaml
 import random
 from typing import List
 from uuid import uuid4
@@ -12,6 +13,7 @@ from brain.auth import authenticate_user
 from brain.api.v2.schemas import common_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import AsyncRemoteFS
+from brain.config import AppConfig, CONFIG_FILE, reload_settings, settings
 
 LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -79,3 +81,39 @@ async def query_task_status(task_id: str):
         LOG.error(f"Failed to query task {task_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to query task")
     return task
+
+
+@router.get("/settings", response_model=AppConfig)
+async def get_settings():
+    """Return current global configuration."""
+    return settings
+
+
+@router.patch("/settings", response_model=AppConfig)
+async def patch_settings(partial: dict):
+    """
+    Partially update configuration.
+    """
+
+    # Convert global settings to dict
+    current = settings.dict()
+
+    # Recursively merge dictionaries
+    def deep_update(original, updates):
+        for key, value in updates.items():
+            if (
+                key in original
+                and isinstance(original[key], dict)
+                and isinstance(value, dict)
+            ):
+                deep_update(original[key], value)
+            else:
+                original[key] = value
+
+    deep_update(current, partial)
+
+    # Save back to YAML
+    with open(CONFIG_FILE, "w") as f:
+        yaml.safe_dump(current, f, allow_unicode=True)
+
+    return reload_settings()
