@@ -114,6 +114,26 @@
           label="网卡信息"
           min-width="170"
         >
+          <template #header>
+            <div class="column-header-with-filter">
+              <span>网卡信息</span>
+              <el-tooltip 
+                effect="dark" 
+                content="按网卡类型过滤"
+                placement="top"
+              >
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="showNicTypeFilter = !showNicTypeFilter"
+                  :class="{ 'filter-active': nicTypeFilter.length > 0 }"
+                  class="filter-btn"
+                >
+                  <el-icon><Filter /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
+          </template>
           <template #default="{ row }">
             <div v-if="getNicSummary(row).length > 0" class="nic-summary-compact">
               <div 
@@ -133,6 +153,26 @@
           label="标签"
           min-width="200"
         >
+          <template #header>
+            <div class="column-header-with-filter">
+              <span>标签</span>
+              <el-tooltip 
+                effect="dark" 
+                content="按标签过滤"
+                placement="top"
+              >
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="showTagFilter = !showTagFilter"
+                  :class="{ 'filter-active': tagFilter.length > 0 }"
+                  class="filter-btn"
+                >
+                  <el-icon><Filter /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
+          </template>
           <template #default="{ row }">
             <div v-if="row.tags && row.tags.length > 0" class="tags-container">
               <el-tag 
@@ -251,16 +291,24 @@
         <!-- 关注列 -->
         <el-table-column label="关注" width="80" align="center">
           <template #header>
-            <span>关注</span>
-            <el-tooltip 
-              effect="dark" 
-              content="关注服务器，将会接收到服务器释放的提醒邮件"
-              placement="top"
-            >
-              <el-icon style="margin-left: 4px; cursor: help;">
-                <QuestionFilled />
-              </el-icon>
-            </el-tooltip>
+            <div class="column-header-with-filter">
+              <span>关注</span>
+              <el-tooltip 
+                effect="dark" 
+                content="点击过滤已关注的服务器"
+                placement="top"
+              >
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="toggleFollowFilter"
+                  :class="{ 'filter-active': showOnlyFollowed }"
+                  class="filter-btn"
+                >
+                  <el-icon><StarFilled /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </template>
           <template #default="{ row }">
             <el-button 
@@ -383,6 +431,124 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 网卡类型过滤面板 - 改为弹窗 -->
+    <el-dialog
+      v-model="showNicTypeFilter"
+      title="按网卡类型过滤"
+      width="500px"
+      class="filter-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="filter-dialog-content">
+        <div class="filter-section">
+          <div class="section-title">
+            <el-icon><Connection /></el-icon>
+            <span>选择网卡类型</span>
+          </div>
+          
+          <div class="filter-header">
+            <div class="selected-count">
+              已选择: {{ nicTypeFilter.length }} 项
+            </div>
+            <div class="logic-selector">
+              <el-radio-group v-model="nicFilterLogic" size="small">
+                <el-radio label="AND">AND（同时满足）</el-radio>
+                <el-radio label="OR">OR（满足任意）</el-radio>
+              </el-radio-group>
+            </div>
+          </div>
+          
+          <div class="scrollable-list">
+            <el-checkbox-group v-model="nicTypeFilter" class="checkbox-group">
+              <div 
+                v-for="nicType in allNicTypes" 
+                :key="nicType"
+                class="checkbox-item"
+              >
+                <el-checkbox :label="nicType">
+                  <div class="nic-type-option">
+                    <span class="nic-type-name">{{ nicType }}</span>
+                    <el-tag size="small" type="info">
+                      {{ getNicTypeCount(nicType) }}
+                    </el-tag>
+                  </div>
+                </el-checkbox>
+              </div>
+            </el-checkbox-group>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="clearNicTypeFilter" size="default">清空</el-button>
+          <el-button type="primary" @click="applyNicTypeFilter" size="default">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 标签过滤面板 - 改为弹窗 -->
+    <el-dialog
+      v-model="showTagFilter"
+      title="按标签过滤"
+      width="500px"
+      class="filter-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="filter-dialog-content">
+        <div class="filter-section">
+          <div class="section-title">
+            <el-icon><PriceTag /></el-icon>
+            <span>选择标签</span>
+          </div>
+          
+          <div class="filter-header">
+            <div class="selected-count">
+              已选择: {{ tagFilter.length }} 项
+            </div>
+            <div class="logic-selector">
+              <el-radio-group v-model="tagFilterLogic" size="small">
+                <el-radio label="AND">AND（同时拥有）</el-radio>
+                <el-radio label="OR">OR（拥有任意）</el-radio>
+              </el-radio-group>
+            </div>
+          </div>
+          
+          <div class="scrollable-list">
+            <el-checkbox-group v-model="tagFilter" class="checkbox-group">
+              <div 
+                v-for="tag in allTags" 
+                :key="tag.name"
+                class="checkbox-item"
+              >
+                <el-checkbox :label="tag.name">
+                  <div class="tag-option">
+                    <el-tag 
+                      size="small" 
+                      :style="getTagStyle(tag.name)"
+                      class="tag-preview"
+                    >
+                      {{ tag.name }}
+                    </el-tag>
+                    <el-tag size="small" type="info">
+                      {{ getTagCount(tag.name) }}
+                    </el-tag>
+                  </div>
+                </el-checkbox>
+              </div>
+            </el-checkbox-group>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="clearTagFilter" size="default">清空</el-button>
+          <el-button type="primary" @click="applyTagFilter" size="default">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- 占用/修改时间对话框 -->
     <el-dialog
@@ -926,7 +1092,10 @@ import {
   Folder,
   Document,
   ArrowRight,
-  QuestionFilled
+  QuestionFilled,
+  Filter,
+  Connection,
+  PriceTag
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { remotefsApi, tagApi, tasksApi } from '@/api/common'
@@ -981,6 +1150,15 @@ const isBatchPowerOperation = ref(false)
 // 关注相关
 const followLoading = ref<Record<string, boolean>>({})
 
+// 新增：过滤相关状态
+const showNicTypeFilter = ref(false)
+const showTagFilter = ref(false)
+const showOnlyFollowed = ref(false)
+const nicTypeFilter = ref<string[]>([])
+const tagFilter = ref<string[]>([])
+const nicFilterLogic = ref<'AND' | 'OR'>('OR')
+const tagFilterLogic = ref<'AND' | 'OR'>('OR')
+
 // MCR包更新相关
 const updateMcrDialogVisible = ref(false)
 const mcrLoading = ref(false)
@@ -994,6 +1172,66 @@ const updateOption = ref<'all' | 'fw' | 'no-fw'>('all')
 const currentPathInput = ref('')
 const taskStatusMap = ref<Record<string, TaskStatusResponse>>({})
 const taskStatusTimers = ref<Record<string, number>>({})
+
+// 新增：计算所有网卡类型
+const allNicTypes = computed(() => {
+  const types = new Set<string>()
+  devices.value.forEach(device => {
+    const nicSummary = getNicSummary(device)
+    nicSummary.forEach(summary => {
+      types.add(summary.type)
+    })
+  })
+  return Array.from(types).sort()
+})
+
+// 新增：计算所有标签
+const allTags = computed(() => {
+  return availableTags.value.filter(tag => 
+    devices.value.some(device => 
+      device.tags && device.tags.includes(tag.name)
+    )
+  )
+})
+
+// 新增：获取网卡类型数量统计
+const getNicTypeCount = (nicType: string) => {
+  return devices.value.filter(device => {
+    const nicSummary = getNicSummary(device)
+    return nicSummary.some(summary => summary.type === nicType)
+  }).length
+}
+
+// 新增：获取标签数量统计
+const getTagCount = (tagName: string) => {
+  return devices.value.filter(device => 
+    device.tags && device.tags.includes(tagName)
+  ).length
+}
+
+// 新增：切换关注过滤
+const toggleFollowFilter = () => {
+  showOnlyFollowed.value = !showOnlyFollowed.value
+}
+
+const applyNicTypeFilter = () => {
+  showNicTypeFilter.value = false
+}
+
+// 新增：应用标签过滤
+const applyTagFilter = () => {
+  showTagFilter.value = false
+}
+
+// 新增：清空网卡类型过滤
+const clearNicTypeFilter = () => {
+  nicTypeFilter.value = []
+}
+
+// 新增：清空标签过滤
+const clearTagFilter = () => {
+  tagFilter.value = []
+}
 
 // MCR状态相关方法
 const getMcrStatus = (device: ServerDetailResponse): string => {
@@ -2709,43 +2947,87 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
   return timeA - timeB;
 };
 
+// 检查设备是否符合网卡类型过滤条件
+const matchesNicTypeFilter = (device: ServerDetailResponse) => {
+  if (nicTypeFilter.value.length === 0) return true
+  
+  const nicSummary = getNicSummary(device)
+  const deviceNicTypes = nicSummary.map(summary => summary.type)
+  
+  if (nicFilterLogic.value === 'AND') {
+    // AND逻辑：设备必须包含所有选中的网卡类型
+    return nicTypeFilter.value.every(type => 
+      deviceNicTypes.includes(type)
+    )
+  } else {
+    // OR逻辑：设备只要包含任意一个选中的网卡类型
+    return nicTypeFilter.value.some(type => 
+      deviceNicTypes.includes(type)
+    )
+  }
+}
+
+// 检查设备是否符合标签过滤条件
+const matchesTagFilter = (device: ServerDetailResponse) => {
+  if (tagFilter.value.length === 0) return true
+  
+  const deviceTags = device.tags || []
+  
+  if (tagFilterLogic.value === 'AND') {
+    // AND逻辑：设备必须包含所有选中的标签
+    return tagFilter.value.every(tag => 
+      deviceTags.includes(tag)
+    )
+  } else {
+    // OR逻辑：设备只要包含任意一个选中的标签
+    return tagFilter.value.some(tag => 
+      deviceTags.includes(tag)
+    )
+  }
+}
+
+// 检查设备是否符合关注过滤条件
+const matchesFollowFilter = (device: ServerDetailResponse) => {
+  if (!showOnlyFollowed.value) return true
+  return isFollowing(device)
+}
+
 // 计算属性：过滤设备列表
 const filteredDevices = computed(() => {
   let filtered = devices.value
   
-  // 搜索过滤
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    filtered = devices.value.filter(device => {
-      // 搜索服务器名称
-      if (device.bmc.hostname.toLowerCase().includes(keyword)) return true
+  // 应用多重过滤
+  filtered = filtered.filter(device => {
+    // 1. 搜索过滤
+    if (searchKeyword.value) {
+      const keyword = searchKeyword.value.toLowerCase()
+      const matchesSearch = 
+        device.bmc.hostname.toLowerCase().includes(keyword) ||
+        device.device.ip.toLowerCase().includes(keyword) ||
+        (device.notes && device.notes.toLowerCase().includes(keyword)) ||
+        (device.user && device.user.toLowerCase().includes(keyword)) ||
+        getNicSummary(device).some(summary => 
+          summary.displayType.toLowerCase().includes(keyword)
+        ) ||
+        (device.tags && device.tags.some(tag => tag.toLowerCase().includes(keyword)))
       
-      // 搜索服务器管理IP
-      if (device.device.ip.toLowerCase().includes(keyword)) return true
-      
-      // 搜索网卡信息
-      const nicSummary = getNicSummary(device)
-      if (nicSummary.some(summary => 
-        summary.displayType.toLowerCase().includes(keyword) ||
-        summary.count.toString().includes(keyword)
-      )) return true
-      
-      // 搜索标签
-      if (device.tags && device.tags.some(tag => tag.toLowerCase().includes(keyword))) return true
-      
-      // 搜索备注
-      if (device.notes && device.notes.toLowerCase().includes(keyword)) return true
-      
-      // 搜索占用人
-      if (device.user && device.user.toLowerCase().includes(keyword)) return true
-      
-      return false
-    })
-  }
+      if (!matchesSearch) return false
+    }
+    
+    // 2. 网卡类型过滤
+    if (!matchesNicTypeFilter(device)) return false
+    
+    // 3. 标签过滤
+    if (!matchesTagFilter(device)) return false
+    
+    // 4. 关注过滤
+    if (!matchesFollowFilter(device)) return false
+    
+    return true
+  })
   
   return filtered
 })
-
 
 // 加载数据
 const loadData = async () => {
@@ -2924,6 +3206,163 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 表头过滤器按钮样式 - 新增 */
+.column-header-with-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-btn {
+  padding: 0 2px !important;
+  margin: 0 !important;
+  color: #c0c4cc;
+  transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+  color: #409eff !important;
+}
+
+.filter-btn.filter-active {
+  color: #409eff !important;
+}
+
+/* 过滤弹窗样式 - 新增 */
+.filter-dialog {
+  :deep(.el-dialog__header) {
+    padding: 16px 20px 8px;
+    margin-right: 0;
+  }
+  
+  :deep(.el-dialog__body) {
+    padding: 8px 20px 16px;
+  }
+  
+  :deep(.el-dialog__footer) {
+    padding: 0 20px 16px;
+  }
+}
+
+.filter-dialog-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.selected-count {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.logic-selector {
+  display: flex;
+  align-items: center;
+}
+
+.logic-selector .el-radio-group {
+  display: flex;
+  gap: 12px;
+}
+
+.logic-selector .el-radio {
+  margin-right: 0;
+  font-size: 12px;
+}
+
+.scrollable-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-top: 8px;
+}
+
+.scrollable-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollable-list::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 2px;
+}
+
+.scrollable-list::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 2px;
+}
+
+.scrollable-list::-webkit-scrollbar-thumb:hover {
+  background: #a0a4ac;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid #f5f5f5;
+  transition: background-color 0.2s ease;
+}
+
+.checkbox-item:hover {
+  background-color: #f8fafc;
+  border-radius: 4px;
+}
+
+.checkbox-item:last-child {
+  border-bottom: none;
+}
+
+.nic-type-option,
+.tag-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-right: 4px;
+}
+
+.nic-type-name {
+  flex: 1;
+  margin-right: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-preview {
+  flex: 1;
+  margin-right: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: none !important;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e4e7ed;
+}
+
 /* MCR状态样式 */
 .mcr-status {
   display: flex;
