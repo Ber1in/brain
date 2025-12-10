@@ -264,19 +264,18 @@ export interface NicInfo {
 
 export interface NicBase {
   type: string
+  nic_info?: NicInfo[]
   sn: string
 }
 
-export interface AIDPU_Nic {
-  type: string
-  nic_info?: Array<NicInfo>
-  sn: string
+export interface AIDPUNic extends NicBase {
   soc_ip: string
   aidpu_sn?: string
   firmware_version?: string
-  nic_sn?: string
   management_ip?: string
 }
+
+export type NicResponse = Array<NicBase | AIDPUNic>
 
 export interface ServerDetailResponse {
   bmc: BMC

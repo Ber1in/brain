@@ -364,11 +364,10 @@ def ipmi_power_action(bmcip: str, action: str):
         raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
 
 
-async def update_automatic_async(ip, user, password):
+async def collect_device_info(ip, user, password):
     server_sn = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_serial", user, password, False)
     server_vendor = await ssh_execute_async(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
-    server_product = await ssh_execute_async(
-        ip, "cat /sys/class/dmi/id/product_name", user, password)
+    server_product = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_name", user, password)
 
     cpu_cmd = (
         "lscpu | awk -F\":\" "
@@ -377,21 +376,45 @@ async def update_automatic_async(ip, user, password):
     )
     cpu_infos = (await ssh_execute_async(ip, cpu_cmd, user, password)).strip().split("\n")
 
-    # PCI VPD
+    route_cmd = (
+        f"ip route get {COMMON_SERVER} | head -1 | "
+        "awk '{for(i=1;i<=NF;i++) if($i==\"dev\") print $(i+1)}'"
+    )
+    iface_name = await ssh_execute_async(ip, route_cmd, user, password)
+    iface_mac = (await ssh_execute_async(
+        ip, f"cat /sys/class/net/{iface_name}/address", user, password)).strip()
+
+    gateway = (await ssh_execute_async(
+        ip, "ip route | awk '/default/ {print $3}'", user, password)).strip()
+
+    return {
+        "sn": server_sn,
+        "mac": iface_mac,
+        "gateway": gateway,
+        "vendor": server_vendor,
+        "product": server_product,
+        "arch": cpu_infos[0],
+        "cpu_vendor": cpu_infos[1],
+        "cpu_mode": cpu_infos[2]
+    }
+
+
+async def collect_nic_info(ip, user, password):
     pci_cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} "
                "/Vital Product Data/ {print; for(i=0;i<5;i++){getline; print}}'")
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     nics = parse_nics_info(pci_res)
 
+    # FRU PARTNUM
     part_num_cmd = ('yuncli fw --fru_info |grep -E "BDF:|Product Part Number"')
     part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
     partnums = parse_bdf_partnum(part_num_res)
 
+    # MAC by BDF
     mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
-
     macs = parse_bdf_mac(mac_res)
 
-    # Remote iface map
+    # Remote iface mapping
     map_cmd = ("for i in /sys/class/net/*/address; do "
                "echo \"$(basename $(dirname $i)) $(cat $i)\"; "
                "done")
@@ -400,7 +423,6 @@ async def update_automatic_async(ip, user, password):
     remote_map = {}
     for raw in out.splitlines():
         line = raw.strip()
-
         if ((line.startswith('"') and line.endswith('"')) or
                 (line.startswith("'") and line.endswith("'"))):
             line = line[1:-1].strip()
@@ -415,42 +437,33 @@ async def update_automatic_async(ip, user, password):
         iface, mac = parts[0].strip(), parts[1].strip().lower()
         remote_map[mac] = iface
 
+    # enrich: alias, mac, iface
     for nic in nics:
         for info in nic["nic_info"]:
-            partnum =  partnums.get(info["bdf"])
-            if partnum:
-                alias = PRODUCT_PART_NUMBER_DICT.get(partnum)
-                if alias:
-                    nic["type"] = alias
-            mac = macs.get(info["bdf"])
+            bdf = info["bdf"]
+
+            # partnum + alias
+            alias = PRODUCT_PART_NUMBER_DICT.get(partnums.get(bdf))
+            if alias:
+                nic["type"] = alias
+
+            # mac
+            mac = macs.get(bdf)
             if not mac:
                 continue
-
             info["mac"] = mac
+
+            # iface
             iface = remote_map.get(mac)
             if iface:
                 info["iface"] = iface
 
-    # Primary route interface
-    route_cmd = (f"ip route get {COMMON_SERVER} | head -1 | "
-                 "awk '{for(i=1;i<=NF;i++) if($i==\"dev\") print $(i+1)}'")
-    iface_name = await ssh_execute_async(ip, route_cmd, user, password)
+    return nics
 
-    iface_mac = (await ssh_execute_async(
-        ip, f"cat /sys/class/net/{iface_name}/address", user, password)).strip()
-    gateway = (await ssh_execute_async(
-        ip, "ip route | awk '/default/ {print $3}'", user, password)).strip()
 
-    device_info = {
-        "sn": server_sn,
-        "mac": iface_mac,
-        "gateway": gateway,
-        "vendor": server_vendor,
-        "product": server_product,
-        "arch": cpu_infos[0],
-        "cpu_vendor": cpu_infos[1],
-        "cpu_mode": cpu_infos[2]
-    }
+async def update_automatic_async(ip, user, password):
+    device_info = await collect_device_info(ip, user, password)
+    nics = await collect_nic_info(ip, user, password)
     return device_info, nics
 
 

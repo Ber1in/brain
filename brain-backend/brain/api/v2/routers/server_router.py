@@ -4,6 +4,7 @@
 import asyncio
 from datetime import datetime
 import re
+from typing import List, Union
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 import logging
@@ -164,19 +165,19 @@ async def get_all_devices():
 async def get_device(device_id: str):
     LOG.info(f"Fetching device, ID: {device_id}")
     try:
-        device = db.find_one(SERVER_COLLECTION, {"id": device_id})
-        if device["time"]:
+        server = db.find_one(SERVER_COLLECTION, {"id": device_id})
+        if server["time"]:
             now = datetime.now().timestamp()
-            start = device.get("start")
+            start = server.get("start")
             passed = int(now - start)
-            remaining = device["time"] - passed
-            device["time"] = max(remaining, 0)
+            remaining = server["time"] - passed
+            server["time"] = max(remaining, 0)
     except Exception as e:
         LOG.warning(f"Device not found, {e}")
         raise HTTPException(status_code=404, detail=f"Device not found, {e}")
 
     LOG.info(f"Device fetched: ID={device_id}")
-    return device
+    return server
 
 
 @router.put("/servers/{device_id}", response_model=server_schemas.ServerDetailResponse)
@@ -334,7 +335,7 @@ async def focus_server(server_id: str, data: server_schemas.FocusRequest,
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
     except Exception as e:
-        LOG.warning(f"Server {server_id} not found for boot entries query")
+        LOG.warning(f"Server {server_id} not found.")
         raise HTTPException(status_code=404, detail=f"{e}")
 
     recipients = server.get("recipients", [])
@@ -426,6 +427,27 @@ async def set_boot_entry(
 
     return {"message": (f"BootNext set to {boot_id} on {server['device']['ip']}"
                         f"{' (default updated)' if set_default else ''}")}
+
+
+@router.get("/servers/{server_id}/nics", response_model=List[Union[server_schemas.NicBase,
+                                                                   server_schemas.AIDPU_Nic]])
+async def get_nic_information(server_id: str):
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception as e:
+        LOG.warning(f"Server {server_id} not found.")
+        raise HTTPException(status_code=404, detail=f"{e}")
+
+    nics = await common_utils.collect_nic_info(
+        server["device"]["ip"],
+        server["device"].get("username", ""),
+        server["device"].get("password", "")
+    )
+    server["nics"] = nics
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+    return nics
 
 
 @router.post("/servers/{server_id}/power-cycle")

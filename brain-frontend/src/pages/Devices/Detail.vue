@@ -222,8 +222,17 @@
         </el-card>
 
         <!-- 网卡详细信息 - 3/5宽度 -->
-        <el-card header="网卡信息" class="nic-card" v-if="deviceData.nics && deviceData.nics.length > 0">
-          <el-table :data="processedNics" class="compact-table">
+        <el-card header="网卡信息" class="nic-card">
+          <div v-if="nicsLoading" class="nics-loading">
+            <el-icon class="loading-icon"><Loading /></el-icon>
+            <span>查询网卡信息中...</span>
+          </div>
+          <el-table 
+            v-else
+            :data="processedNics" 
+            class="compact-table"
+            :show-header="nicsData && nicsData.length > 0"
+          >
             <el-table-column prop="type" label="类型" width="110">
               <template #default="{ row }">
                 <span>{{ formatNicTypeForDisplay(row.type) }}</span>
@@ -360,6 +369,9 @@
             <el-table-column v-if="hasAidpuNics" prop="firmware_version" label="固件版本" width="100" />
             <el-table-column v-if="hasAidpuNics" prop="management_ip" label="管理IP" width="100" />
           </el-table>
+          <div v-if="!nicsLoading && (!nicsData || nicsData.length === 0)" class="no-nics-data">
+            <el-empty description="暂无网卡信息" :image-size="60" />
+          </div>
         </el-card>
       </div>
     </el-card>
@@ -647,7 +659,7 @@ import {
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { mv200Api } from '@/api/mv200'
-import type { ServerDetailResponse, AIDPU_Nic, BootEntriesResponse, MVServer, NicBase, NicInfo } from '@/types/api'
+import type { ServerDetailResponse, BootEntriesResponse, MVServer, NicResponse, NicBase, NicInfo } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -658,6 +670,10 @@ const refreshing = ref(false)
 const bootEntriesLoading = ref(false)
 const bootEntriesData = ref<BootEntriesResponse | null>(null)
 const allMv200s = ref<MVServer[]>([])
+
+// 网卡信息相关状态
+const nicsLoading = ref(false)
+const nicsData = ref<NicResponse | null>(null)
 
 // 当前用户信息
 const currentUser = computed(() => authStore.username)
@@ -857,9 +873,9 @@ const bootEntriesList = computed(() => {
 
 // 处理网卡数据，统一处理 nic_info
 const processedNics = computed(() => {
-  if (!deviceData.value.nics) return []
+  if (!nicsData.value || nicsData.value.length === 0) return []
   
-  return deviceData.value.nics.map(nic => {
+  return nicsData.value.map(nic => {
     // 所有网卡都有 nic_info 数组，但普通网卡可能没有
     const nicInfo = (nic as any).nic_info || []
     
@@ -884,8 +900,22 @@ const handleMv200Detail = (mv200: MVServer | null) => {
 
 // 检查是否有AIDPU网卡
 const hasAidpuNics = computed(() => {
-  return deviceData.value.nics?.some(nic => 'soc_ip' in nic)
+  return nicsData.value?.some(nic => 'soc_ip' in nic) || false
 })
+
+// 加载网卡信息
+const loadNics = async () => {
+  try {
+    nicsLoading.value = true
+    const data = await deviceApi.getNics(deviceId.value)
+    nicsData.value = data
+  } catch (error: any) {
+    console.error('加载网卡信息失败:', error)
+    nicsData.value = null
+  } finally {
+    nicsLoading.value = false
+  }
+}
 
 // 时间快捷选项
 const timeShortcuts = [
@@ -1249,10 +1279,11 @@ const loadDeviceDetail = async () => {
     
     deviceData.value = { ...data }
     
-    // 同时加载启动项信息和MV200数据
+    // 同时加载启动项信息、MV200数据和网卡信息
     await Promise.all([
       loadBootEntries(),
-      loadAllMv200s()
+      loadAllMv200s(),
+      loadNics()
     ])
   } catch (error) {
     ElMessage.error('加载服务器详情失败')
@@ -1280,8 +1311,11 @@ const handleRefresh = async () => {
     
     ElMessage.success('服务器信息更新成功')
     
-    // 重新加载详情数据和启动项信息
-    await loadDeviceDetail()
+    // 重新加载详情数据、启动项信息和网卡信息
+    await Promise.all([
+      loadDeviceDetail(),
+      loadNics() // 重新加载网卡信息
+    ])
     
     // 强制重新计算 computed 属性
     deviceData.value = { ...deviceData.value }
@@ -1628,6 +1662,42 @@ onMounted(() => {
 
 .underlined-link:hover {
   text-decoration-thickness: 2px;
+}
+
+/* 网卡加载状态样式 */
+.nics-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #909399;
+  text-align: center;
+}
+
+.nics-loading .loading-icon {
+  font-size: 24px;
+  margin-bottom: 12px;
+  color: #409eff;
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.nics-loading span {
+  font-size: 14px;
+}
+
+/* 无网卡数据样式 */
+.no-nics-data {
+  padding: 40px 0;
 }
 
 /* 并排布局样式 - 1:1:3比例 */
