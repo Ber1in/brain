@@ -23,6 +23,7 @@ os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 TEST_DATA_DIR = "/opt/yunTesterData"
+TEST_HISTORY_COLLECTION = "test_history"
 
 
 class FsyncFileHandler(logging.FileHandler):
@@ -139,6 +140,16 @@ async def startup_event():
 
     except Exception as e:
         logger.error(f"Error while restoring device timers: {str(e)}")
+
+    try:
+        cancelled_task = db.find(TEST_HISTORY_COLLECTION, {"cancel": 1, "status": "running"})
+        task_ids = [task["id"] for task in cancelled_task]
+        db.update(TEST_HISTORY_COLLECTION, {"cancel": 1, "status": "running"},
+                  {"status": "cancelled"})
+        logger.info("The following test tasks have been automatically canceled due to a service"
+                    f" restart: {task_ids}")
+    except Exception as e:
+        logger.error("Resetting test task status failed")
 
 
 # app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
