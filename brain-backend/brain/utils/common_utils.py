@@ -207,68 +207,92 @@ def parse_nics_info(output: str) -> List[Dict[str, str]]:
 
 def parse_bdf_partnum(output: str) -> dict:
     """
-    Parse BDF and Product Part Number pairs from yuncli fw --fru_info output,
-    and remove PCI domain (the first 4 hex digits).
-
-    Example:
-        BDF:0000:31:00.0:  -> 31:00.0
+    Parse BDF → {part_number, serial} from 'yuncli fw --fru_info' output.
+    Removes PCI domain (first 4 hex digits).
     """
     result = {}
     current_bdf = None
 
-    for line in output.splitlines():
-        line = line.strip()
-
-        # Detect BDF line
-        if line.startswith("BDF:") and line.endswith(":"):
-            raw_bdf = line.replace("BDF:", "").rstrip(":")  # 0000:31:00.0
-            # Remove domain (first segment)
-            # 0000:31:00.0 → ["0000","31","00.0"] → join from index 1
-            parts = raw_bdf.split(":")
-            if len(parts) == 3:
-                current_bdf = ":".join(parts[1:])  # 31:00.0
-            else:
-                current_bdf = raw_bdf  # fallback
-            continue
-
-        # Detect Product Part Number
-        if "Product Part Number" in line and ":" in line:
-            if current_bdf:
-                part_num = line.split(":", 1)[1].strip()
-                result[current_bdf] = part_num
-                current_bdf = None
-
-    return result
-
-
-def parse_bdf_mac(output: str) -> Dict[str, str]:
-    """
-    Parse `yuncli mac -r` output into {bdf_with_func: mac}
-    e.g. {"b3:00.0": "xx:xx:xx:xx:xx:xx"}
-    """
-    result = {}
-    current_bdf = None
     for line in output.splitlines():
         line = line.strip()
         if not line:
             continue
 
-        bdf_match = re.match(r'BDF:([0-9a-fA-F:.]+):', line)
-        if bdf_match:
-            raw_bdf = bdf_match.group(1)
-            if raw_bdf.startswith('0000:'):
-                raw_bdf = raw_bdf[5:]
-            current_bdf = raw_bdf
+        # 1. Detect BDF line
+        if line.startswith("BDF:") and line.endswith(":"):
+            raw_bdf = line.replace("BDF:", "").rstrip(":")  # e.g., 0000:87:00.0
+            parts = raw_bdf.split(":")
+
+            # strip PCI domain (0000:)
+            if len(parts) == 3:
+                current_bdf = ":".join(parts[1:])  # → "87:00.0"
+            else:
+                current_bdf = raw_bdf
+
+            # Ensure dict entry exists
+            result.setdefault(current_bdf, {})
             continue
 
+        # 2. Product Part Number
+        if line.startswith("Product Part Number") and ":" in line:
+            if current_bdf:
+                value = line.split(":", 1)[1].strip()
+                result[current_bdf]["pn"] = value
+            continue
+
+        # 3. Product Serial
+        if line.startswith("Product Serial") and ":" in line:
+            if current_bdf:
+                value = line.split(":", 1)[1].strip()
+                result[current_bdf]["sn"] = value
+            continue
+
+    return result
+
+
+def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
+    """
+    Parse `yuncli mac -r` output into {root_bdf: [{"bdf": bdf_with_func, "mac": mac}, ...]}
+    Compatible with outputs that include 'Index Mac Address' header.
+    """
+    result: Dict[str, List[dict]] = {}
+    current_bdf = None  # the root BDF
+
+    for line in output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        # Detect BDF line
+        m = re.match(r"BDF:([0-9a-fA-F:.]+):", line)
+        if m:
+            raw = m.group(1)
+            if raw.startswith("0000:"):
+                raw = raw[5:]  # strip domain
+            current_bdf = raw
+            if current_bdf not in result:
+                result[current_bdf] = []
+            continue
+
+        # Skip header line like "Index Mac Address"
+        if line.lower().startswith("index"):
+            continue
+
+        # Parse MAC lines
         if current_bdf:
             parts = line.split()
             if len(parts) == 2:
-                func, mac = parts
+                func_str, mac = parts
                 try:
-                    func = int(func)
-                    full_bdf = f"{current_bdf[:-1]}{func}"
-                    result[full_bdf] = mac
+                    func = int(func_str)
+                    # full_bdf: replace function part
+                    base = current_bdf[:-1]
+                    full_bdf = f"{base}{func}"
+
+                    result[current_bdf].append({
+                        "bdf": full_bdf,
+                        "mac": mac,
+                    })
                 except ValueError:
                     pass
 
@@ -399,66 +423,82 @@ async def collect_device_info(ip, user, password):
     }
 
 
-async def collect_nic_info(ip, user, password):
-    pci_cmd = ("lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} "
-               "/Vital Product Data/ {print; for(i=0;i<5;i++){getline; print}}'")
+async def collect_nic_info(ip: str, user: str, password: str) -> list:
+    """
+    Collect NIC info from remote server.
+    - Parse PCI info
+    - Parse FRU part number & serial
+    - Parse MACs
+    - Merge into unified structure with type/mac/iface
+    """
+    # PCI info
+    pci_cmd = (
+        "lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} "
+        "/Vital Product Data/ {print; for(i=0;i<5;i++){getline; print}}'"
+    )
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     nics = parse_nics_info(pci_res)
 
-    # FRU PARTNUM
-    part_num_cmd = ('yuncli fw --fru_info |grep -E "BDF:|Product Part Number"')
+    # FRU info
+    part_num_cmd = 'yuncli fw --fru_info |grep -E "BDF:|Product Part Number|Product Serial"'
     part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
     partnums = parse_bdf_partnum(part_num_res)
 
-    # MAC by BDF
+    # MAC info
     mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
     macs = parse_bdf_mac(mac_res)
 
+    # Build nics_list
+    nics_list = []
+    for root_bdf, funcs in macs.items():
+        part_info = partnums.get(root_bdf, {})
+        pn = part_info.get("pn", "")
+        sn = part_info.get("sn", "")
+        nic_type = PRODUCT_PART_NUMBER_DICT.get(pn, "")
+
+        nic_info_list = [{"bdf": f["bdf"], "mac": f["mac"]} for f in funcs]
+
+        nics_list.append({
+            "sn": sn,
+            "type": nic_type,
+            "nic_info": nic_info_list
+        })
+
+    # Merge with existing nics by sn
+    nics_map = {nic["sn"]: nic for nic in nics_list}
+    merged = [nics_map.get(nic.get("sn"), nic) for nic in nics]
+    # Add nics_list entries not in nics
+    existing_sn = {nic.get("sn") for nic in nics}
+    merged.extend(nic for sn, nic in nics_map.items() if sn not in existing_sn)
+
     # Remote iface mapping
-    map_cmd = ("for i in /sys/class/net/*/address; do "
-               "echo \"$(basename $(dirname $i)) $(cat $i)\"; "
-               "done")
+    map_cmd = (
+        "for i in /sys/class/net/*/address; do "
+        "echo \"$(basename $(dirname $i)) $(cat $i)\"; "
+        "done"
+    )
     out = await ssh_execute_async(ip, map_cmd, user, password)
-
     remote_map = {}
-    for raw in out.splitlines():
-        line = raw.strip()
-        if ((line.startswith('"') and line.endswith('"')) or
-                (line.startswith("'") and line.endswith("'"))):
-            line = line[1:-1].strip()
-
+    for line in out.splitlines():
+        line = line.strip().strip('\'"')
         if not line:
             continue
-
         parts = line.split()
-        if len(parts) < 2:
-            continue
+        if len(parts) >= 2:
+            iface, mac = parts[0], parts[1].lower()
+            remote_map[mac] = iface
 
-        iface, mac = parts[0].strip(), parts[1].strip().lower()
-        remote_map[mac] = iface
-
-    # enrich: alias, mac, iface
-    for nic in nics:
+    # Enrich merged nics with iface
+    for nic in merged:
         for info in nic["nic_info"]:
-            bdf = info["bdf"]
+            mac = info.get("mac")
+            if mac:
+                iface = remote_map.get(mac.lower())
+                if iface:
+                    info["iface"] = iface
 
-            # partnum + alias
-            alias = PRODUCT_PART_NUMBER_DICT.get(partnums.get(bdf))
-            if alias:
-                nic["type"] = alias
+    return merged
 
-            # mac
-            mac = macs.get(bdf)
-            if not mac:
-                continue
-            info["mac"] = mac
-
-            # iface
-            iface = remote_map.get(mac)
-            if iface:
-                info["iface"] = iface
-
-    return nics
 
 
 async def update_automatic_async(ip, user, password):
