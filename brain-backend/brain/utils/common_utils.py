@@ -63,81 +63,94 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
     """
     Ensure packages (interpreted as commands) exist on remote host.
     If not, install corresponding packages (assumed same as names).
-    Supports Debian / RHEL / Fedora / SUSE.
+    Supports Debian / RHEL / Fedora / SUSE / openEuler.
     """
-
     pkg_str = " ".join(packages)
 
     cmd = f"""
-    detect_os() {{
-        if [ -f /etc/os-release ]; then
-            . /etc/os-release
-            if [ -n "$ID_LIKE" ]; then
-                echo "$ID_LIKE"
-            else
-                echo "$ID"
-            fi
+detect_os() {{
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ -n "$ID_LIKE" ]; then
+            echo "$ID_LIKE"
         else
-            echo "$(uname -s)"
+            echo "$ID"
         fi
-    }}
+    else
+        echo "$(uname -s)"
+    fi
+}}
 
-    OS=$(detect_os)
+OS=$(detect_os)
 
-    ensure_repo() {{
-        if echo "$OS" | grep -qi "debian"; then
-            sed -i 's/archive.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
-            sed -i 's/security.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
-            apt-get update -y || true
+ensure_repo() {{
+    if echo "$OS" | grep -qi "debian"; then
+        sed -i 's/archive.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
+        sed -i 's/security.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
+        apt-get update -y || true
 
-        elif echo "$OS" | grep -qi "rhel"; then
-            curl -s -o /etc/yum.repos.d/centos7.6.repo http://mirrors.yunsilicon.com/yum.repos.d/centos7.9.repo || true
-            curl -s -o /etc/yum.repos.d/epel.repo http://mirrors.yunsilicon.com/yum.repos.d/epel.repo || true
-            yum clean all || true
-            yum makecache || true
+    elif echo "$OS" | grep -Ei "rhel|centos"; then
+        curl -s -o /etc/yum.repos.d/centos7.6.repo http://mirrors.yunsilicon.com/yum.repos.d/centos7.9.repo || true
+        curl -s -o /etc/yum.repos.d/epel.repo http://mirrors.yunsilicon.com/yum.repos.d/epel.repo || true
+        yum clean all || true
+        yum makecache || true
 
+    elif echo "$OS" | grep -qi "fedora"; then
+        dnf makecache || true
+
+    elif echo "$OS" | grep -qi "suse"; then
+        zypper refresh || true
+
+    elif echo "$OS" | grep -qi "openeuler"; then
+        # openEuler 22+ 使用 dnf
+        dnf makecache || true
+
+    fi
+}}
+
+ensure_packages() {{
+    MISSING=()
+    for pkg in {pkg_str}; do
+        if ! command -v $pkg >/dev/null 2>&1; then
+            MISSING+=($pkg)
         fi
-    }}
+    done
 
-    ensure_packages() {{
-        MISSING=()
-        for pkg in {pkg_str}; do
-            if ! command -v $pkg >/dev/null 2>&1; then
-                MISSING+=($pkg)
-            fi
-        done
+    if [ ${{#MISSING[@]}} -eq 0 ]; then
+        echo "All packages already installed"
+        return
+    fi
 
-        if [ ${{#MISSING[@]}} -eq 0 ]; then
-            echo "All packages already installed"
-            return
-        fi
+    echo "Installing packages: ${{MISSING[@]}}"
 
-        echo "Installing packages: ${{MISSING[@]}}"
+    if echo "$OS" | grep -qi "debian"; then
+        apt-get install -y ${{MISSING[@]}}
 
-        if echo "$OS" | grep -qi "debian"; then
-            apt-get install -y ${{MISSING[@]}}
+    elif echo "$OS" | grep -Ei "rhel|centos"; then
+        yum install -y ${{MISSING[@]}}
 
-        elif echo "$OS" | grep -qi "rhel"; then
-            yum install -y ${{MISSING[@]}}
+    elif echo "$OS" | grep -qi "fedora"; then
+        dnf install -y ${{MISSING[@]}}
 
-        elif echo "$OS" | grep -qi "fedora"; then
-            dnf install -y ${{MISSING[@]}}
+    elif echo "$OS" | grep -qi "suse"; then
+        zypper install -y ${{MISSING[@]}}
 
-        elif echo "$OS" | grep -qi "suse"; then
-            zypper install -y ${{MISSING[@]}}
+    elif echo "$OS" | grep -qi "openeuler"; then
+        dnf install -y ${{MISSING[@]}}
 
-        else
-            echo "Unsupported distro: $OS"
-            exit 1
-        fi
-    }}
+    else
+        echo "Unsupported distro: $OS"
+        exit 1
+    fi
+}}
 
-    ensure_repo
-    ensure_packages
-    """  # noqa
+ensure_repo
+ensure_packages
+"""  # noqa
 
     LOG.info(f"Ensuring repo and packages on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
+
 
 
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
