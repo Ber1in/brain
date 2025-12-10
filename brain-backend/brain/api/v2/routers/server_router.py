@@ -432,6 +432,7 @@ async def set_boot_entry(
 @router.get("/servers/{server_id}/nics", response_model=List[Union[server_schemas.NicBase,
                                                                    server_schemas.AIDPU_Nic]])
 async def get_nic_information(server_id: str):
+    LOG.info(f"Requesting NIC information for server_id: {server_id}")
 
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
@@ -444,9 +445,14 @@ async def get_nic_information(server_id: str):
         server["device"].get("username", ""),
         server["device"].get("password", "")
     )
+
+    LOG.info(f"Collected {len(nics)} NIC entries for server {server_id}")
+
     server["nics"] = nics
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+    LOG.info(f'Returning NIC info for server {server["device"]["ip"]}')
     return nics
 
 
