@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest, ResetFwRequest, NicResponse } from '@/types/api'
+import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest, ResetFwRequest, NicResponse, DeviceResponse } from '@/types/api'
 
 export const deviceApi = {
   // 获取所有设备
@@ -29,6 +29,10 @@ export const deviceApi = {
 
   getNics(serverId: string): Promise<NicResponse> {
     return apiClient.get(`/api/servers/${serverId}/nics`)
+  },
+
+  getHws(serverId: string): Promise<DeviceResponse> {
+    return apiClient.get(`/api/servers/${serverId}/hw`)
   },
 
   // 获取启动项（支持使用保存的凭据）

@@ -456,6 +456,31 @@ async def get_nic_information(server_id: str):
     return nics
 
 
+@router.get("/servers/{server_id}/hw", response_model=server_schemas.DeviceResponse)
+async def get_hw_information(server_id: str):
+    LOG.info(f"Requesting hardware information for server_id: {server_id}")
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception as e:
+        LOG.warning(f"Server {server_id} not found.")
+        raise HTTPException(status_code=404, detail=f"{e}")
+
+    device = await common_utils.collect_device_info(
+        server["device"]["ip"],
+        server["device"].get("username", ""),
+        server["device"].get("password", "")
+    )
+    server["device"].update(device)
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+    LOG.info(f'Returning hardware info for server {server["device"]["ip"]}')
+    device["ip"] = server["device"]["ip"]
+    device["username"] = server["device"].get("username", "")
+    return device
+
+
 @router.post("/servers/{server_id}/power-cycle")
 async def power_cycle_server(server_id: str):
     """
