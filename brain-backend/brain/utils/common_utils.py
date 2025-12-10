@@ -152,7 +152,6 @@ ensure_packages
     await ssh_execute_async(host, cmd, user, pwd)
 
 
-
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
     """
     Parse yuncli lspci output and return a list of devices.
@@ -218,46 +217,63 @@ def parse_nics_info(output: str) -> List[Dict[str, str]]:
     return result
 
 
-def parse_bdf_partnum(output: str) -> dict:
+def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
     """
-    Parse BDF → {part_number, serial} from 'yuncli fw --fru_info' output.
-    Removes PCI domain (first 4 hex digits).
+    Parse BDF → {pn, sn} from 'yuncli fw --fru_info' output.
+    Supports:
+      - Single BDF:  BDF:0000:87:00.0:
+      - Multiple BDFs: Multihost BDFs:0000:41:00.0,0000:c1:00.0:
+    Strips PCI domain (first 4 hex digits) to get e.g., "87:00.0".
     """
-    result = {}
-    current_bdf = None
+    result: Dict[str, Dict[str, str]] = {}
+    current_bdfs = []
 
     for line in output.splitlines():
         line = line.strip()
         if not line:
             continue
 
-        # 1. Detect BDF line
+        # 1. Detect single BDF
         if line.startswith("BDF:") and line.endswith(":"):
-            raw_bdf = line.replace("BDF:", "").rstrip(":")  # e.g., 0000:87:00.0
+            raw_bdf = line.replace("BDF:", "").rstrip(":")
             parts = raw_bdf.split(":")
-
-            # strip PCI domain (0000:)
-            if len(parts) == 3:
-                current_bdf = ":".join(parts[1:])  # → "87:00.0"
+            if len(parts) == 3 and parts[0] == "0000":
+                bdf = ":".join(parts[1:])  # "87:00.0"
             else:
-                current_bdf = raw_bdf
-
-            # Ensure dict entry exists
-            result.setdefault(current_bdf, {})
+                bdf = raw_bdf
+            current_bdfs = [bdf]
+            for b in current_bdfs:
+                result.setdefault(b, {})
             continue
 
-        # 2. Product Part Number
-        if line.startswith("Product Part Number") and ":" in line:
-            if current_bdf:
-                value = line.split(":", 1)[1].strip()
-                result[current_bdf]["pn"] = value
+        # 2. Detect multiple BDFs (Multihost)
+        if line.startswith("Multihost BDFs:") and line.endswith(":"):
+            raw = line.replace("Multihost BDFs:", "").rstrip(":")
+            bdfs = []
+            for raw_bdf in raw.split(","):
+                raw_bdf = raw_bdf.strip()
+                parts = raw_bdf.split(":")
+                if len(parts) == 3 and parts[0] == "0000":
+                    bdf = ":".join(parts[1:])
+                else:
+                    bdf = raw_bdf
+                bdfs.append(bdf)
+                result.setdefault(bdf, {})
+            current_bdfs = bdfs
             continue
 
-        # 3. Product Serial
-        if line.startswith("Product Serial") and ":" in line:
-            if current_bdf:
-                value = line.split(":", 1)[1].strip()
-                result[current_bdf]["sn"] = value
+        # 3. Product Part Number
+        if "Product Part Number" in line and ":" in line:
+            value = line.split(":", 1)[1].strip()
+            for bdf in current_bdfs:
+                result[bdf]["pn"] = value
+            continue
+
+        # 4. Product Serial
+        if "Product Serial" in line and ":" in line:
+            value = line.split(":", 1)[1].strip()
+            for bdf in current_bdfs:
+                result[bdf]["sn"] = value
             continue
 
     return result
@@ -265,50 +281,82 @@ def parse_bdf_partnum(output: str) -> dict:
 
 def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
     """
-    Parse `yuncli mac -r` output into {root_bdf: [{"bdf": bdf_with_func, "mac": mac}, ...]}
-    Compatible with outputs that include 'Index Mac Address' header.
+    Parse `yuncli mac -r` output into {root_bdf: [{"bdf": bdf_with_func, "mac": mac}, ...]}.
+    Supports:
+      - Single BDF:  BDF:0000:87:00.0:
+      - Multiple BDFs: Multihost BDFs:0000:41:00.0,0000:c1:00.0:
+    For Multihost BDFs, MACs are evenly distributed across BDFs.
     """
     result: Dict[str, List[dict]] = {}
-    current_bdf = None  # the root BDF
+    current_bdfs: List[str] = []
+    macs_buffer: List[str] = []
 
     for line in output.splitlines():
         line = line.strip()
         if not line:
             continue
 
-        # Detect BDF line
-        m = re.match(r"BDF:([0-9a-fA-F:.]+):", line)
-        if m:
-            raw = m.group(1)
+        # 1. Detect single BDF
+        m_single = re.match(r"BDF:([0-9a-fA-F:.]+):", line)
+        if m_single:
+            # flush previous buffer if any
+            if current_bdfs and macs_buffer:
+                result = _assign_macs_to_bdfs(result, current_bdfs, macs_buffer)
+            raw = m_single.group(1)
             if raw.startswith("0000:"):
-                raw = raw[5:]  # strip domain
-            current_bdf = raw
-            if current_bdf not in result:
-                result[current_bdf] = []
+                raw = raw[5:]
+            current_bdfs = [raw]
+            result.setdefault(raw, [])
+            macs_buffer = []
             continue
 
-        # Skip header line like "Index Mac Address"
+        # 2. Detect multiple BDFs (Multihost)
+        if line.startswith("Multihost BDFs:") and line.endswith(":"):
+            if current_bdfs and macs_buffer:
+                result = _assign_macs_to_bdfs(result, current_bdfs, macs_buffer)
+            raw = line.replace("Multihost BDFs:", "").rstrip(":")
+            bdfs = []
+            for r in raw.split(","):
+                r = r.strip()
+                if r.startswith("0000:"):
+                    r = r[5:]
+                bdfs.append(r)
+                result.setdefault(r, [])
+            current_bdfs = bdfs
+            macs_buffer = []
+            continue
+
+        # 3. Skip header like "Index Mac Address"
         if line.lower().startswith("index"):
             continue
 
-        # Parse MAC lines
-        if current_bdf:
-            parts = line.split()
-            if len(parts) == 2:
-                func_str, mac = parts
-                try:
-                    func = int(func_str)
-                    # full_bdf: replace function part
-                    base = current_bdf[:-1]
-                    full_bdf = f"{base}{func}"
+        # 4. Collect MAC lines
+        parts = line.split()
+        if len(parts) == 2:
+            macs_buffer.append(parts[1].lower())
 
-                    result[current_bdf].append({
-                        "bdf": full_bdf,
-                        "mac": mac,
-                    })
-                except ValueError:
-                    pass
+    # flush remaining buffer
+    if current_bdfs and macs_buffer:
+        result = _assign_macs_to_bdfs(result, current_bdfs, macs_buffer)
 
+    return result
+
+
+def _assign_macs_to_bdfs(result: Dict[str, List[dict]], bdfs: List[str], macs: List[str]) -> Dict[str, List[dict]]:
+    """
+    Evenly distribute MACs across BDFs. func numbering starts from 0 per BDF.
+    """
+    n_bdfs = len(bdfs)
+    for idx, mac in enumerate(macs):
+        bdf_idx = idx % n_bdfs
+        func_idx = idx // n_bdfs
+        root_bdf = bdfs[bdf_idx]
+        base = root_bdf[:-1]
+        full_bdf = f"{base}{func_idx}"
+        result[root_bdf].append({
+            "bdf": full_bdf,
+            "mac": mac
+        })
     return result
 
 
@@ -453,16 +501,17 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
     nics = parse_nics_info(pci_res)
 
     # FRU info
-    part_num_cmd = 'yuncli fw --fru_info |grep -E "BDF:|Product Part Number|Product Serial"'
-    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
+    part_num_cmd = 'yuncli fw --fru_info |grep -E "Multihost BDFs:|BDF:|Product Part Number|Product Serial"'
+    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password)
     partnums = parse_bdf_partnum(part_num_res)
 
     # MAC info
-    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
+    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password)
     macs = parse_bdf_mac(mac_res)
 
     # Build nics_list
-    nics_list = []
+    nics_map: dict[str, dict] = {}
+
     for root_bdf, funcs in macs.items():
         part_info = partnums.get(root_bdf, {})
         pn = part_info.get("pn", "")
@@ -471,14 +520,17 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
 
         nic_info_list = [{"bdf": f["bdf"], "mac": f["mac"]} for f in funcs]
 
-        nics_list.append({
-            "sn": sn,
-            "type": nic_type,
-            "nic_info": nic_info_list
-        })
+        if sn in nics_map:
+            # SN 已存在，则合并 nic_info
+            nics_map[sn]["nic_info"].extend(nic_info_list)
+        else:
+            # 新 SN，创建条目
+            nics_map[sn] = {
+                "sn": sn,
+                "type": nic_type,
+                "nic_info": nic_info_list
+            }
 
-    # Merge with existing nics by sn
-    nics_map = {nic["sn"]: nic for nic in nics_list}
     merged = [nics_map.get(nic.get("sn"), nic) for nic in nics]
     # Add nics_list entries not in nics
     existing_sn = {nic.get("sn") for nic in nics}
@@ -511,7 +563,6 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
                     info["iface"] = iface
 
     return merged
-
 
 
 async def update_automatic_async(ip, user, password):

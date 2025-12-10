@@ -1221,11 +1221,6 @@ const formatNicTypeForDisplay = (type: string | undefined): string => {
   
   const typeLower = type.toLowerCase()
   
-  // 特殊处理：metaScale-200 OCP3.0 -> MS200-OCP
-  if (typeLower.includes('metascale-200') && typeLower.includes('ocp3.0')) {
-    return 'MS200-OCP'
-  }
-  
   // 其他类型按原样显示
   return type
 }
