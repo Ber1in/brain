@@ -24,6 +24,39 @@ COMMON_USER_PASSWORD = "Test.999"
 COMMON_SERVER = "10.0.3.248"
 TASK_POOL_COLLECTION = "tasks"
 db = SQLiteDocumentDB()
+PRODUCT_PART_NUMBER_DICT = {
+    "90-0001-02": "MF200",
+    "90-0002-02": "MC200",
+    "90-0003-02": "MF50-019",
+    "90-0004-02": "MC50-019",
+    "90-0005-02": "MF50-023",
+    "90-0006-02": "MC50-023",
+    "90-0007-01": "Andes EVB",
+    "90-0008-01": "MV200",
+    "90-0009-01": "MS200-FHHL",
+    "90-0010-01": "MC100",
+    "90-0011-01": "MS200-HHHL",
+    "90-0012-01": "MS50",
+    "90-0013-01": "MS200s",
+    "90-0014-01": "MS200 OCP3.0",
+    "90-0015-01": "MS200_V2.0",
+    "90-0016-01": "MS200s_V2.0",
+    "90-0017-01": "PCIe Socket Direct card",
+    "90-0018-01": "MS100s OCP3.0",
+    "90-0019-01": "NCSI test card",
+    "90-0020-01": "MC400s-浪潮版本",
+    "90-0020-02": "MC400s-字节版本",
+    "90-0021-01": "OCP3.0 test card",
+    "90-0022-01": "MS200 OCP3.0_V2.0",
+    "90-0023-01": "MS100s OCP3.0_V2.0",
+    "90-0024-01": "MS200s-SL",
+    "90-0025-01": "MC400s-SL",
+    "90-0027-01": "MC400S-GA",
+    "90-0026-01": "MF200-Multi-Host",
+    "90-0028-01": "MS400",
+    "90-0029-01": "MC400S-Verdi",
+    "90-0030-01": "MC400-Verdi"
+}
 
 
 async def ensure_packages_installed(host: str, user: str, pwd: str, packages: list):
@@ -101,7 +134,7 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
 
     ensure_repo
     ensure_packages
-    """ # noqa
+    """  # noqa
 
     LOG.info(f"Ensuring repo and packages on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
@@ -172,6 +205,42 @@ def parse_nics_info(output: str) -> List[Dict[str, str]]:
     return result
 
 
+def parse_bdf_partnum(output: str) -> dict:
+    """
+    Parse BDF and Product Part Number pairs from yuncli fw --fru_info output,
+    and remove PCI domain (the first 4 hex digits).
+
+    Example:
+        BDF:0000:31:00.0:  -> 31:00.0
+    """
+    result = {}
+    current_bdf = None
+
+    for line in output.splitlines():
+        line = line.strip()
+
+        # Detect BDF line
+        if line.startswith("BDF:") and line.endswith(":"):
+            raw_bdf = line.replace("BDF:", "").rstrip(":")  # 0000:31:00.0
+            # Remove domain (first segment)
+            # 0000:31:00.0 → ["0000","31","00.0"] → join from index 1
+            parts = raw_bdf.split(":")
+            if len(parts) == 3:
+                current_bdf = ":".join(parts[1:])  # 31:00.0
+            else:
+                current_bdf = raw_bdf  # fallback
+            continue
+
+        # Detect Product Part Number
+        if "Product Part Number" in line and ":" in line:
+            if current_bdf:
+                part_num = line.split(":", 1)[1].strip()
+                result[current_bdf] = part_num
+                current_bdf = None
+
+    return result
+
+
 def parse_bdf_mac(output: str) -> Dict[str, str]:
     """
     Parse `yuncli mac -r` output into {bdf_with_func: mac}
@@ -207,9 +276,9 @@ def parse_bdf_mac(output: str) -> Dict[str, str]:
 
 
 async def get_boot_entries(host_ip, user, pwd):
-    efiboot_output = ssh_execute_async(host_ip, "efibootmgr -v", user, pwd).splitlines()
-    lsblk_output = ssh_execute_async(
-        host_ip, "lsblk -rno NAME,PKNAME,PARTUUID", user, pwd).splitlines()
+    efiboot_output = (await ssh_execute_async(host_ip, "efibootmgr -v", user, pwd)).splitlines()
+    lsblk_output = (await ssh_execute_async(
+        host_ip, "lsblk -rno NAME,PKNAME,PARTUUID", user, pwd)).splitlines()
 
     uuid_to_disk = {}
     for line in lsblk_output:
@@ -314,6 +383,10 @@ async def update_automatic_async(ip, user, password):
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     nics = parse_nics_info(pci_res)
 
+    part_num_cmd = ('yuncli fw --fru_info |grep -E "BDF:|Product Part Number"')
+    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
+    partnums = parse_bdf_partnum(part_num_res)
+
     mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
 
     macs = parse_bdf_mac(mac_res)
@@ -344,6 +417,11 @@ async def update_automatic_async(ip, user, password):
 
     for nic in nics:
         for info in nic["nic_info"]:
+            partnum =  partnums.get(info["bdf"])
+            if partnum:
+                alias = PRODUCT_PART_NUMBER_DICT.get(partnum)
+                if alias:
+                    nic["type"] = alias
             mac = macs.get(info["bdf"])
             if not mac:
                 continue
