@@ -226,7 +226,7 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
     Strips PCI domain (first 4 hex digits) to get e.g., "87:00.0".
     """
     result: Dict[str, Dict[str, str]] = {}
-    current_bdfs = []
+    current_bdfs: list[str] = []
 
     for line in output.splitlines():
         line = line.strip()
@@ -277,6 +277,7 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
             continue
 
     return result
+
 
 
 def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
@@ -501,7 +502,7 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
     nics = parse_nics_info(pci_res)
 
     # FRU info
-    part_num_cmd = 'yuncli fw --fru_info |grep -E "Multihost BDFs:|BDF:|Product Part Number|Product Serial"'
+    part_num_cmd = 'yuncli fw --fru_info'
     part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password)
     partnums = parse_bdf_partnum(part_num_res)
 
