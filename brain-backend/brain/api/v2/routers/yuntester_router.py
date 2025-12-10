@@ -416,7 +416,7 @@ async def cancel_task(task_id: str):
     if task.get("cancel", 0) == 1:
         return {"message": "Task already requested to cancel", "task_id": task_id}
 
-    db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, {"cancel": True})
+    db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, {"cancel": 1})
     LOG.info(f"Cancel requested for task {task_id}")
     return {"message": "Task cancellation requested", "task_id": task_id}
 
