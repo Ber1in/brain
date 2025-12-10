@@ -14,7 +14,7 @@ from brain.auth import authenticate_user
 from brain.api.v1.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
 from brain.utils.get_client import get_dpuagentclient
-from brain.utils.ssh_client import ssh_execute
+from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -107,7 +107,8 @@ async def create_mv_server(server_data: mv200_schemas.MVServerCreate):
         #     server_dict["recovery_mode"] = res.mode
         #     LOG.info(f"Recovery mode from SOC {server_data.ip_address}: "
         #              f"{res.mode}")
-        res = ssh_execute(server_data.ip_address, "cat /opt/dpuagent/mode", "root", "yunsilicon")
+        res = await ssh_execute_async(server_data.ip_address, 
+                                      "cat /opt/dpuagent/mode", "root", "yunsilicon")
         server_dict["recovery_mode"] = res.strip()
     except Exception as e:
         LOG.error(f"Failed to get recovery mode for {server_data.ip_address}, error: {e}")
@@ -169,7 +170,8 @@ async def get_mv_server(server_id: str):
         #     server["recovery_mode"] = res.mode.value
         #     LOG.info(f"Recovery mode for SOC {server['ip_address']}: "
         #              f"{res.mode}")
-        res = ssh_execute(server['ip_address'], "cat /opt/dpuagent/mode", "root", "yunsilicon")
+        res = await ssh_execute_async(server['ip_address'],
+                                      "cat /opt/dpuagent/mode", "root", "yunsilicon")
         server["recovery_mode"] = res.strip()
         versionapi = dpuagentApi.VersionApi(dpuagentclient)
         res = versionapi.get_version_dpu_agent_v1_version_get()

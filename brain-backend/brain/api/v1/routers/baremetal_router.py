@@ -237,7 +237,7 @@ async def get_boot_entries(
         credentials_pwd = pwd
 
     LOG.info(f"Retrieving boot entries from server {server_id} ({host_ip})")
-    entries, current_boot, next_boot, default_boot = common_utils.get_boot_entries(
+    entries, current_boot, next_boot, default_boot = await common_utils.get_boot_entries(
         host_ip, credentials_user, credentials_pwd)
 
     LOG.info(f"Found {len(entries)} boot entries for server {server_id}")

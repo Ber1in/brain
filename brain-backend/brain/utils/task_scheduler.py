@@ -12,9 +12,10 @@ import asyncio
 from datetime import datetime
 import logging
 from typing import Dict, Callable
+from fastapi import HTTPException
 
 from brain.json_db import SQLiteDocumentDB
-from brain.utils.ssh_client import ssh_execute
+from brain.utils.ssh_client import ssh_execute_async
 from brain.config import settings
 
 db = SQLiteDocumentDB()
@@ -174,7 +175,12 @@ echo "--------------------------------------------------------------------------
 # WARNING_MESSAGE_END
 EOF
 '''
-    ssh_execute(ip, init_command, user, pwd)
+    try:
+        await ssh_execute_async(ip, init_command, user, pwd, False)
+    except HTTPException as e:
+        if e.status_code == 503:
+            LOG.warning(
+                f"The server {ip} is offline and the init_warning process has not been completed")
 
 
 async def occupy_warning(ip, ssh_user, ssh_pass, occupy_user, end_time):
@@ -203,7 +209,12 @@ echo "================================================"
 # WARNING_MESSAGE_END
 EOF
 '''
-    ssh_execute(ip, command, ssh_user, ssh_pass)
+    try:
+        await ssh_execute_async(ip, command, ssh_user, ssh_pass, False)
+    except HTTPException as e:
+        if e.status_code == 503:
+            LOG.warning(f"The server {ip} is offline and the occupy_warning"
+                        " process has not been completed")
 
 
 async def init_server_warning(device_id: str, now=False):
@@ -359,7 +370,7 @@ async def send_feishu_group_message(server_info, now=False):
         def send_feishu(webhook: str, payload: dict, action: str) -> bool:
             headers = {'Content-Type': 'application/json'}
             try:
-                resp = requests.post(webhook, headers=headers, data=json.dumps(payload))
+                resp = requests.post(webhook, headers=headers, data=json.dumps(payload), timeout=15)
             except Exception as e:
                 LOG.error(f"Feishu request error: {e}")
                 return False

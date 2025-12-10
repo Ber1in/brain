@@ -13,7 +13,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from brain.json_db import SQLiteDocumentDB
-from brain.utils.ssh_client import ssh_execute, ssh_execute_async
+from brain.utils.ssh_client import ssh_execute_async
 from brain.api.v2.schemas import common_schemas
 
 LOG = logging.getLogger(__name__)
@@ -206,9 +206,9 @@ def parse_bdf_mac(output: str) -> Dict[str, str]:
     return result
 
 
-def get_boot_entries(host_ip, user, pwd):
-    efiboot_output = ssh_execute(host_ip, "efibootmgr -v", user, pwd).splitlines()
-    lsblk_output = ssh_execute(
+async def get_boot_entries(host_ip, user, pwd):
+    efiboot_output = ssh_execute_async(host_ip, "efibootmgr -v", user, pwd).splitlines()
+    lsblk_output = ssh_execute_async(
         host_ip, "lsblk -rno NAME,PKNAME,PARTUUID", user, pwd).splitlines()
 
     uuid_to_disk = {}
@@ -296,7 +296,7 @@ def ipmi_power_action(bmcip: str, action: str):
 
 
 async def update_automatic_async(ip, user, password):
-    server_sn = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_serial", user, password)
+    server_sn = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_serial", user, password, False)
     server_vendor = await ssh_execute_async(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
     server_product = await ssh_execute_async(
         ip, "cat /sys/class/dmi/id/product_name", user, password)
@@ -314,11 +314,7 @@ async def update_automatic_async(ip, user, password):
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     nics = parse_nics_info(pci_res)
 
-    try:
-        mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password)
-    except Exception as e:
-        LOG.warning(f"failed to retrieve MAC information, error: {e}")
-        mac_res = ""
+    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
 
     macs = parse_bdf_mac(mac_res)
 

@@ -372,7 +372,7 @@ async def get_boot_entries(server_id: str):
             status_code=400, detail="No saved OS credentials found for this server")
 
     LOG.info(f"Retrieving boot entries from server {server_id} ({server['device']['ip']})")
-    entries, current_boot, next_boot, default_boot = common_utils.get_boot_entries(
+    entries, current_boot, next_boot, default_boot = await common_utils.get_boot_entries(
         server["device"]["ip"], credentials_user, credentials_pwd)
 
     LOG.info(f"Found {len(entries)} boot entries for server {server_id}")
