@@ -305,8 +305,14 @@ async def get_nics(
             nic_infos.extend(d["nic_info"])
 
         if vendor_id.lower() == "1f67":
-            product_info = product_infos.get(dev_list[0]["bdf"])
-            prod_name = PRODUCT_PART_NUMBER_DICT.get(product_info["pn"], product_info["pn"]) if product_info else prod_name_key
+            for dev in dev_list:
+                product_info = product_infos.get(dev["bdf"])
+                if product_info:
+                    prod_name = PRODUCT_PART_NUMBER_DICT.get(product_info["pn"], product_info["pn"])
+                    sn_key = product_info.get("sn")
+                    break
+            else:
+                prod_name = prod_name_key
         elif vendor_id.lower() == "15b3":
             prod_name = simplify_mlx_product_name(dev_list[0].get("Product Name", prod_name_key))
         else:
