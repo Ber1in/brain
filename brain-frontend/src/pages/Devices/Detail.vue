@@ -14,15 +14,6 @@
             >
               {{ isFollowing ? '已关注' : '关注' }}
             </el-button>
-            <el-button 
-              type="warning" 
-              @click="handleRefresh" 
-              :loading="refreshing"
-              :disabled="refreshing"
-            >
-              <el-icon><Refresh /></el-icon>
-              {{ refreshing ? '更新中...' : '更新信息' }}
-            </el-button>
             <!-- 操作下拉框 -->
             <el-dropdown @command="(command) => handleCommand(command)" size="small">
               <el-button type="primary">
