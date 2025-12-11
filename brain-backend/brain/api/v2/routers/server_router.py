@@ -4,7 +4,7 @@
 import asyncio
 from datetime import datetime
 import re
-from typing import List, Union
+from typing import Dict, List, Union
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 import logging
@@ -225,7 +225,8 @@ async def update_device(
 
     db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-    LOG.info(f"Device updated, server: {server['device']['ip']}, user: {user}, time: {server.get('time', 0)}")
+    LOG.info(
+        f"Device updated, server: {server['device']['ip']}, user: {user}, time: {server.get('time', 0)}")
     return server
 
 
@@ -380,6 +381,40 @@ async def get_boot_entries(server_id: str):
         "next": next_boot,
         "default": default_boot
     }
+
+
+@router.get("/servers/{server_id}/grub", summary="Get parsed GRUB configuration", response_model=Dict[str, str])
+async def get_grub_config(server_id: str):
+    """
+    Return parsed GRUB configuration.
+    """
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.warning(f"Server {server_id} not found")
+        raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
+
+    host = server["device"]["ip"]
+    user = server["device"]["username"]
+    pwd = server["device"]["password"]
+
+    cmd = "cat /etc/default/grub"
+    raw_output = await ssh_execute_async(host, cmd, user, pwd)
+    config = {}
+    for line in raw_output.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        value = value.strip().strip('"').strip("'")
+        config[key.strip()] = value
+
+    return config
 
 
 @router.post("/servers/{server_id}/set-boot")

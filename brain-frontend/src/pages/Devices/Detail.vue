@@ -153,6 +153,27 @@
           <span v-else>-</span>
         </el-descriptions-item>
 
+        <!-- Grub配置信息 -->
+        <el-descriptions-item label="Grub配置" :span="2">
+          <div v-if="grubConfigLoading" class="loading-text">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            查询Grub配置中...
+          </div>
+          <div v-else-if="grubConfigData && Object.keys(grubConfigData).length > 0" class="grub-config-container">
+            <div class="grub-config-table">
+              <table class="compact-grub-table">
+                <tbody>
+                  <tr v-for="(value, key) in grubConfigData" :key="key">
+                    <td class="grub-key">{{ key }}</td>
+                    <td class="grub-value">{{ value }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <span v-else>-</span>
+        </el-descriptions-item>
+
         <!-- 标签 -->
         <el-descriptions-item label="标签" :span="2">
           <div v-if="deviceData.tags && deviceData.tags.length > 0">
@@ -662,6 +683,9 @@ const bootEntriesLoading = ref(false)
 const bootEntriesData = ref<BootEntriesResponse | null>(null)
 const allMv200s = ref<MVServer[]>([])
 
+const grubConfigLoading = ref(false)
+const grubConfigData = ref<Record<string, string> | null>(null)
+
 // 网卡信息相关状态
 const nicsLoading = ref(false)
 const nicsData = ref<NicResponse | null>(null)
@@ -702,6 +726,21 @@ const deviceData = ref<ServerDetailResponse>({
 
 // 关注相关
 const followLoading = ref(false)
+
+// 添加加载Grub配置的方法
+const loadGrubConfig = async () => {
+  try {
+    grubConfigLoading.value = true
+    const data = await deviceApi.getGrubConfig(deviceId.value)
+    grubConfigData.value = data
+  } catch (error) {
+    console.error('加载Grub配置失败:', error)
+    grubConfigData.value = null
+    // 不显示错误信息，因为Grub配置不是必须的
+  } finally {
+    grubConfigLoading.value = false
+  }
+}
 
 // 计算当前用户是否已关注
 const isFollowing = computed(() => {
@@ -1265,11 +1304,12 @@ const loadDeviceDetail = async () => {
     
     deviceData.value = { ...data }
     
-    // 同时加载启动项信息、MV200数据和网卡信息
+    // 同时加载启动项信息、MV200数据、网卡信息和Grub配置
     await Promise.all([
       loadBootEntries(),
       loadAllMv200s(),
-      loadNics()
+      loadNics(),
+      loadGrubConfig()  // 添加这行
     ])
   } catch (error) {
     ElMessage.error('加载服务器详情失败')
@@ -1930,6 +1970,57 @@ onMounted(() => {
   font-family: 'Monaco', 'Consolas', monospace;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.grub-config-container {
+  margin-top: 4px;
+}
+
+.grub-config-table {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.compact-grub-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.compact-grub-table tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s ease;
+}
+
+.compact-grub-table tr:last-child {
+  border-bottom: none;
+}
+
+.compact-grub-table tr:hover {
+  background-color: #f1f5f9;
+}
+
+.compact-grub-table td {
+  padding: 6px 8px;
+  line-height: 1.4;
+  vertical-align: top;
+}
+
+.grub-key {
+  color: #3b82f6;
+  font-weight: 500;
+  min-width: 150px;
+  width: 20%;
+  border-right: 1px solid #e5e7eb;
+  background-color: #f0f9ff;
+}
+
+.grub-value {
+  color: #1f2937;
+  word-break: break-all;
 }
 
 /* 响应式设计 */

@@ -256,6 +256,8 @@ export interface DeviceResponse {
   cpu_mode?: string
 }
 
+export type GrubConfig = Record<string, string>
+
 export interface NicInfo {
   mac?: string
   bdf?: string
