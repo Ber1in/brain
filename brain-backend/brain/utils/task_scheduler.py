@@ -336,7 +336,7 @@ async def send_feishu_group_message(server_info, now=False):
                         "text": {
                             "tag": "lark_md",
                             "content": (
-                                f"**关注人数:** 👥 {len(server_info.get('recipients', []))}人"
+                                f"**关注人:** 👥 {server_info.get('recipients', [])}人"
                             )
                         }
                     },
@@ -574,7 +574,7 @@ async def create_server_reminder_email(server_info, current_recipient, now=False
             <div class="footer">
                 <p>此邮件由系统自动发送，请勿直接回复</p>
                 <p>发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-                <p>收件人: {current_recipient} | 总关注人数: {len(server_info.get('recipients', []))}</p>
+                <p>收件人: {current_recipient} | 关注人: {server_info.get('recipients', [])}</p>
                 <p>如有问题，请联系系统管理员</p>
             </div>
         </div>
