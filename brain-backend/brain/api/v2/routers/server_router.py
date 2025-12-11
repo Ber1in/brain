@@ -149,6 +149,7 @@ async def delete_device(device_id: str):
 
 @router.get("/servers", response_model=list[server_schemas.ServerDetailResponse])
 async def get_all_devices():
+    LOG.info(f"Fetching all servers.")
     devices = db.find(SERVER_COLLECTION, {})
     for i in devices:
         if i["time"]:
@@ -157,7 +158,7 @@ async def get_all_devices():
             passed = int(now - start)
             remaining = i["time"] - passed
             i["time"] = max(remaining, 0)
-    LOG.info(f"Total devices fetched: {len(devices)}")
+    LOG.info(f"Total servers fetched: {len(devices)}")
     return devices
 
 
