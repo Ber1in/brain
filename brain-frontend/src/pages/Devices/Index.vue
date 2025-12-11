@@ -369,10 +369,19 @@
                   <el-dropdown-item 
                     command="updateMcr" 
                     class="dropdown-item update-mcr-item"
+                    :disabled="isMcrTaskRunning(row)"
                     @click="handleUpdateMcrDialog(row)"
                   >
                     <el-icon><Upload /></el-icon>
                     <span>更新MCR包</span>
+                    <el-tooltip 
+                      v-if="isMcrTaskRunning(row)"
+                      effect="dark" 
+                      content="该服务器MCR包更新任务正在进行中"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
                   </el-dropdown-item>
                   
                   <!-- 占用服务器按钮 -->
@@ -1746,7 +1755,14 @@ const getFileName = (filePath: string) => {
 }
 
 // 方法：处理更新MCR包对话框
+// 处理更新MCR包对话框
 const handleUpdateMcrDialog = async (device: ServerDetailResponse) => {
+  // 检查是否有正在运行的MCR任务
+  if (isMcrTaskRunning(device)) {
+    ElMessage.warning('该服务器MCR包更新任务正在进行中，请等待任务完成后再操作')
+    return
+  }
+  
   currentDevice.value = device
   currentPath.value = '/auto/asic-dump/meta_release'
   selectedMcrFile.value = ''
@@ -2294,6 +2310,15 @@ const bootEntriesList = computed(() => {
 
   return result
 })
+
+const isMcrTaskRunning = (device: ServerDetailResponse): boolean => {
+  if (!device.task_id) return false
+  
+  const taskStatus = taskStatusMap.value[device.task_id]
+  if (!taskStatus) return false
+  
+  return taskStatus.status === 'running' || taskStatus.status === 'pending'
+}
 
 // 加载启动项信息
 const loadBootEntries = async (deviceId: string) => {
@@ -3584,6 +3609,20 @@ onMounted(() => {
 }
 
 /* 更新MCR包按钮样式 */
+:deep(.update-mcr-item.is-disabled) {
+  color: #c0c4cc !important;
+  cursor: not-allowed !important;
+}
+
+:deep(.update-mcr-item.is-disabled .el-icon) {
+  color: #c0c4cc !important;
+}
+
+:deep(.update-mcr-item.is-disabled:hover) {
+  background-color: transparent !important;
+  color: #c0c4cc !important;
+}
+
 :deep(.update-mcr-item:not(.is-disabled)) {
   color: #7239ea !important;
 }
