@@ -486,7 +486,7 @@ async def collect_device_info(ip, user, password):
     }
 
 
-async def collect_nic_info(ip: str, user: str, password: str) -> list:
+async def collect_nic_info(ip: str, user: str, password: str, check=True) -> list:
     """
     Collect NIC info from remote server.
     - Parse PCI info
@@ -504,11 +504,11 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
 
     # FRU info
     part_num_cmd = 'yuncli fw --fru_info'
-    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password)
+    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, check)
     partnums = parse_bdf_partnum(part_num_res)
 
     # MAC info
-    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password)
+    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, check)
     macs = parse_bdf_mac(mac_res)
 
     # Build nics_list
@@ -569,7 +569,7 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
 
 async def update_automatic_async(ip, user, password):
     device_info = await collect_device_info(ip, user, password)
-    nics = await collect_nic_info(ip, user, password)
+    nics = await collect_nic_info(ip, user, password, False)
     return device_info, nics
 
 
