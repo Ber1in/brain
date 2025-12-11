@@ -243,12 +243,15 @@ async def get_nics(
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     pci_list = [pci.strip() for pci in pci_res.splitlines() if pci.strip()]
 
-    # 云脉网卡获取 fru_info
     product_infos = {}
+    macs = []
     if vendor_id.lower() == "1f67":
         part_num_cmd = 'yuncli fw --fru_info'
         part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
         product_infos = parse_bdf_partnum(part_num_res)
+
+        mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
+        macs = parse_bdf_mac(mac_res)
 
     devices = []
 
@@ -265,18 +268,23 @@ async def get_nics(
                 current["Serial number"] = line.split(":")[-1].strip()
 
         iface_cmd = f"basename $(readlink -f /sys/bus/pci/devices/0000:{pci}/net/* 2>/dev/null)"
-        iface_res = await ssh_execute_async(ip, iface_cmd, user, password)
+        iface_res = await ssh_execute_async(ip, iface_cmd, user, password, False)
         iface_list = [iface.strip() for iface in iface_res.splitlines() if iface.strip()]
 
-        nic_info = [
-            {
+        nic_info = []
+
+        if iface_list:
+            for iface in iface_list:
+                mac_cmd = f"cat /sys/class/net/{iface}/address"
+                mac = (await ssh_execute_async(ip, mac_cmd, user, password)).strip()
+                nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
+        elif vendor_id.lower() == "1f67":
+            mac_entry = next((m for m in macs if m["bdf"] == pci), None)
+            nic_info.append({
                 "bdf": pci,
-                "iface": iface,
-                "mac": (await ssh_execute_async(
-                    ip, f"cat /sys/class/net/{iface}/address", user, password)).strip()
-            }
-            for iface in iface_list
-        ]
+                "iface": "",
+                "mac": mac_entry["mac"] if mac_entry else ""
+            })
 
         if nic_info:
             devices.append({**current, "nic_info": nic_info})
@@ -377,15 +385,15 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
     return result
 
 
-def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
+def parse_bdf_mac(output: str) -> List[dict]:
     """
-    Parse `yuncli mac -r` output into {root_bdf: [{"bdf": bdf_with_func, "mac": mac}, ...]}.
+    Parse `yuncli mac -r` output into a list of dicts: [{"bdf": bdf_with_func, "mac": mac}, ...].
     Supports:
       - Single BDF:  BDF:0000:87:00.0:
       - Multiple BDFs: Multihost BDFs:0000:41:00.0,0000:c1:00.0:
     For Multihost BDFs, MACs are evenly distributed across BDFs.
     """
-    result: Dict[str, List[dict]] = {}
+    result: List[dict] = []
     current_bdfs: List[str] = []
     macs_buffer: List[str] = []
 
@@ -399,19 +407,18 @@ def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
         if m_single:
             # flush previous buffer if any
             if current_bdfs and macs_buffer:
-                result = _assign_macs_to_bdfs(result, current_bdfs, macs_buffer)
+                result.extend(_assign_macs_to_bdfs(current_bdfs, macs_buffer))
             raw = m_single.group(1)
             if raw.startswith("0000:"):
                 raw = raw[5:]
             current_bdfs = [raw]
-            result.setdefault(raw, [])
             macs_buffer = []
             continue
 
         # 2. Detect multiple BDFs (Multihost)
         if line.startswith("Multihost BDFs:") and line.endswith(":"):
             if current_bdfs and macs_buffer:
-                result = _assign_macs_to_bdfs(result, current_bdfs, macs_buffer)
+                result.extend(_assign_macs_to_bdfs(current_bdfs, macs_buffer))
             raw = line.replace("Multihost BDFs:", "").rstrip(":")
             bdfs = []
             for r in raw.split(","):
@@ -419,7 +426,6 @@ def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
                 if r.startswith("0000:"):
                     r = r[5:]
                 bdfs.append(r)
-                result.setdefault(r, [])
             current_bdfs = bdfs
             macs_buffer = []
             continue
@@ -435,17 +441,17 @@ def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
 
     # flush remaining buffer
     if current_bdfs and macs_buffer:
-        result = _assign_macs_to_bdfs(result, current_bdfs, macs_buffer)
+        result.extend(_assign_macs_to_bdfs(current_bdfs, macs_buffer))
 
     return result
 
 
-def _assign_macs_to_bdfs(result: Dict[str, List[dict]], 
-                         bdfs: List[str], 
-                         macs: List[str]) -> Dict[str, List[dict]]:
+def _assign_macs_to_bdfs(bdfs: List[str], macs: List[str]) -> List[dict]:
     """
     Evenly distribute MACs across BDFs. func numbering starts from 0 per BDF.
+    Returns a flat list of dicts: [{"bdf": ..., "mac": ...}, ...]
     """
+    assigned: List[dict] = []
     n_bdfs = len(bdfs)
     for idx, mac in enumerate(macs):
         bdf_idx = idx % n_bdfs
@@ -453,11 +459,11 @@ def _assign_macs_to_bdfs(result: Dict[str, List[dict]],
         root_bdf = bdfs[bdf_idx]
         base = root_bdf[:-1]
         full_bdf = f"{base}{func_idx}"
-        result[root_bdf].append({
+        assigned.append({
             "bdf": full_bdf,
             "mac": mac
         })
-    return result
+    return assigned
 
 
 async def get_boot_entries(host_ip, user, pwd):
