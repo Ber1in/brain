@@ -336,7 +336,7 @@ async def send_feishu_group_message(server_info, now=False):
                         "text": {
                             "tag": "lark_md",
                             "content": (
-                                f"**关注人:** 👥 {server_info.get('recipients', [])}人"
+                                f"**关注人:** 👥 {server_info.get('recipients', [])}"
                             )
                         }
                     },
