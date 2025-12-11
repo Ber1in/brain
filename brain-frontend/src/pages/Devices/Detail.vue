@@ -821,31 +821,16 @@ const handleFollow = async () => {
   try {
     followLoading.value = true
     
-    const updateData = {
-      auto: false,
-      focus: !isFollowing.value, // true表示关注，false表示取消关注
-      device: {
-        ip: deviceData.value.device.ip,
-        username: deviceData.value.device.username,
-        password: '' // 密码不更新
-      },
-      bmc: {
-        hostname: deviceData.value.bmc.hostname,
-        ip: deviceData.value.bmc.ip
-      },
-      tags: deviceData.value.tags || [],
-      notes: deviceData.value.notes || '',
-      os_types: deviceData.value.os_types || []
-    }
+    const focus = !isFollowing.value // true 表示关注，false 表示取消关注
     
-    await deviceApi.update(deviceId.value, updateData)
+    await deviceApi.focusServer(deviceId.value, focus)
     
-    if (!isFollowing.value) {
+    if (focus) {
       // 关注成功
       ElMessage.success(`关注成功，将会接收到该服务器的占用释放提醒邮件`)
     } else {
       // 取消关注成功
-      ElMessage.success('取消关注, 不再接收该服务器的占用释放提醒邮件')
+      ElMessage.success('取消关注，不再接收该服务器的占用释放提醒邮件')
     }
     
     // 重新加载数据以更新关注状态
