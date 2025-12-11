@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 from uuid import uuid4
 from fastapi import HTTPException
 
@@ -24,9 +24,6 @@ COMMON_USER_PASSWORD = "Test.999"
 COMMON_SERVER = "10.0.3.248"
 TASK_POOL_COLLECTION = "tasks"
 db = SQLiteDocumentDB()
-MELLANOX_ALIAS = {
-    ""
-}
 PRODUCT_PART_NUMBER_DICT = {
     "90-0001-02": "MF200",
     "90-0002-02": "MC200",
@@ -236,25 +233,26 @@ async def get_nics(
     ip: str,
     user: str,
     password: str,
-    vendor_id: str,
-    simplify_func: Optional[Callable[[str], str]] = None
+    vendor_id: str
 ) -> List[Dict]:
     """
     Get NIC info from remote server, return in the same format as parse_nics_info.
     :param vendor_id: PCI vendor ID (e.g., '1f67' for Yunsilicon, '15b3' for Mellanox)
-    :param simplify_func: optional function to simplify product name
     """
     pci_cmd = f"lspci -n -d {vendor_id}: | awk '{{print $1}}'"
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
-    pci_list = pci_res.splitlines()
+    pci_list = [pci.strip() for pci in pci_res.splitlines() if pci.strip()]
+
+    # 云脉网卡获取 fru_info
+    product_infos = {}
+    if vendor_id.lower() == "1f67":
+        part_num_cmd = 'yuncli fw --fru_info'
+        part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
+        product_infos = parse_bdf_partnum(part_num_res)
 
     devices = []
 
     for pci in pci_list:
-        pci = pci.strip()
-        if not pci:
-            continue
-
         detail_cmd = f"lspci -vvv -s {pci}"
         detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
 
@@ -263,45 +261,51 @@ async def get_nics(
             line = line.strip()
             if line.startswith("Product Name:"):
                 current["Product Name"] = line.replace("Product Name:", "").strip()
-            elif "[PN]" in line and "Part number:" in line:
-                current["Part number"] = line.split(":")[-1].strip()
             elif "[SN]" in line and "Serial number:" in line:
                 current["Serial number"] = line.split(":")[-1].strip()
 
         iface_cmd = f"basename $(readlink -f /sys/bus/pci/devices/0000:{pci}/net/* 2>/dev/null)"
         iface_res = await ssh_execute_async(ip, iface_cmd, user, password)
-        iface_list = iface_res.splitlines()
+        iface_list = [iface.strip() for iface in iface_res.splitlines() if iface.strip()]
 
-        nic_info = []
-        for iface in iface_list:
-            iface = iface.strip()
-            if not iface:
-                continue
-            mac_cmd = f"cat /sys/class/net/{iface}/address"
-            mac_res = await ssh_execute_async(ip, mac_cmd, user, password)
-            mac = mac_res.strip()
-            nic_info.append({
+        nic_info = [
+            {
                 "bdf": pci,
                 "iface": iface,
-                "mac": mac
-            })
+                "mac": (await ssh_execute_async(
+                    ip, f"cat /sys/class/net/{iface}/address", user, password)).strip()
+            }
+            for iface in iface_list
+        ]
 
-        if all(k in current for k in ("Product Name", "Part number", "Serial number")):
+        if nic_info:
             devices.append({**current, "nic_info": nic_info})
 
     counter = defaultdict(list)
     for d in devices:
-        key = (d["Product Name"], d["Part number"], d["Serial number"])
-        counter[key].append(d)
+        sn = d.get("Serial number")
+        prod_name = d.get("Product Name", "")
+        if not sn and vendor_id.lower() == "1f67":
+            product_info = product_infos.get(d["bdf"])
+            if product_info:
+                sn = product_info["sn"]
+        if sn:
+            counter[(prod_name, sn)].append(d)
 
     result = []
     for key, dev_list in counter.items():
-        prod_name, part_num, sn = key
+        _, sn = key
         nic_infos = []
         for d in dev_list:
             nic_infos.extend(d["nic_info"])
-        if simplify_func:
-            prod_name = simplify_func(prod_name)
+
+        if vendor_id.lower() == "1f67":
+            product_info = product_infos.get(dev_list[0]["bdf"])
+            if product_info:
+                prod_name = PRODUCT_PART_NUMBER_DICT.get(product_info["pn"], product_info["pn"])
+        elif vendor_id.lower() == "15b3":
+            prod_name = simplify_mlx_product_name(dev_list[0].get("Product Name", ""))
+
         result.append({
             "sn": sn,
             "type": prod_name,
@@ -590,22 +594,9 @@ async def collect_nic_info(ip: str, user: str, password: str, check=True) -> lis
     - Parse MACs
     - Merge into unified structure with type/mac/iface
     """
-    yunsilicon_nics = await get_nics(ip, user, password, vendor_id="1f67")
-    # FRU info
-    part_num_cmd = 'yuncli fw --fru_info'
-    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, check)
-    partnums = parse_bdf_partnum(part_num_res)
-
-    for nic in yunsilicon_nics:
-        for interface in nic["nic_info"]:
-            part_info = partnums.get(interface["bdf"], {})
-            if part_info:
-                pn = part_info.get("pn", "")
-                nic["type"] = PRODUCT_PART_NUMBER_DICT.get(pn, "")
-
     merged = []
-    mellanox_nics = await get_nics(
-        ip, user, password, vendor_id="15b3", simplify_func=simplify_mlx_product_name)
+    yunsilicon_nics = await get_nics(ip, user, password, vendor_id="1f67")
+    mellanox_nics = await get_nics(ip, user, password, vendor_id="15b3")
     merged = yunsilicon_nics + mellanox_nics
     return merged
 
