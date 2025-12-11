@@ -14,6 +14,7 @@ SERVER_COLLECTION = "servers"
 TEST_CASE_COLLECTION = "test_cases"
 TEST_HISTORY_COLLECTION = "test_history"
 TASK_POOL_COLLECTION = "tasks"
+TASK_DIY_CONFIG = "users"
 
 
 class BaseDocumentDB(ABC):
@@ -319,6 +320,17 @@ class SQLiteDocumentDB:
             "timestamp": "",
             "mcr": "",
             "option": ""
+        },
+        TASK_DIY_CONFIG: {
+            "id": "",
+            "user": "",
+            "prefer_servers": {
+                "tags": [],
+                "tag_filtering_condition": "",
+                "nics": [],
+                "nic_filtering_condition": "",
+                "only_focus": 0
+            }
         }
     }
 

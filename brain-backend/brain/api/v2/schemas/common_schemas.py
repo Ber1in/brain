@@ -41,3 +41,11 @@ class ResetFwRequest(BaseModel):
 
 class MCRRequest(ResetFwRequest):
     update_options: str = Field("all")
+
+
+class FilteringConditions(BaseModel):
+    only_focus: int = 0
+    tags: List[str] = []
+    tag_filtering_condition: str = ""
+    nics: List[str] = []
+    nic_filtering_condition: str = ""

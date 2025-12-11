@@ -1107,8 +1107,8 @@ import {
   PriceTag
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import { remotefsApi, tagApi, tasksApi } from '@/api/common'
-import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse } from '@/types/api'
+import { remotefsApi, tagApi, tasksApi, filterApi } from '@/api/common'
+import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse, FilteringConditions } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -1182,6 +1182,67 @@ const currentPathInput = ref('')
 const taskStatusMap = ref<Record<string, TaskStatusResponse>>({})
 const taskStatusTimers = ref<Record<string, number>>({})
 
+// 过滤相关状态
+const filteringConditions = ref<FilteringConditions>({
+  only_focus: 0,
+  tags: [],
+  tag_filtering_condition: 'or',
+  nics: [],
+  nic_filtering_condition: 'or'
+})
+
+const loadingConditions = ref(false)
+
+// 加载用户保存的过滤条件
+const loadFilteringConditions = async () => {
+  try {
+    loadingConditions.value = true
+    const data = await filterApi.getFilteringConditions()
+    
+    // 更新本地状态
+    filteringConditions.value = {
+      only_focus: data.only_focus || 0,
+      tags: data.tags || [],
+      tag_filtering_condition: data.tag_filtering_condition || 'or',
+      nics: data.nics || [],
+      nic_filtering_condition: data.nic_filtering_condition || 'or'
+    }
+    
+    // 同步到UI状态
+    showOnlyFollowed.value = filteringConditions.value.only_focus === 1
+    tagFilter.value = filteringConditions.value.tags
+    nicTypeFilter.value = filteringConditions.value.nics
+    tagFilterLogic.value = filteringConditions.value.tag_filtering_condition.toUpperCase() as 'AND' | 'OR'
+    nicFilterLogic.value = filteringConditions.value.nic_filtering_condition.toUpperCase() as 'AND' | 'OR'
+    
+  } catch (error) {
+    console.error('加载过滤条件失败:', error)
+  } finally {
+    loadingConditions.value = false
+  }
+}
+
+// 保存过滤条件到后端
+const saveFilteringConditions = async () => {
+  try {
+    const data: FilteringConditions = {
+      only_focus: showOnlyFollowed.value ? 1 : 0,
+      tags: tagFilter.value,
+      tag_filtering_condition: tagFilterLogic.value.toLowerCase(),
+      nics: nicTypeFilter.value,
+      nic_filtering_condition: nicFilterLogic.value.toLowerCase()
+    }
+    
+    await filterApi.updateFilteringConditions(data)
+    filteringConditions.value = data
+    
+  } catch (error) {
+    console.error('保存过滤条件失败:', error)
+    ElMessage.error('保存过滤条件失败')
+  }
+}
+
+
 // 新增：计算所有网卡类型
 const allNicTypes = computed(() => {
   const types = new Set<string>()
@@ -1218,28 +1279,35 @@ const getTagCount = (tagName: string) => {
   ).length
 }
 
-// 新增：切换关注过滤
-const toggleFollowFilter = () => {
+// 切换关注过滤
+const toggleFollowFilter = async () => {
   showOnlyFollowed.value = !showOnlyFollowed.value
+  await saveFilteringConditions()
 }
 
-const applyNicTypeFilter = () => {
+const applyNicTypeFilter = async () => {
   showNicTypeFilter.value = false
+  await saveFilteringConditions()
 }
 
-// 新增：应用标签过滤
-const applyTagFilter = () => {
+// 修改现有方法：应用标签过滤并保存
+const applyTagFilter = async () => {
   showTagFilter.value = false
+  await saveFilteringConditions()
 }
 
 // 新增：清空网卡类型过滤
-const clearNicTypeFilter = () => {
+const clearNicTypeFilter = async () => {
   nicTypeFilter.value = []
+  showNicTypeFilter.value = false
+  await saveFilteringConditions()
 }
 
-// 新增：清空标签过滤
-const clearTagFilter = () => {
+// 修改现有方法：清空标签过滤并保存
+const clearTagFilter = async () => {
   tagFilter.value = []
+  showTagFilter.value = false
+  await saveFilteringConditions()
 }
 
 // MCR状态相关方法
@@ -3227,6 +3295,7 @@ const handleDelete = async (device: ServerDetailResponse) => {
 onMounted(() => {
   loadData()
   loadTags()
+  loadFilteringConditions()
 })
 </script>
 

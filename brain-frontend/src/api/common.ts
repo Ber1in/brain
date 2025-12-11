@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse, AppConfig } from '@/types/api'
+import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse, AppConfig, FilteringConditions } from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -41,5 +41,15 @@ export const settingsApi = {
   // Patch partial settings
   patchSettings(data: AppConfig): Promise<AppConfig> {
     return apiClient.patch('/api/settings', data)
+  }
+}
+
+export const filterApi = {
+  getFilteringConditions(): Promise<FilteringConditions> {
+    return apiClient.get(`/api/filtering_conditions`)
+  },
+
+  updateFilteringConditions(data: FilteringConditions): Promise<FilteringConditions> {
+    return apiClient.post('/api/filtering_conditions', data)
   }
 }

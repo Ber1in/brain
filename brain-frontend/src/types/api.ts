@@ -429,3 +429,11 @@ export interface AppConfig {
   admin_password: string;
   release_notices: ReleaseNotice[] | null;
 }
+
+export interface FilteringConditions {
+  only_focus: number;               // 0 or 1
+  tags: string[];
+  tag_filtering_condition: string;
+  nics: string[];
+  nic_filtering_condition: string;
+}

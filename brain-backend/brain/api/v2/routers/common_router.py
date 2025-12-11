@@ -20,6 +20,7 @@ LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 TAG_COLLERCTION = "tags"
 TASK_POOL_COLLECTION = "tasks"
+TASK_DIY_CONFIG = "users"
 db = SQLiteDocumentDB()
 COMMON_USER = "tester"
 COMMON_USER_PASSWORD = "Test.999"
@@ -120,3 +121,35 @@ async def patch_settings(data: AppConfig):
 
     reload_settings()
     return settings.dict()
+
+
+@router.post("/filtering_conditions", response_model=common_schemas.FilteringConditions)
+async def update_filter_conditions(data: common_schemas.FilteringConditions, 
+                                   user=Depends(authenticate_user)):
+    try:
+        user_info = db.find_one(TASK_DIY_CONFIG, {"user": user})
+    except Exception:
+        LOG.debug(f"User {user} has not customized server filtering conditions")
+        user_info = {
+            "id": str(uuid4()),
+            "user": user,
+            "prefer_servers": data.dict()
+        }
+        db.insert(TASK_DIY_CONFIG, user_info)
+    else:
+        user_info["prefer_servers"] = data.dict()
+        db.update(TASK_DIY_CONFIG, {"id": user_info["id"]}, user_info)
+
+    return data.dict()
+
+
+@router.get("/filtering_conditions", response_model=common_schemas.FilteringConditions)
+async def get_filter_conditions(user=Depends(authenticate_user)):
+    filter_conditions = {}
+    try:
+        user_info = db.find_one(TASK_DIY_CONFIG, {"user": user})
+        filter_conditions = user_info["prefer_servers"]
+    except Exception:
+        LOG.debug(f"User {user} has not customized server filtering conditions")
+
+    return filter_conditions
