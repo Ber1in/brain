@@ -928,7 +928,7 @@
                       size="small"
                     >
                       <el-icon><Loading /></el-icon>
-                      更新硬件信息中
+                      获取网卡信息中
                     </el-tag>
                     
                     <!-- 更新失败状态 -->
@@ -981,7 +981,7 @@
 >
                     <div class="nic-header">
                       <div class="nic-info">
-                        <span class="nic-type">{{ formatNicType(nic.type) || '未知类型' }}</span>
+                        <span class="nic-type">{{ nic.type || '未知类型' }}</span>
                         <span class="nic-sn">SN: {{ nic.sn || '未知SN' }}</span>
 
                         <el-tag 
@@ -2009,24 +2009,6 @@ const isNicSelected = (nic: any): boolean => {
   }
   
   return false
-}
-
-// 格式化网卡类型显示
-const formatNicType = (type: string | undefined): string => {
-  if (!type) return '未知类型'
-  
-  // 特殊处理metaScale-200 OCP3.0
-  if (type.toLowerCase().includes('metascale-200') && type.toLowerCase().includes('ocp3.0')) {
-    return 'MS200-OCP'
-  }
-  
-  // 其他类型
-  const parts = type.split('-')
-  if (parts.length > 0) {
-    return parts[0].toUpperCase()
-  }
-  
-  return type
 }
 
 const hasSkippedMv200Nics = (server: ServerDetailResponse): boolean => {
@@ -3693,7 +3675,7 @@ const validateAndMatchMv200Nics = async () => {
   }
 }
 
-// 修改更新状态为三种：true(更新中)、false(更新成功)、'failed'(更新失败)
+// 修改更新服务器硬件信息的方法，只获取网卡信息
 const updateAllServersHardwareInfo = async () => {
   // 重置更新状态
   serverUpdatingStatus.value = {}
@@ -3705,16 +3687,16 @@ const updateAllServersHardwareInfo = async () => {
     }
   })
   
-  // 并行更新所有服务器的硬件信息
+  // 并行更新所有服务器的网卡信息
   const updatePromises = availableServers.value.map(async (server) => {
     if (!server.id) return server
     
     try {
-      // 调用更新接口获取最新硬件信息
-      const updatedServer = await deviceApi.update(server.id, { auto: true })
+      // 调用新的接口获取网卡信息
+      const nics = await deviceApi.getNics(server.id)
       
-      // 更新服务器信息
-      Object.assign(server, updatedServer)
+      // 更新服务器的网卡信息
+      server.nics = nics
       
       // 确保网卡信息正确初始化
       if (server.nics) {
@@ -3735,8 +3717,8 @@ const updateAllServersHardwareInfo = async () => {
       
       return server
     } catch (error) {
-      console.error(`更新服务器 ${server.bmc.hostname} 硬件信息失败:`, error)
-      // 更新失败，保持禁用状态
+      console.error(`更新服务器 ${server.bmc?.hostname} 网卡信息失败:`, error)
+      // 更新失败
       serverUpdatingStatus.value[server.id] = 'failed'
       return server
     }
@@ -5180,12 +5162,9 @@ onUnmounted(() => {
 }
 
 .mv200-nic {
-  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-  border: 2px solid #ff9966;
 }
 
 .mv200-nic .nic-header {
-  background: rgba(255, 153, 102, 0.1);
 }
 
 .mv200-nic.unmatched {
