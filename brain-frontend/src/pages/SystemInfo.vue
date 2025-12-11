@@ -6,12 +6,28 @@
           <span>系统设置</span>
           <div class="header-actions">
             <el-button 
+              v-if="!isEditing"
+              type="primary" 
+              @click="startEditing" 
+              class="edit-btn"
+            >
+              修改设置
+            </el-button>
+            <el-button 
+              v-else
               type="primary" 
               @click="saveSettings" 
               :loading="saving"
               class="save-btn"
             >
               保存设置
+            </el-button>
+            <el-button 
+              v-if="isEditing"
+              @click="cancelEditing"
+              class="cancel-btn"
+            >
+              取消
             </el-button>
           </div>
         </div>
@@ -32,75 +48,69 @@
           <div class="reminder-config">
             <!-- SMTP配置 -->
             <div class="config-section">
-              <h4 class="subsection-header">邮件提醒配置</h4>
-              <el-form 
+            <h4 class="subsection-header">邮件提醒配置</h4>
+            <el-form 
                 :model="settingsForm" 
                 label-width="140px" 
                 class="compact-form"
                 ref="settingsFormRef"
-              >
+            >
                 <!-- SMTP主机 -->
                 <el-form-item 
-                  label="SMTP主机" 
-                  prop="smtp.host"
-                  :rules="[{ required: true, message: '请输入SMTP主机地址', trigger: 'blur' }]"
+                label="SMTP主机" 
+                prop="smtp.host"
                 >
-                  <el-input 
+                <el-input 
                     v-model="settingsForm.smtp.host" 
                     placeholder="smtp.example.com"
                     readonly
                     disabled
                     style="width: 300px;"
                     size="medium"
-                    >
+                >
                     <template #prefix>
-                        <el-icon><Connection /></el-icon>
+                    <el-icon><Connection /></el-icon>
                     </template>
-                  </el-input>
+                </el-input>
                 </el-form-item>
 
                 <!-- SMTP端口 -->
                 <el-form-item 
-                  label="SMTP端口" 
-                  prop="smtp.port"
-                  :rules="[
-                    { required: true, message: '请输入SMTP端口', trigger: 'blur' },
-                    { type: 'number', min: 1, max: 65535, message: '端口号必须在1-65535之间', trigger: 'blur' }
-                  ]"
+                label="SMTP端口" 
+                prop="smtp.port"
                 >
-                  <el-input-number
+                <el-input-number
                     v-model="settingsForm.smtp.port"
                     placeholder="端口号"
                     readonly
                     disabled
                     style="width: 200px;"
                     size="medium"
-                  />
-                  <div class="form-tip">
+                />
+                <div class="form-tip">
                     常用端口：587（TLS），465（SSL），25（不加密）
-                  </div>
+                </div>
                 </el-form-item>
 
                 <!-- SMTP用户名 -->
                 <el-form-item 
-                  label="SMTP用户名" 
-                  prop="smtp.user"
-                  :rules="[{ required: true, message: '请输入SMTP用户名', trigger: 'blur' }]"
+                label="SMTP用户名" 
+                prop="smtp.user"
                 >
-                  <el-input 
+                <el-input 
                     v-model="settingsForm.smtp.user"
                     placeholder="用户名"
                     readonly
                     disabled
                     style="width: 300px;"
                     size="medium"
-                  >
+                >
                     <template #prefix>
-                      <el-icon><User /></el-icon>
+                    <el-icon><User /></el-icon>
                     </template>
-                  </el-input>
+                </el-input>
                 </el-form-item>
-              </el-form>
+            </el-form>
             </div>
 
             <!-- 飞书群消息配置 -->
@@ -132,6 +142,8 @@
                       <el-input 
                         v-model="defaultWebhookId" 
                         placeholder="请输入群机器人ID"
+                        :readonly="!isEditing"
+                        :disabled="!isEditing"
                         clearable
                         style="width: 300px;"
                         size="medium"
@@ -176,6 +188,7 @@
                           <el-select
                             v-model="row.tag"
                             placeholder="请选择标签"
+                            :disabled="!isEditing"
                             clearable
                             filterable
                             style="width: 160px;"
@@ -214,6 +227,8 @@
                               <el-input 
                                 v-model="tagWebhookIds[$index]"
                                 placeholder="请输入群机器人ID"
+                                :readonly="!isEditing"
+                                :disabled="!isEditing"
                                 clearable
                                 style="width: 300px;"
                                 size="small"
@@ -225,7 +240,13 @@
                       </template>
                     </el-table-column>
                     
-                    <el-table-column label="操作" width="60" fixed="right" align="center">
+                    <el-table-column 
+                      v-if="isEditing"
+                      label="操作" 
+                      width="60" 
+                      fixed="right" 
+                      align="center"
+                    >
                       <template #default="{ $index }">
                         <el-button
                           type="danger"
@@ -240,15 +261,19 @@
                     </el-table-column>
                   </el-table>
                   
-                  <!-- 添加行按钮 -->
-                  <div class="add-row" @click="addReleaseNotice" v-if="hasMoreTagsAvailable">
+                  <!-- 添加行按钮 - 仅在编辑模式下显示 -->
+                  <div 
+                    v-if="isEditing && hasMoreTagsAvailable" 
+                    class="add-row" 
+                    @click="addReleaseNotice"
+                  >
                     <el-button type="text" class="add-row-btn">
                       <el-icon><Plus /></el-icon>
                       <span>添加自定义配置</span>
                     </el-button>
                   </div>
                   
-                  <div v-else class="no-more-tags">
+                  <div v-else-if="isEditing" class="no-more-tags">
                     <el-icon><InfoFilled /></el-icon>
                     <span>所有标签都已配置完毕</span>
                   </div>
@@ -281,6 +306,7 @@ const settingsFormRef = ref<FormInstance>()
 
 // 状态
 const saving = ref(false)
+const isEditing = ref(false)
 const originalSettings = ref<AppConfig | null>(null)
 const availableTags = ref<TagResponse[]>([])
 
@@ -290,6 +316,24 @@ const WEBHOOK_PREFIX = 'https://webhook.yunsilicon.com/open-apis/bot/v2/hook/'
 // 分离的Webhook ID
 const defaultWebhookId = ref('')
 const tagWebhookIds = ref<string[]>([])
+
+// 备份数据
+const backupSettings = reactive<AppConfig>({
+  default_webhook: '',
+  smtp: {
+    host: '',
+    port: 587,
+    user: '',
+    password: ''
+  },
+  yuntester_platform: '',
+  file_server: '',
+  platform_port: 0,
+  debug: false,
+  ldap_server: '',
+  admin_password: '',
+  release_notices: []
+})
 
 // 表单数据
 const settingsForm = reactive<AppConfig>({
@@ -396,9 +440,11 @@ const loadSettings = async () => {
     originalSettings.value = data
     
     // 只更新我们需要显示的字段，其他字段保持原值
-    settingsForm.default_webhook = data.default_webhook
-    settingsForm.smtp = { ...data.smtp }
-    settingsForm.release_notices = data.release_notices ? [...data.release_notices] : []
+    Object.assign(settingsForm, {
+      default_webhook: data.default_webhook,
+      smtp: { ...data.smtp },
+      release_notices: data.release_notices ? [...data.release_notices] : []
+    })
     
     // 确保release_notices不为null
     if (!settingsForm.release_notices) {
@@ -421,6 +467,27 @@ const loadSettings = async () => {
   } catch (error: any) {
     ElMessage.error('加载设置失败: ' + (error.response?.data?.detail || '网络错误'))
   }
+}
+
+// 开始编辑
+const startEditing = () => {
+  // 备份当前数据
+  Object.assign(backupSettings, JSON.parse(JSON.stringify(settingsForm)))
+  isEditing.value = true
+}
+
+// 取消编辑
+const cancelEditing = () => {
+  // 恢复备份的数据
+  Object.assign(settingsForm, JSON.parse(JSON.stringify(backupSettings)))
+  
+  // 重新提取ID
+  defaultWebhookId.value = extractWebhookId(settingsForm.default_webhook)
+  tagWebhookIds.value = settingsForm.release_notices 
+    ? settingsForm.release_notices.map(notice => extractWebhookId(notice.webhook))
+    : []
+  
+  isEditing.value = false
 }
 
 // 保存设置
@@ -449,6 +516,9 @@ const saveSettings = async () => {
     
     await settingsApi.patchSettings(submitData as AppConfig)
     ElMessage.success('设置保存成功')
+    
+    // 退出编辑模式
+    isEditing.value = false
     
     // 重新加载设置以获取更新后的数据
     await loadSettings()
@@ -494,7 +564,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -515,15 +584,36 @@ onMounted(() => {
   z-index: 1001;
 }
 
-.save-btn {
+.edit-btn {
   background-color: #409eff;
   border-color: #409eff;
   color: white;
 }
 
-.save-btn:hover {
+.edit-btn:hover {
   background-color: #337ecc;
   border-color: #337ecc;
+}
+
+.save-btn {
+  background-color: #67c23a;
+  border-color: #67c23a;
+  color: white;
+}
+
+.save-btn:hover {
+  background-color: #5ca935;
+  border-color: #5ca935;
+}
+
+.cancel-btn {
+  border-color: #c0c4cc;
+  color: #606266;
+}
+
+.cancel-btn:hover {
+  border-color: #909399;
+  color: #303133;
 }
 
 .settings-container {
@@ -659,6 +749,22 @@ onMounted(() => {
 
 .webhook-input.compact :deep(.el-input) {
   flex-shrink: 0;
+}
+
+/* 只读模式下的样式 */
+:deep(.el-input.is-disabled .el-input__wrapper) {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+}
+
+:deep(.el-input-number.is-disabled .el-input__wrapper) {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+}
+
+:deep(.el-select.is-disabled .el-input__wrapper) {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
 }
 
 /* 标签Webhook配置样式 */
