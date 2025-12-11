@@ -149,7 +149,7 @@ async def delete_device(device_id: str):
 
 @router.get("/servers", response_model=list[server_schemas.ServerDetailResponse])
 async def get_all_devices():
-    LOG.info(f"Fetching all servers.")
+    LOG.info("Fetching all servers.")
     devices = db.find(SERVER_COLLECTION, {})
     for i in devices:
         if i["time"]:
@@ -225,8 +225,8 @@ async def update_device(
 
     db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-    LOG.info(
-        f"Device updated, server: {server['device']['ip']}, user: {user}, time: {server.get('time', 0)}")
+    LOG.info(f"Device updated, server: {server['device']['ip']}, "
+             f"user: {user}, time: {server.get('time', 0)}")
     return server
 
 
@@ -383,7 +383,7 @@ async def get_boot_entries(server_id: str):
     }
 
 
-@router.get("/servers/{server_id}/grub", summary="Get parsed GRUB configuration", response_model=Dict[str, str])
+@router.get("/servers/{server_id}/grub", response_model=Dict[str, str])
 async def get_grub_config(server_id: str):
     """
     Return parsed GRUB configuration.

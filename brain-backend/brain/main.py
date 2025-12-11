@@ -149,7 +149,7 @@ async def startup_event():
         logger.info("The following test tasks have been automatically canceled due to a service"
                     f" restart: {task_ids}")
     except Exception as e:
-        logger.error("Resetting test task status failed")
+        logger.error(f"Resetting test task status failed : {e}")
 
 
 # app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)

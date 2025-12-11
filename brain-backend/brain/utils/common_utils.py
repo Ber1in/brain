@@ -24,6 +24,9 @@ COMMON_USER_PASSWORD = "Test.999"
 COMMON_SERVER = "10.0.3.248"
 TASK_POOL_COLLECTION = "tasks"
 db = SQLiteDocumentDB()
+MELLANOX_ALIAS = {
+    ""
+}
 PRODUCT_PART_NUMBER_DICT = {
     "90-0001-02": "MF200",
     "90-0002-02": "MC200",
@@ -219,6 +222,85 @@ def parse_nics_info(output: str) -> List[Dict[str, str]]:
     return result
 
 
+async def get_mellanox_nics(ip: str, user: str, password: str) -> List[Dict]:
+    """
+    Get Mellanox NIC info from remote server, return in the same format as parse_nics_info.
+    """
+
+    def simplify_mlx_product_name(raw_name: str) -> str:
+        model_match = re.search(r'ConnectX-\d+', raw_name)
+        model = model_match.group(0) if model_match else ""
+
+        speed_match = re.search(r'(\d+)GbE', raw_name)
+        speed = f"{speed_match.group(1)}G" if speed_match else ""
+
+        return " ".join(filter(None, [model, speed]))
+
+    pci_cmd = "lspci -n -d 15b3: | awk '{print $1}'"
+    pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
+    pci_list = pci_res.splitlines()
+
+    devices = []
+
+    for pci in pci_list:
+        pci = pci.strip()
+        if not pci:
+            continue
+
+        detail_cmd = f"lspci -vvv -s {pci}"
+        detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
+
+        current = {"bdf": pci}
+        for line in detail_res.splitlines():
+            line = line.strip()
+            if line.startswith("Product Name:"):
+                current["Product Name"] = line.replace("Product Name:", "").strip()
+            elif "[PN]" in line and "Part number:" in line:
+                current["Part number"] = line.split(":")[-1].strip()
+            elif "[SN]" in line and "Serial number:" in line:
+                current["Serial number"] = line.split(":")[-1].strip()
+
+        iface_cmd = f"basename $(readlink -f /sys/bus/pci/devices/0000:{pci}/net/* 2>/dev/null)"
+        iface_res = await ssh_execute_async(ip, iface_cmd, user, password)
+        iface_list = iface_res.splitlines()
+
+        nic_info = []
+        for iface in iface_list:
+            iface = iface.strip()
+            if not iface:
+                continue
+            mac_cmd = f"cat /sys/class/net/{iface}/address"
+            mac_res = await ssh_execute_async(ip, mac_cmd, user, password)
+            mac = mac_res.strip()
+            nic_info.append({
+                "bdf": pci,
+                "iface": iface,
+                "mac": mac
+            })
+
+        if all(k in current for k in ("Product Name", "Part number", "Serial number")):
+            devices.append({**current, "nic_info": nic_info})
+
+    counter = defaultdict(list)
+    for d in devices:
+        key = (d["Product Name"], d["Part number"], d["Serial number"])
+        counter[key].append(d)
+
+    result = []
+    for key, dev_list in counter.items():
+        prod_name, part_num, sn = key
+        nic_infos = []
+        for d in dev_list:
+            nic_infos.extend(d["nic_info"])
+        result.append({
+            "sn": sn,
+            "type": simplify_mlx_product_name(prod_name),
+            "nic_info": nic_infos
+        })
+
+    return result
+
+
 def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
     """
     Parse BDF → {pn, sn} from 'yuncli fw --fru_info' output.
@@ -344,7 +426,9 @@ def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
     return result
 
 
-def _assign_macs_to_bdfs(result: Dict[str, List[dict]], bdfs: List[str], macs: List[str]) -> Dict[str, List[dict]]:
+def _assign_macs_to_bdfs(result: Dict[str, List[dict]], 
+                         bdfs: List[str], 
+                         macs: List[str]) -> Dict[str, List[dict]]:
     """
     Evenly distribute MACs across BDFs. func numbering starts from 0 per BDF.
     """
@@ -452,9 +536,11 @@ def ipmi_power_action(bmcip: str, action: str):
 
 
 async def collect_device_info(ip, user, password):
-    server_sn = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_serial", user, password, False)
+    server_sn = await ssh_execute_async(
+        ip, "cat /sys/class/dmi/id/product_serial", user, password, False)
     server_vendor = await ssh_execute_async(ip, "cat /sys/class/dmi/id/sys_vendor", user, password)
-    server_product = await ssh_execute_async(ip, "cat /sys/class/dmi/id/product_name", user, password)
+    server_product = await ssh_execute_async(
+        ip, "cat /sys/class/dmi/id/product_name", user, password)
 
     cpu_cmd = (
         "lscpu | awk -F\":\" "
@@ -564,6 +650,8 @@ async def collect_nic_info(ip: str, user: str, password: str, check=True) -> lis
                 if iface:
                     info["iface"] = iface
 
+    mellanox_nics = await get_mellanox_nics(ip, user, password)
+    merged.extend(mellanox_nics)
     return merged
 
 
