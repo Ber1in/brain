@@ -177,7 +177,7 @@ async def get_device(device_id: str):
         LOG.warning(f"Device not found, {e}")
         raise HTTPException(status_code=404, detail=f"Device not found, {e}")
 
-    LOG.info(f"Device fetched: ID={device_id}")
+    LOG.info(f"Device fetched: ip={server['device']['ip']}")
     return server
 
 
@@ -187,7 +187,6 @@ async def update_device(
     data: server_schemas.ServerUpdateRequest,
     user=Depends(authenticate_user)
 ):
-    LOG.info(f"Updating device, ID: {device_id}, auto: {data.auto}, user: {user}")
 
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": device_id})
@@ -195,8 +194,9 @@ async def update_device(
         LOG.warning(f"Device not found, ID: {device_id}")
         raise HTTPException(status_code=404, detail="Device not found")
 
+    LOG.info(f"Updating device, server: {server['device']['ip']}, auto: {data.auto}, user: {user}")
     if data.auto:
-        LOG.info(f"Automatic updating device: {device_id}")
+        LOG.info(f"Automatic updating device: {server['device']['ip']}")
 
         device, nics = await common_utils.update_automatic_async(
             server["device"]["ip"],
@@ -207,7 +207,7 @@ async def update_device(
         server["nics"] = nics
 
     else:
-        LOG.info(f"Manual updating device: {device_id}")
+        LOG.info(f"Manual updating device: {server['device']['ip']}")
 
         if data.device and data.device.password:
             server["device"]["password"] = data.device.password
@@ -225,7 +225,7 @@ async def update_device(
 
     db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-    LOG.info(f"Device updated, ID: {device_id}, user: {user}, time: {server.get('time', 0)}")
+    LOG.info(f"Device updated, server: {server['device']['ip']}, user: {user}, time: {server.get('time', 0)}")
     return server
 
 
@@ -250,7 +250,6 @@ async def occupy_server(
     Returns:
         The updated server record as a dict.
     """
-    LOG.info(f"occupy_server called: server_id={server_id}, user={user}, time={data.time}")
 
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
@@ -265,6 +264,7 @@ async def occupy_server(
     ssh_pass = server["device"].get("password", "")
     time = int(data.time)
 
+    LOG.info(f"occupy_server called: ip={ip}, user={user}, time={data.time}")
     if time > 0:
         server["user"] = user
         server["recipients"] = list(set(server.get("recipients", []) + [user]))
@@ -342,10 +342,10 @@ async def focus_server(server_id: str, data: server_schemas.FocusRequest,
     recipients = server.get("recipients", [])
     if data.focus:
         server["recipients"] = list(set(recipients + [user]))
-        LOG.info(f"User {user} followed server {server_id}.")
+        LOG.info(f"User {user} followed server {server['device']['ip']}.")
     else:
         server["recipients"] = [r for r in recipients if r != user]
-        LOG.info(f"User {user} unfollowed server {server_id}.")
+        LOG.info(f"User {user} unfollowed server {server['device']['ip']}.")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
