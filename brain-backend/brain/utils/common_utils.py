@@ -281,7 +281,6 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
     return result
 
 
-
 def parse_bdf_mac(output: str) -> Dict[str, List[dict]]:
     """
     Parse `yuncli mac -r` output into {root_bdf: [{"bdf": bdf_with_func, "mac": mac}, ...]}.
@@ -836,16 +835,21 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             await ssh_execute_async(host, install_cmd, user, pwd)
             LOG.info(f"[{task_id}] New MCR installed successfully")
 
-            update_task(task_id, stage="reboot", detail="The server is undergoing a cold restart")
-            ipmi_power_action(ipmi, "cycle")
-
-            success = await wait_for_server_reboot(host)
-            if success:
-                update_task(task_id, status="finished", detail="MCR update completed")
-                LOG.info(f"[{task_id}] Reset Fw task finished successfully")
+            if aidpu:
+                update_task(task_id, status="finished",
+                            detail="MCR update completed (Note: A cold reboot is required)")
             else:
-                LOG.error(f"{host} did not come online within timeout")
-                update_task(task_id, status="reboot_timeout", detail="Server restart timeout")
+                update_task(task_id, stage="reboot",
+                            detail="The server is undergoing a cold restart")
+                ipmi_power_action(ipmi, "cycle")
+
+                success = await wait_for_server_reboot(host)
+                if success:
+                    update_task(task_id, status="finished", detail="MCR update completed")
+                    LOG.info(f"[{task_id}] Reset Fw task finished successfully")
+                else:
+                    LOG.error(f"{host} did not come online within timeout")
+                    update_task(task_id, status="reboot_timeout", detail="Server restart timeout")
 
             LOG.info(f"[{task_id}] MCR update task finished successfully")
 
