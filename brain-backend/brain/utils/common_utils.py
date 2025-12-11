@@ -237,6 +237,7 @@ async def get_nics(
 ) -> List[Dict]:
     """
     Get NIC info from remote server, return in the same format as parse_nics_info.
+    Ensures that devices without SN/Product Name are still returned.
     :param vendor_id: PCI vendor ID (e.g., '1f67' for Yunsilicon, '15b3' for Mellanox)
     """
     pci_cmd = f"lspci -n -d {vendor_id}: | awk '{{print $1}}'"
@@ -259,7 +260,7 @@ async def get_nics(
         detail_cmd = f"lspci -vvv -s {pci}"
         detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
 
-        current = {"bdf": pci}
+        current = {"bdf": pci, "Product Name": "", "Serial number": ""}
         for line in detail_res.splitlines():
             line = line.strip()
             if line.startswith("Product Name:"):
@@ -285,42 +286,41 @@ async def get_nics(
                 "iface": "",
                 "mac": mac_entry["mac"] if mac_entry else ""
             })
+        else:
+            nic_info.append({"bdf": pci, "iface": "", "mac": ""})
 
-        if nic_info:
-            devices.append({**current, "nic_info": nic_info})
+        devices.append({**current, "nic_info": nic_info})
 
     counter = defaultdict(list)
     for d in devices:
-        sn = d.get("Serial number")
+        sn = d.get("Serial number", "")
         prod_name = d.get("Product Name", "")
-        if not sn and vendor_id.lower() == "1f67":
-            product_info = product_infos.get(d["bdf"])
-            if product_info:
-                sn = product_info["sn"]
-        if sn:
-            counter[(prod_name, sn)].append(d)
+        counter[(prod_name, sn)].append(d)
 
     result = []
     for key, dev_list in counter.items():
-        _, sn = key
+        prod_name_key, sn_key = key
         nic_infos = []
         for d in dev_list:
             nic_infos.extend(d["nic_info"])
 
         if vendor_id.lower() == "1f67":
             product_info = product_infos.get(dev_list[0]["bdf"])
-            if product_info:
-                prod_name = PRODUCT_PART_NUMBER_DICT.get(product_info["pn"], product_info["pn"])
+            prod_name = PRODUCT_PART_NUMBER_DICT.get(product_info["pn"], product_info["pn"]) if product_info else prod_name_key
         elif vendor_id.lower() == "15b3":
-            prod_name = simplify_mlx_product_name(dev_list[0].get("Product Name", ""))
+            prod_name = simplify_mlx_product_name(dev_list[0].get("Product Name", prod_name_key))
+        else:
+            prod_name = prod_name_key
 
         result.append({
-            "sn": sn,
+            "sn": sn_key,
             "type": prod_name,
             "nic_info": nic_infos
         })
 
     return result
+
+
 
 
 def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
