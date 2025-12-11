@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 from uuid import uuid4
 from fastapi import HTTPException
 
@@ -222,21 +222,29 @@ def parse_nics_info(output: str) -> List[Dict[str, str]]:
     return result
 
 
-async def get_mellanox_nics(ip: str, user: str, password: str) -> List[Dict]:
+def simplify_mlx_product_name(raw_name: str) -> str:
+    model_match = re.search(r'ConnectX-\d+', raw_name)
+    model = model_match.group(0) if model_match else ""
+
+    speed_match = re.search(r'(\d+)GbE', raw_name)
+    speed = f"{speed_match.group(1)}G" if speed_match else ""
+
+    return " ".join(filter(None, [model, speed]))
+
+
+async def get_nics(
+    ip: str,
+    user: str,
+    password: str,
+    vendor_id: str,
+    simplify_func: Optional[Callable[[str], str]] = None
+) -> List[Dict]:
     """
-    Get Mellanox NIC info from remote server, return in the same format as parse_nics_info.
+    Get NIC info from remote server, return in the same format as parse_nics_info.
+    :param vendor_id: PCI vendor ID (e.g., '1f67' for Yunsilicon, '15b3' for Mellanox)
+    :param simplify_func: optional function to simplify product name
     """
-
-    def simplify_mlx_product_name(raw_name: str) -> str:
-        model_match = re.search(r'ConnectX-\d+', raw_name)
-        model = model_match.group(0) if model_match else ""
-
-        speed_match = re.search(r'(\d+)GbE', raw_name)
-        speed = f"{speed_match.group(1)}G" if speed_match else ""
-
-        return " ".join(filter(None, [model, speed]))
-
-    pci_cmd = "lspci -n -d 15b3: | awk '{print $1}'"
+    pci_cmd = f"lspci -n -d {vendor_id}: | awk '{{print $1}}'"
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     pci_list = pci_res.splitlines()
 
@@ -292,9 +300,11 @@ async def get_mellanox_nics(ip: str, user: str, password: str) -> List[Dict]:
         nic_infos = []
         for d in dev_list:
             nic_infos.extend(d["nic_info"])
+        if simplify_func:
+            prod_name = simplify_func(prod_name)
         result.append({
             "sn": sn,
-            "type": simplify_mlx_product_name(prod_name),
+            "type": prod_name,
             "nic_info": nic_infos
         })
 
@@ -580,78 +590,23 @@ async def collect_nic_info(ip: str, user: str, password: str, check=True) -> lis
     - Parse MACs
     - Merge into unified structure with type/mac/iface
     """
-    # PCI info
-    pci_cmd = (
-        "lspci -d 1f67: -vvv | awk '/Ethernet controller/ {print} "
-        "/Vital Product Data/ {print; for(i=0;i<5;i++){getline; print}}'"
-    )
-    pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
-    nics = parse_nics_info(pci_res)
-
+    yunsilicon_nics = await get_nics(ip, user, password, vendor_id="1f67")
     # FRU info
     part_num_cmd = 'yuncli fw --fru_info'
     part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, check)
     partnums = parse_bdf_partnum(part_num_res)
 
-    # MAC info
-    mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, check)
-    macs = parse_bdf_mac(mac_res)
+    for nic in yunsilicon_nics:
+        for interface in nic["nic_info"]:
+            part_info = partnums.get(interface["bdf"], {})
+            if part_info:
+                pn = part_info.get("pn", "")
+                nic["type"] = PRODUCT_PART_NUMBER_DICT.get(pn, "")
 
-    # Build nics_list
-    nics_map: dict[str, dict] = {}
-
-    for root_bdf, funcs in macs.items():
-        part_info = partnums.get(root_bdf, {})
-        pn = part_info.get("pn", "")
-        sn = part_info.get("sn", "")
-        nic_type = PRODUCT_PART_NUMBER_DICT.get(pn, "")
-
-        nic_info_list = [{"bdf": f["bdf"], "mac": f["mac"]} for f in funcs]
-
-        if sn in nics_map:
-            # SN 已存在，则合并 nic_info
-            nics_map[sn]["nic_info"].extend(nic_info_list)
-        else:
-            # 新 SN，创建条目
-            nics_map[sn] = {
-                "sn": sn,
-                "type": nic_type,
-                "nic_info": nic_info_list
-            }
-
-    merged = [nics_map.get(nic.get("sn"), nic) for nic in nics]
-    # Add nics_list entries not in nics
-    existing_sn = {nic.get("sn") for nic in nics}
-    merged.extend(nic for sn, nic in nics_map.items() if sn not in existing_sn)
-
-    # Remote iface mapping
-    map_cmd = (
-        "for i in /sys/class/net/*/address; do "
-        "echo \"$(basename $(dirname $i)) $(cat $i)\"; "
-        "done"
-    )
-    out = await ssh_execute_async(ip, map_cmd, user, password)
-    remote_map = {}
-    for line in out.splitlines():
-        line = line.strip().strip('\'"')
-        if not line:
-            continue
-        parts = line.split()
-        if len(parts) >= 2:
-            iface, mac = parts[0], parts[1].lower()
-            remote_map[mac] = iface
-
-    # Enrich merged nics with iface
-    for nic in merged:
-        for info in nic["nic_info"]:
-            mac = info.get("mac")
-            if mac:
-                iface = remote_map.get(mac.lower())
-                if iface:
-                    info["iface"] = iface
-
-    mellanox_nics = await get_mellanox_nics(ip, user, password)
-    merged.extend(mellanox_nics)
+    merged = []
+    mellanox_nics = await get_nics(
+        ip, user, password, vendor_id="15b3", simplify_func=simplify_mlx_product_name)
+    merged = yunsilicon_nics + mellanox_nics
     return merged
 
 
