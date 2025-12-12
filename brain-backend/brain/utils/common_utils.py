@@ -267,28 +267,12 @@ async def get_nics(
                 user, password)
             if pf.strip() == "0":
                 continue
-        cmd = f'''
-for addr in /sys/bus/pci/devices/0000:{pci}/net/*/address; do
-    iface=$(basename $(dirname $addr))
-    [[ $iface == *_h ]] && continue
-    echo "$iface $(cat $addr)"
-done
-'''
-        pfs = (await ssh_execute_async(ip, cmd, user, password)).strip().splitlines()
+        cmd = f"ls /sys/bus/pci/devices/0000:{pci}/net | grep -v '_h'"
+        ifaces = (await ssh_execute_async(ip, cmd, user, password)).strip().splitlines()
 
-        if len(pfs) != 1:
-            return HTTPException(
-                500, detail=f"bdf {pci} matched multiple interfaces")
-
-        iface, fallback_mac = pfs[0].strip().split()
-
-        perm_mac_cmd = f"ethtool -P {iface} 2>/dev/null | awk '/Permanent/ {{print $3}}'"
-        perm_mac = (await ssh_execute_async(ip, perm_mac_cmd, user, password)).strip()
-
-        if not perm_mac:
-            perm_mac = fallback_mac
-
-        nic_info.append({"bdf": pci, "iface": iface, "mac": perm_mac})
+        for iface in ifaces:
+            mac = (await ssh_execute_async(ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
+            nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
 
         devices.append({**current, "nic_info": nic_info})
 
