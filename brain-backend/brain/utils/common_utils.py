@@ -287,15 +287,18 @@ done
             devices.append({**current, "nic_info": nic_info})
 
     for dev in devices:
-        for nic_info in dev["nic_info"]:
-            product_info = product_infos.get(nic_info["bdf"])
-            if product_info:
-                dev["type"] = PRODUCT_PART_NUMBER_DICT.get(
-                    product_info["pn"], 
-                    product_info["pn"]
-                )
-                dev["sn"] = product_info.get("sn")
-                break
+        if vendor_id.lower() == "1f67":
+            for nic_info in dev["nic_info"]:
+                product_info = product_infos.get(nic_info["bdf"])
+                if product_info:
+                    dev["type"] = PRODUCT_PART_NUMBER_DICT.get(
+                        product_info["pn"], 
+                        product_info["pn"]
+                    )
+                    dev["sn"] = product_info.get("sn")
+                    break
+        elif vendor_id.lower() == "15b3":
+            dev["type"] = simplify_mlx_product_name(dev.get("type"))
 
     merged_pf = OrderedDict()
 
