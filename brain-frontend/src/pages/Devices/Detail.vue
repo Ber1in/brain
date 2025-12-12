@@ -267,7 +267,7 @@
               </template>
             </el-table-column>
             <!-- 网口名列 -->
-            <el-table-column label="网口名" width="100">
+            <el-table-column label="网口名" width="120">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 

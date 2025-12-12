@@ -2,7 +2,7 @@
 # All rights reserved.
 
 import asyncio
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 import logging
 import os
@@ -240,14 +240,10 @@ async def get_nics(
     pci_list = [pci.strip() for pci in pci_res.splitlines() if pci.strip()]
 
     product_infos = {}
-    macs = []
     if vendor_id.lower() == "1f67":
         part_num_cmd = 'yuncli fw --fru_info'
         part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
         product_infos = parse_bdf_partnum(part_num_res)
-
-        mac_res = await ssh_execute_async(ip, "yuncli mac -r", user, password, False)
-        macs = parse_bdf_mac(mac_res)
 
     devices = []
 
@@ -255,72 +251,84 @@ async def get_nics(
         detail_cmd = f"lspci -vvv -s {pci}"
         detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
 
-        current = {"bdf": pci, "Product Name": "", "Serial number": ""}
+        current = {"bdf": pci, "type": "", "sn": ""}
         for line in detail_res.splitlines():
             line = line.strip()
             if line.startswith("Product Name:"):
-                current["Product Name"] = line.replace("Product Name:", "").strip()
+                current["type"] = line.replace("Product Name:", "").strip()
             elif "[SN]" in line and "Serial number:" in line:
-                current["Serial number"] = line.split(":")[-1].strip()
-
-        iface_cmd = f"basename $(readlink -f /sys/bus/pci/devices/0000:{pci}/net/* 2>/dev/null)"
-        iface_res = await ssh_execute_async(ip, iface_cmd, user, password, False)
-        iface_list = [iface.strip() for iface in iface_res.splitlines() if iface.strip()]
+                current["sn"] = line.split(":")[-1].strip()
 
         nic_info = []
 
-        if iface_list:
-            for iface in iface_list:
-                mac_cmd = f"cat /sys/class/net/{iface}/address"
-                mac = (await ssh_execute_async(ip, mac_cmd, user, password)).strip()
-                nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
-        elif vendor_id.lower() == "1f67":
-            mac_entry = next((m for m in macs if m["bdf"] == pci), None)
-            if mac_entry:
-                nic_info.append({
-                    "bdf": pci,
-                    "iface": "",
-                    "mac": mac_entry["mac"]
-                })
-        else:
-            nic_info.append({"bdf": pci, "iface": "", "mac": ""})
-
-        devices.append({**current, "nic_info": nic_info})
-
-    counter = defaultdict(list)
-    for d in devices:
-        sn = d.get("Serial number", "")
-        prod_name = d.get("Product Name", "")
-        counter[(prod_name, sn)].append(d)
-
-    result = []
-    for key, dev_list in counter.items():
-        prod_name_key, sn_key = key
-        nic_infos = []
-        for d in dev_list:
-            nic_infos.extend(d["nic_info"])
-
         if vendor_id.lower() == "1f67":
-            for dev in dev_list:
-                product_info = product_infos.get(dev["bdf"])
-                if product_info:
-                    prod_name = PRODUCT_PART_NUMBER_DICT.get(product_info["pn"], product_info["pn"])
-                    sn_key = product_info.get("sn")
-                    break
-            else:
-                prod_name = prod_name_key
-        elif vendor_id.lower() == "15b3":
-            prod_name = simplify_mlx_product_name(dev_list[0].get("Product Name", prod_name_key))
-        else:
-            prod_name = prod_name_key
+            pf = await ssh_execute_async(
+                ip, f"test -e /sys/bus/pci/devices/0000:{pci}/vpd && echo 1 || echo 0",
+                user, password)
+            if pf.strip() == "0":
+                continue
+        cmd = f'''
+for addr in /sys/bus/pci/devices/0000:{pci}/net/*/address; do
+    iface=$(basename $(dirname $addr))
+    [[ $iface == *_h ]] && continue
+    echo "$iface $(cat $addr)"
+done
+'''
+        pfs = (await ssh_execute_async(ip, cmd, user, password)).strip().splitlines()
 
-        result.append({
-            "sn": sn_key,
-            "type": prod_name,
-            "nic_info": nic_infos
-        })
+        if len(pfs) != 1:
+            return HTTPException(
+                500, detail=f"bdf {pci} matched multiple interfaces and MAC addresses")
+        for pf_info in pfs:
+            iface, mac = pf_info.strip().split()
+            nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
 
-    return result
+        if nic_info:
+            devices.append({**current, "nic_info": nic_info})
+
+    for dev in devices:
+        for nic_info in dev["nic_info"]:
+            product_info = product_infos.get(nic_info["bdf"])
+            if product_info:
+                dev["type"] = PRODUCT_PART_NUMBER_DICT.get(
+                    product_info["pn"], 
+                    product_info["pn"]
+                )
+                dev["sn"] = product_info.get("sn")
+                break
+
+    merged_pf = OrderedDict()
+
+    for dev in devices:
+        bdf = dev["bdf"]
+        pf_key = bdf.split('.')[0]
+
+        if pf_key not in merged_pf:
+            merged_pf[pf_key] = {
+                "type": dev.get("type", ""),
+                "sn": dev.get("sn", ""),
+                "nic_info": []
+            }
+
+        merged_pf[pf_key]["nic_info"].extend(dev.get("nic_info", []))
+
+    pf_list = list(merged_pf.values())
+
+    merged_sn = OrderedDict()
+
+    for item in pf_list:
+        sn_key = item.get("sn") or f"nosn_{id(item)}"
+
+        if sn_key not in merged_sn:
+            merged_sn[sn_key] = {
+                "type": item.get("type", ""),
+                "sn": item.get("sn", ""),
+                "nic_info": []
+            }
+
+        merged_sn[sn_key]["nic_info"].extend(item.get("nic_info", []))
+
+    return list(merged_sn.values())
 
 
 def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
