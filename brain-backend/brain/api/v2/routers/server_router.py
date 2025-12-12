@@ -531,7 +531,9 @@ async def power_cycle_server(server_id: str):
 
     bmcip = server["bmc"]["ip"]
     LOG.info(f"Power cycling server {server_id} via BMC {bmcip}")
-    common_utils.ipmi_power_action(bmcip, "cycle")
+    await common_utils.ipmi_power_action(
+        bmcip, "cycle", server["device"]["ip"],
+        server["device"]["username"], server["device"]["password"])
 
     LOG.info(f"Successfully completed power cycle for server {server_id}")
     return {"message": f"Server {server_id} power cycled via BMC {bmcip}"}
@@ -551,7 +553,10 @@ async def power_reset_server(server_id: str):
 
     bmcip = server["bmc"]["ip"]
     LOG.info(f"Power resetting server {server_id} via BMC {bmcip}")
-    common_utils.ipmi_power_action(bmcip, "reset")
+    
+    await common_utils.ipmi_power_action(
+        bmcip, "reset", server["device"]["ip"],
+        server["device"]["username"], server["device"]["password"])
 
     LOG.info(f"Successfully completed power reset for server {server_id}")
     return {"message": f"Server {server_id} warm rebooted via BMC {bmcip}"}

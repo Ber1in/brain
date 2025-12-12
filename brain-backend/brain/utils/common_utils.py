@@ -527,7 +527,7 @@ async def get_boot_entries(host_ip, user, pwd):
     return entries, current_boot, next_boot, default_boot
 
 
-def ipmi_power_action(bmcip: str, action: str):
+async def ipmi_power_action(bmcip: str, action: str, host: str, user: str, pwd: str):
     """Execute IPMI power action via ipmitool command"""
     LOG.info(f"Executing IPMI {action} on BMC {bmcip}")
 
@@ -538,13 +538,16 @@ def ipmi_power_action(bmcip: str, action: str):
            "chassis", "power", action]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         if result.returncode != 0:
             LOG.error(f"IPMI {action} failed on BMC {bmcip}: {result.stderr.strip()}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"IPMI {action} failed: {result.stderr.strip()}"
-            )
+            try:
+                await ssh_execute_async(host, f"ipmitool power {action}", user, pwd)
+            except Exception:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"IPMI {action} failed"
+                )
         LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}: {result.stdout.strip()}")
     except Exception as e:
         LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
@@ -832,7 +835,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             LOG.info(f"[{task_id}]All BDFs in {bdf_list} have been successfully erased.")
 
             update_task(task_id, stage="reboot", detail="The server is restarting")
-            ipmi_power_action(ipmi, "reset")
+            await ipmi_power_action(ipmi, "reset", host, user, pwd)
 
             success = await wait_for_server_reboot(host)
             if success:
@@ -877,7 +880,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             else:
                 update_task(task_id, stage="reboot",
                             detail="The server is undergoing a cold restart")
-                ipmi_power_action(ipmi, "cycle")
+                await ipmi_power_action(ipmi, "cycle", host, user, pwd)
 
                 success = await wait_for_server_reboot(host)
                 if success:
