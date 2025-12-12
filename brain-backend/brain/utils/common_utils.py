@@ -63,7 +63,7 @@ async def ensure_packages_installed(host: str, user: str, pwd: str, packages: li
     """
     Ensure packages (interpreted as commands) exist on remote host.
     If not, install corresponding packages (assumed same as names).
-    Supports Debian / RHEL / Fedora / SUSE / openEuler.
+    Supports Debian / Ubuntu / Kylin / RHEL / CentOS / Fedora / SUSE / openEuler.
     """
     pkg_str = " ".join(packages)
 
@@ -84,12 +84,14 @@ detect_os() {{
 OS=$(detect_os)
 
 ensure_repo() {{
-    if echo "$OS" | grep -qi "debian"; then
+    if echo "$OS" | grep -qiE "debian|ubuntu|kylin.*debian"; then
+        # Debian/Ubuntu/Kylin Desktop
         sed -i 's/archive.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
         sed -i 's/security.ubuntu.com/mirrors.yunsilicon.com/g' /etc/apt/sources.list || true
         apt-get update -y || true
 
-    elif echo "$OS" | grep -Ei "rhel|centos"; then
+    elif echo "$OS" | grep -qiE "rhel|centos|fedora|openeuler|kylin"; then
+        # RHEL/CentOS/Fedora/OpenEuler/Kylin Advanced Server
         if grep -q 'VERSION_ID="7"' /etc/os-release 2>/dev/null; then
             curl -s -o /etc/yum.repos.d/centos.repo http://mirrors.yunsilicon.com/yum.repos.d/centos7.9.repo || true
             curl -s -o /etc/yum.repos.d/epel.repo http://mirrors.yunsilicon.com/yum.repos.d/epel7.repo || true
@@ -102,11 +104,6 @@ ensure_repo() {{
 
     elif echo "$OS" | grep -qi "suse"; then
         zypper refresh || true
-
-    elif echo "$OS" | grep -qi "openeuler"; then
-        # openEuler 22+ 使用 dnf
-        dnf makecache || true
-
     fi
 }}
 
@@ -125,20 +122,14 @@ ensure_packages() {{
 
     echo "Installing packages: ${{MISSING[@]}}"
 
-    if echo "$OS" | grep -qi "debian"; then
+    if echo "$OS" | grep -qiE "debian|ubuntu|kylin.*debian"; then
         apt-get install -y ${{MISSING[@]}}
 
-    elif echo "$OS" | grep -Ei "rhel|centos"; then
-        yum install -y ${{MISSING[@]}}
-
-    elif echo "$OS" | grep -qi "fedora"; then
-        dnf install -y ${{MISSING[@]}}
+    elif echo "$OS" | grep -qiE "rhel|centos|fedora|openeuler|kylin"; then
+        yum install -y ${{MISSING[@]}} || dnf install -y ${{MISSING[@]}}
 
     elif echo "$OS" | grep -qi "suse"; then
         zypper install -y ${{MISSING[@]}}
-
-    elif echo "$OS" | grep -qi "openeuler"; then
-        dnf install -y ${{MISSING[@]}}
 
     else
         echo "Unsupported distro: $OS"
