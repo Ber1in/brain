@@ -103,36 +103,21 @@ async def startup_event():
                 warn_delay = max(remaining_time - 300, 0)
                 if warn_delay > 0:
                     warn_task_id = f"device_warn_{ip.replace('.', '_')}"
-                    warn_success = await task_scheduler.schedule_task(
+                    await task_scheduler.schedule_task(
                         task_id=warn_task_id,
                         delay_seconds=warn_delay,
                         task_func=init_server_warning,
                         device_id=server["id"],
                     )
-                    if warn_success:
-                        logger.info(
-                            f"Scheduled warning task {warn_task_id} "
-                            f"(delay={warn_delay}s)"
-                        )
-                    else:
-                        logger.error(f"Failed to schedule warning task {warn_task_id}")
 
                 task_id = f"device_cleanup_{ip.replace('.', '_')}"
-                success = await task_scheduler.schedule_task(
+                await task_scheduler.schedule_task(
                     task_id=task_id,
                     delay_seconds=int(remaining_time),
                     task_func=init_server_warning,
                     device_id=server["id"],
                     now=True
                 )
-
-                if success:
-                    logger.info(
-                        f"Restored timer for device {ip}, "
-                        f"remaining: {remaining_time:.0f}s"
-                    )
-                else:
-                    logger.error(f"Failed to restore timer for device {ip}")
             else:
                 # If the time has already expired, clean up immediately
                 logger.info(f"Device {ip} occupancy expired, cleaning up...")
