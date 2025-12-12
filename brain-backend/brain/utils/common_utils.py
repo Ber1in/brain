@@ -247,37 +247,46 @@ async def get_nics(
 
     devices = []
 
-    for pci in pci_list:
-        detail_cmd = f"lspci -vvv -s {pci}"
-        detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
+    semaphore = asyncio.Semaphore(5) 
 
-        current = {"bdf": pci, "type": "", "sn": ""}
-        for line in detail_res.splitlines():
-            line = line.strip()
-            if line.startswith("Product Name:"):
-                current["type"] = line.replace("Product Name:", "").strip()
-            elif "[SN]" in line and "Serial number:" in line:
-                current["sn"] = line.split(":")[-1].strip()
+    async def fetch_pci_info(pci: str) -> Dict:
+        async with semaphore:
+            detail_cmd = f"lspci -vvv -s {pci}"
+            detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
 
-        nic_info = []
+            current = {"bdf": pci, "type": "", "sn": ""}
+            for line in detail_res.splitlines():
+                line = line.strip()
+                if line.startswith("Product Name:"):
+                    current["type"] = line.replace("Product Name:", "").strip()
+                elif "[SN]" in line and "Serial number:" in line:
+                    current["sn"] = line.split(":")[-1].strip()
 
-        if vendor_id.lower() == "1f67":
-            pf = await ssh_execute_async(
-                ip, f"test -e /sys/bus/pci/devices/0000:{pci}/vpd && echo 1 || echo 0",
-                user, password)
-            if pf.strip() == "0":
-                continue
-        cmd = f"ls /sys/bus/pci/devices/0000:{pci}/net | grep -v '_h'"
-        ifaces = (await ssh_execute_async(ip, cmd, user, password, False)).strip().splitlines()
+            nic_info = []
 
-        if ifaces:
-            for iface in ifaces:
-                mac = (await ssh_execute_async(ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
-                nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
-        else:
-            nic_info.append({"bdf": pci, "iface": "", "mac": ""})
+            if vendor_id.lower() == "1f67":
+                pf = await ssh_execute_async(
+                    ip, f"test -e /sys/bus/pci/devices/0000:{pci}/vpd && echo 1 || echo 0",
+                    user, password)
+                if pf.strip() == "0":
+                    return None
 
-        devices.append({**current, "nic_info": nic_info})
+            cmd = f"ls /sys/bus/pci/devices/0000:{pci}/net | grep -v '_h'"
+            ifaces = (await ssh_execute_async(ip, cmd, user, password, False)).strip().splitlines()
+
+            if ifaces:
+                for iface in ifaces:
+                    mac = (await ssh_execute_async(ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
+                    nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
+            else:
+                nic_info.append({"bdf": pci, "iface": "", "mac": ""})
+
+            return {**current, "nic_info": nic_info}
+
+    pci_tasks = [fetch_pci_info(pci) for pci in pci_list]
+    pci_results = await asyncio.gather(*pci_tasks)
+
+    devices = [res for res in pci_results if res]
 
     for dev in devices:
         if vendor_id.lower() == "1f67":
@@ -285,7 +294,7 @@ async def get_nics(
                 product_info = product_infos.get(nic_info["bdf"])
                 if product_info:
                     dev["type"] = PRODUCT_PART_NUMBER_DICT.get(
-                        product_info["pn"], 
+                        product_info["pn"],
                         product_info["pn"]
                     )
                     dev["sn"] = product_info.get("sn")
@@ -325,6 +334,7 @@ async def get_nics(
         merged_sn[sn_key]["nic_info"].extend(item.get("nic_info", []))
 
     return list(merged_sn.values())
+
 
 
 def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
