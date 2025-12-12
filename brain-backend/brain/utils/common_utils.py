@@ -95,6 +95,10 @@ ensure_repo() {{
         if grep -q 'VERSION_ID="7"' /etc/os-release 2>/dev/null; then
             curl -s -o /etc/yum.repos.d/centos.repo http://mirrors.yunsilicon.com/yum.repos.d/centos7.9.repo || true
             curl -s -o /etc/yum.repos.d/epel.repo http://mirrors.yunsilicon.com/yum.repos.d/epel7.repo || true
+        elif grep -q 'VERSION_ID="8"' /etc/os-release 2>/dev/null; then
+            rm -rf /etc/yum.repos.d/*
+            curl -s -o /etc/yum.repos.d/rhel8.6.repo https://mirrors.yunsilicon.com/yum.repos.d/rhel8.6.repo
+            curl -s -o /etc/yum.repos.d/epel8.repo http://mirrors.yunsilicon.com/yum.repos.d/epel8.repo || true
         fi
         yum clean all || true
         yum makecache || true
