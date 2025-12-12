@@ -268,11 +268,14 @@ async def get_nics(
             if pf.strip() == "0":
                 continue
         cmd = f"ls /sys/bus/pci/devices/0000:{pci}/net | grep -v '_h'"
-        ifaces = (await ssh_execute_async(ip, cmd, user, password)).strip().splitlines()
+        ifaces = (await ssh_execute_async(ip, cmd, user, password, False)).strip().splitlines()
 
-        for iface in ifaces:
-            mac = (await ssh_execute_async(ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
-            nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
+        if ifaces:
+            for iface in ifaces:
+                mac = (await ssh_execute_async(ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
+                nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
+        else:
+            nic_info.append({"bdf": pci, "iface": "", "mac": ""})
 
         devices.append({**current, "nic_info": nic_info})
 
