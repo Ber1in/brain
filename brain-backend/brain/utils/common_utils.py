@@ -281,11 +281,12 @@ async def get_nics(
                 nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
         elif vendor_id.lower() == "1f67":
             mac_entry = next((m for m in macs if m["bdf"] == pci), None)
-            nic_info.append({
-                "bdf": pci,
-                "iface": "",
-                "mac": mac_entry["mac"] if mac_entry else ""
-            })
+            if mac_entry:
+                nic_info.append({
+                    "bdf": pci,
+                    "iface": "",
+                    "mac": mac_entry["mac"]
+                })
         else:
             nic_info.append({"bdf": pci, "iface": "", "mac": ""})
 
@@ -325,8 +326,6 @@ async def get_nics(
         })
 
     return result
-
-
 
 
 def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
