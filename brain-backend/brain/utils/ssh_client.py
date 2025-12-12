@@ -51,10 +51,13 @@ def ssh_execute(host: str, command: str, user: str, pwd: str, check=True) -> str
         ssh.close()
 
         if err:
-            LOG.error(f"Command {command} error on {host}: {err.strip()}")
+            LOG.error(f"Command {command} error on {host}: \n"
+                      f"stdout: {out.strip()} \nstderr: {err.strip()}")
         if check and exit_code != 0:
             LOG.debug(f"Command {command} failed on {host} (exit {exit_code}): {out.strip()}")
-            raise HTTPException(status_code=500, detail=f"SSH command failed: {out.strip()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"SSH command failed: \nstdout: {out.strip()} \nstderr: {err.strip()}")
 
         LOG.debug(f"SSH command {command} completed on {host}")
         return out.strip()
