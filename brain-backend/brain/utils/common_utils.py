@@ -278,13 +278,19 @@ done
 
         if len(pfs) != 1:
             return HTTPException(
-                500, detail=f"bdf {pci} matched multiple interfaces and MAC addresses")
-        for pf_info in pfs:
-            iface, mac = pf_info.strip().split()
-            nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
+                500, detail=f"bdf {pci} matched multiple interfaces")
 
-        if nic_info:
-            devices.append({**current, "nic_info": nic_info})
+        iface, fallback_mac = pfs[0].strip().split()
+
+        perm_mac_cmd = f"ethtool -P {iface} 2>/dev/null | awk '/Permanent/ {{print $3}}'"
+        perm_mac = (await ssh_execute_async(ip, perm_mac_cmd, user, password)).strip()
+
+        if not perm_mac:
+            perm_mac = fallback_mac
+
+        nic_info.append({"bdf": pci, "iface": iface, "mac": perm_mac})
+
+        devices.append({**current, "nic_info": nic_info})
 
     for dev in devices:
         if vendor_id.lower() == "1f67":
