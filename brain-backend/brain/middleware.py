@@ -5,11 +5,15 @@ import logging
 import uuid
 from contextvars import ContextVar
 
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from brain.auth import verify_token
+from brain.json_db import db
 
 LOG = logging.getLogger(__name__)
+OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
+NON_AUDITED_OPERATIONS = [
+    "/login"]
 
 
 request_id_var = ContextVar("request_id", default=None)
@@ -31,49 +35,40 @@ class RequestIdLogFilter(logging.Filter):
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        incoming_id = request.headers.get("X-Request-ID")
-        req_id = incoming_id or f"req-{uuid.uuid4()}"
+        req_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4()}"
         set_request_id(req_id)
 
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = req_id
+
+        try:
+            username = request.headers.get("X-User")
+            if not username:
+                username = self.get_current_user(request.headers.get("Authorization"))
+
+            path = request.url.path
+            if request.method != "GET" and path not in NON_AUDITED_OPERATIONS:
+                db.insert(
+                    OPERATIONAL_AUDIT_COLLECTION,
+                    {
+                        "request_id": req_id,
+                        "user": username,
+                        "path": path,
+                        "method": request.method,
+                        "status": response.status_code,
+                    }
+                )
+        except Exception as e:
+            LOG.error(f"Failed to insert audit record for {req_id}: {e}")
+
         return response
 
-
-class QAAutoFileAccessMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, db_connection):
-        super().__init__(app)
-        self.db = db_connection
-
-    async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/qa-auto-files/"):
-            deny = await self.validate_file_access(request)
-            if deny:
-                return deny
-        return await call_next(request)
-
-    async def validate_file_access(self, request: Request):
-        path_parts = request.url.path.split('/')
-        if len(path_parts) < 5:
-            raise HTTPException(status_code=403, detail="Invalid path")
-
-        requested_user = path_parts[2]
-
-        current_user = await self.get_current_user(request)
-        if not current_user:
-            return Response("Authentication required", status_code=401)
-
-        if requested_user != current_user:
-            return Response("Access denied", status_code=403)
-
-    async def get_current_user(self, request: Request) -> str:
-        token = request.query_params.get("token")
-        if token:
+    def get_current_user(self, token: str) -> str:
+        if token and token.startswith("Bearer "):
             try:
                 payload = verify_token(token)
-                user_id = payload.get("sub")
-                if user_id:
-                    return user_id
+                return payload.get("sub")
             except Exception:
-                return None
-        return None
+                return ""
+        return ""
+

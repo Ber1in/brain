@@ -7,6 +7,7 @@ import sqlite3
 import os
 
 from typing import Dict, List, Any
+from uuid import uuid4
 from filelock import FileLock
 from abc import ABC, abstractmethod
 
@@ -15,6 +16,7 @@ TEST_CASE_COLLECTION = "test_cases"
 TEST_HISTORY_COLLECTION = "test_history"
 TASK_POOL_COLLECTION = "tasks"
 TASK_DIY_CONFIG = "users"
+OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
 
 
 class BaseDocumentDB(ABC):
@@ -331,6 +333,13 @@ class SQLiteDocumentDB:
                 "nic_filtering_condition": "",
                 "only_focus": 0
             }
+        },
+        OPERATIONAL_AUDIT_COLLECTION: {
+            "request_id": "",
+            "user": "",
+            "path": "",
+            "method": "",
+            "status": "",
         }
     }
 
@@ -393,7 +402,7 @@ class SQLiteDocumentDB:
 
     def insert(self, collection: str, document: Dict[str, Any]) -> None:
         if "id" not in document:
-            raise ValueError("Document must have 'id' key before insert.")
+            document["id"] = str(uuid4())
         self._ensure_table(collection)
         schema = self.COLLECTION_SCHEMAS[collection]
         row = {k: document.get(k, v) for k, v in schema.items()}
@@ -509,3 +518,6 @@ class SQLiteDocumentDB:
             return json.loads(value)
         except Exception:
             return value
+
+
+db = SQLiteDocumentDB()
