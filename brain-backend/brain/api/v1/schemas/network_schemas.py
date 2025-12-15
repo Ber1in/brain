@@ -74,7 +74,6 @@ class InterfaceCreate(BaseModel):
 
 class InterfaceUpdate(BaseModel):
     """Schema for updating only the description of an interface"""
-    id: str = Field(..., description="Unique ID of the interface to update")
     description: Optional[str] = Field(None, description="New description for the interface")
 
 

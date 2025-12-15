@@ -220,7 +220,6 @@ export interface InterfaceCreate {
 }
 
 export interface InterfaceUpdate {
-  id: string
   description?: string
 }
 

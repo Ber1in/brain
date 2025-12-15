@@ -490,7 +490,7 @@ const handleDelete = async (intf: InterfaceInfo & { deleting?: boolean }) => {
     // 设置删除状态
     intf.deleting = true
     
-    await networkApi.delete(intf.id, intf.mv200_id)
+    await networkApi.delete(intf.id)
     ElMessage.success('删除成功')
     await loadData() // 重新加载数据
   } catch (error) {

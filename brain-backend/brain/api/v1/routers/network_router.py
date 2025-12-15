@@ -28,8 +28,9 @@ async def create_interface(data: network_schemas.InterfaceCreate, user=Depends(a
     interface_id = str(uuid.uuid4())
     LOG.info(f"Creating interface {interface_id} on SoC {data.mv200_id} with IP {data.ip}")
 
-    server = db.find_one(MV_SERVER_COLLECTION, {"id": data.mv200_id})
-    if not server:
+    try:
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": data.mv200_id})
+    except Exception:
         LOG.warning(f"MV server {data.mv200_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="MV server not found"
@@ -114,23 +115,25 @@ async def create_interface(data: network_schemas.InterfaceCreate, user=Depends(a
     return interface_data
 
 
-@router.delete("/networks", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_interface(data: network_schemas.InterfaceDelete):
+@router.delete("/networks/{interface_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_interface(interface_id:str):
     """Delete an existing network interface"""
-    LOG.info(f"Deleting interface {data.id} on SoC {data.mv200_id}")
 
-    interface = db.find_one(NETWORK_COLLECTION, {"id": data.id})
-    if not interface:
-        LOG.warning(f"Interface {data.id} not found in database")
+    try:
+        interface = db.find_one(NETWORK_COLLECTION, {"id": interface_id})
+    except Exception:
+        LOG.warning(f"Interface {interface_id} not found in database")
         raise HTTPException(status_code=404, detail="Interface not found")
 
-    server = db.find_one(MV_SERVER_COLLECTION, {"id": data.mv200_id})
-    if not server:
-        LOG.warning(f"MV server {data.mv200_id} not found")
+    try:
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": interface["mv200_id"]})
+    except Exception:
+        LOG.warning(f"MV server {interface['mv200_id']} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="MV server not found"
         )
 
+    LOG.info(f"Deleting interface {interface_id} on SoC {server['ip_address']}")
     dpuagentclient = get_dpuagentclient(server['ip_address'])
     try:
         res = api.XscnetApi(dpuagentclient).delete_xscnet_dpu_agent_v1_xscnet_del_post(
@@ -138,46 +141,46 @@ async def delete_interface(data: network_schemas.InterfaceDelete):
         )
         if res.code != 0:
             LOG.error(
-                f"Failed to delete XSC network for interface {data.id} "
+                f"Failed to delete XSC network for interface {interface_id} "
                 f"on SoC {server['ip_address']}: {res.message}"
             )
             raise HTTPException(status_code=500, detail=res.message)
-        LOG.info(f"XSC network for interface {data.id} deleted successfully")
+        LOG.info(f"XSC network for interface {interface_id} deleted successfully")
     except Exception as e:
-        LOG.error(f"Exception deleting XSC network for {data.id}: {e}")
+        LOG.error(f"Exception deleting XSC network for {interface_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
     # Save checkpoint
-    LOG.info(f"Saving checkpoint for xsc interface {data.id}")
+    LOG.info(f"Saving checkpoint for xsc interface {interface_id}")
     try:
         recoverapi = api.RecoveryApi(dpuagentclient)
         res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
         if res.code != 0:
-            LOG.error(f"Failed to save checkpoint for interface {data.id}: {res.message}")
+            LOG.error(f"Failed to save checkpoint for interface {interface_id}: {res.message}")
             raise exceptions.CheckPointSaveException(res.message)
-        LOG.info(f"Successfully saved checkpoint for interface {data.id}")
+        LOG.info(f"Successfully saved checkpoint for interface {interface_id}")
     except Exception as e:
-        LOG.error(f"Failed to save checkpoint after deleting interface {data.id}: {e}")
+        LOG.error(f"Failed to save checkpoint after deleting interface {interface_id}: {e}")
         raise
 
-    db.delete(NETWORK_COLLECTION, {"id": data.id})
-    LOG.info(f"Interface {data.id} deleted successfully")
+    db.delete(NETWORK_COLLECTION, {"id": interface_id})
+    LOG.info(f"Interface {interface_id} deleted successfully")
     return
 
 
-@router.put("/networks", response_model=network_schemas.InterfaceInfo)
-async def update_interface_description(data: network_schemas.InterfaceUpdate):
+@router.put("/networks/{interface_id}", response_model=network_schemas.InterfaceInfo)
+async def update_interface_description(interface_id:str, data: network_schemas.InterfaceUpdate):
     """Update description of an existing interface"""
-    LOG.info(f"Updating description for interface {data.id}: {data.description}")
+    LOG.info(f"Updating description for interface {interface_id}: {data.description}")
     updated = db.update(
-        NETWORK_COLLECTION, {"id": data.id}, {"description": data.description}
+        NETWORK_COLLECTION, {"id": interface_id}, {"description": data.description}
     )
     if not updated:
-        LOG.warning(f"Interface {data.id} not found for update")
+        LOG.warning(f"Interface {interface_id} not found for update")
         raise HTTPException(status_code=404, detail="Interface not found")
 
-    interface = db.find_one(NETWORK_COLLECTION, {"id": data.id})
-    LOG.info(f"Interface {data.id} description updated successfully")
+    interface = db.find_one(NETWORK_COLLECTION, {"id": interface_id})
+    LOG.info(f"Interface {interface_id} description updated successfully")
     return interface
 
 

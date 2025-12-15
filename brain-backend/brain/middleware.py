@@ -42,9 +42,9 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         response.headers["X-Request-ID"] = req_id
 
         try:
-            username = request.headers.get("X-User")
+            username = self.get_current_user(request.headers.get("authorization"))
             if not username:
-                username = self.get_current_user(request.headers.get("Authorization"))
+                username = request.headers.get("X-User", "")
 
             path = request.url.path
             if request.method != "GET" and path not in NON_AUDITED_OPERATIONS:
@@ -64,11 +64,16 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
     def get_current_user(self, token: str) -> str:
-        if token and token.startswith("Bearer "):
-            try:
-                payload = verify_token(token)
-                return payload.get("sub")
-            except Exception:
-                return ""
-        return ""
+        if not token:
+            return ""
+
+        if token.startswith("Bearer "):
+            token = token[len("Bearer "):].strip()
+
+        try:
+            payload = verify_token(token)
+            return payload.get("sub", "")
+        except Exception:
+            return ""
+
 

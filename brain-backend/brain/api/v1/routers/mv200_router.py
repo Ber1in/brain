@@ -2,6 +2,7 @@
 # All rights reserved.
 
 import asyncio
+import copy
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 import logging
@@ -139,8 +140,9 @@ async def get_mv_server(server_id: str):
     Get specific MV server by ID
     """
     LOG.info(f"Received request to get MV server {server_id}")
-    server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
-    if not server:
+    try:
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
+    except Exception:
         LOG.warning(f"MV server {server_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -173,6 +175,7 @@ async def get_mv_server(server_id: str):
         res = await ssh_execute_async(server['ip_address'],
                                       "cat /opt/dpuagent/mode", "root", "yunsilicon")
         server["recovery_mode"] = res.strip()
+        server_original = copy.deepcopy(server)
         versionapi = dpuagentApi.VersionApi(dpuagentclient)
         res = versionapi.get_version_dpu_agent_v1_version_get()
         if res.code != 200:
@@ -194,6 +197,7 @@ async def get_mv_server(server_id: str):
     #     LOG.warning(f"DPU agent at {server['ip_address']} does not support "
     #                 "recovery mode query API (possibly old version)")
 
+    db.update(MV_SERVER_COLLECTION, {"id": server_id}, server_original)
     LOG.info(f"Successfully retrieved MV server {server_id}")
     return server
 
