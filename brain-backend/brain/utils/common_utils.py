@@ -249,6 +249,7 @@ async def get_nics(
 
     semaphore = asyncio.Semaphore(5) 
 
+    await ensure_packages_installed(ip, user, password, ["ethtool"])
     async def fetch_pci_info(pci: str) -> Dict:
         async with semaphore:
             detail_cmd = f"lspci -vvv -s {pci}"
