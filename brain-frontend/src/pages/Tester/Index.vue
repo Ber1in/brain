@@ -3605,6 +3605,9 @@ const loadAndUpdateServers = async () => {
       return
     }
     
+    // 确认本地为最新代码
+    await loadBranchAndTag()
+
     // 同时加载MV200服务器信息
     await loadMv200Servers()
     
