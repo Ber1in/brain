@@ -235,7 +235,7 @@ async def get_nics(
     Ensures that devices without SN/Product Name are still returned.
     :param vendor_id: PCI vendor ID (e.g., '1f67' for Yunsilicon, '15b3' for Mellanox)
     """
-    pci_cmd = f"lspci -n -d {vendor_id}: | awk '{{print $1}}'"
+    pci_cmd = f"lspci -Dn -d {vendor_id}: | awk '{{print $1}}'"
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     pci_list = [pci.strip() for pci in pci_res.splitlines() if pci.strip()]
 
@@ -266,12 +266,12 @@ async def get_nics(
 
             if vendor_id.lower() == "1f67":
                 pf = await ssh_execute_async(
-                    ip, f"test -e /sys/bus/pci/devices/0000:{pci}/vpd && echo 1 || echo 0",
+                    ip, f"test -e /sys/bus/pci/devices/{pci}/vpd && echo 1 || echo 0",
                     user, password)
                 if pf.strip() == "0":
                     return None
 
-            cmd = f"ls /sys/bus/pci/devices/0000:{pci}/net | grep -v '_h'"
+            cmd = f"ls /sys/bus/pci/devices/{pci}/net | grep -v '_h'"
             ifaces = (await ssh_execute_async(ip, cmd, user, password, False)).strip().splitlines()
 
             if ifaces:
@@ -336,14 +336,13 @@ async def get_nics(
     return list(merged_sn.values())
 
 
-
 def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
     """
     Parse BDF → {pn, sn} from 'yuncli fw --fru_info' output.
     Supports:
       - Single BDF:  BDF:0000:87:00.0:
       - Multiple BDFs: Multihost BDFs:0000:41:00.0,0000:c1:00.0:
-    Strips PCI domain (first 4 hex digits) to get e.g., "87:00.0".
+    Keeps full PCI BDF including domain (e.g. 0000:87:00.0).
     """
     result: Dict[str, Dict[str, str]] = {}
     current_bdfs: list[str] = []
@@ -355,12 +354,7 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
 
         # 1. Detect single BDF
         if line.startswith("BDF:") and line.endswith(":"):
-            raw_bdf = line.replace("BDF:", "").rstrip(":")
-            parts = raw_bdf.split(":")
-            if len(parts) == 3 and parts[0] == "0000":
-                bdf = ":".join(parts[1:])  # "87:00.0"
-            else:
-                bdf = raw_bdf
+            bdf = line.replace("BDF:", "").rstrip(":")
             current_bdfs = [bdf]
             for b in current_bdfs:
                 result.setdefault(b, {})
@@ -370,13 +364,8 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
         if line.startswith("Multihost BDFs:") and line.endswith(":"):
             raw = line.replace("Multihost BDFs:", "").rstrip(":")
             bdfs = []
-            for raw_bdf in raw.split(","):
-                raw_bdf = raw_bdf.strip()
-                parts = raw_bdf.split(":")
-                if len(parts) == 3 and parts[0] == "0000":
-                    bdf = ":".join(parts[1:])
-                else:
-                    bdf = raw_bdf
+            for bdf in raw.split(","):
+                bdf = bdf.strip()
                 bdfs.append(bdf)
                 result.setdefault(bdf, {})
             current_bdfs = bdfs
@@ -401,11 +390,15 @@ def parse_bdf_partnum(output: str) -> Dict[str, Dict[str, str]]:
 
 def parse_bdf_mac(output: str) -> List[dict]:
     """
-    Parse `yuncli mac -r` output into a list of dicts: [{"bdf": bdf_with_func, "mac": mac}, ...].
+    Parse `yuncli mac -r` output into a list of dicts:
+    [{"bdf": bdf_with_domain, "mac": mac}, ...].
+
     Supports:
       - Single BDF:  BDF:0000:87:00.0:
       - Multiple BDFs: Multihost BDFs:0000:41:00.0,0000:c1:00.0:
+
     For Multihost BDFs, MACs are evenly distributed across BDFs.
+    Keeps full PCI BDF including domain.
     """
     result: List[dict] = []
     current_bdfs: List[str] = []
@@ -422,9 +415,8 @@ def parse_bdf_mac(output: str) -> List[dict]:
             # flush previous buffer if any
             if current_bdfs and macs_buffer:
                 result.extend(_assign_macs_to_bdfs(current_bdfs, macs_buffer))
-            raw = m_single.group(1)
-            if raw.startswith("0000:"):
-                raw = raw[5:]
+
+            raw = m_single.group(1)   # keep full BDF, e.g. 0000:87:00.0
             current_bdfs = [raw]
             macs_buffer = []
             continue
@@ -433,14 +425,9 @@ def parse_bdf_mac(output: str) -> List[dict]:
         if line.startswith("Multihost BDFs:") and line.endswith(":"):
             if current_bdfs and macs_buffer:
                 result.extend(_assign_macs_to_bdfs(current_bdfs, macs_buffer))
+
             raw = line.replace("Multihost BDFs:", "").rstrip(":")
-            bdfs = []
-            for r in raw.split(","):
-                r = r.strip()
-                if r.startswith("0000:"):
-                    r = r[5:]
-                bdfs.append(r)
-            current_bdfs = bdfs
+            current_bdfs = [bdf.strip() for bdf in raw.split(",")]
             macs_buffer = []
             continue
 
@@ -556,20 +543,38 @@ async def ipmi_power_action(bmcip: str, action: str, host: str, user: str, pwd: 
            "chassis", "power", action]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        if result.returncode != 0:
-            LOG.error(f"IPMI {action} failed on BMC {bmcip}: {result.stderr.strip()}")
+        used_fallback = False
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            failed = result.returncode != 0
+            if failed:
+                LOG.error(f"IPMI {action} failed on BMC {bmcip} "
+                          f"(local ipmitool): {result.stderr.strip()}")
+        except subprocess.TimeoutExpired as e:
+            LOG.error(f"IPMI {action} timeout on BMC {bmcip} "
+                      f"(local ipmitool): {e}")
+            failed = True
+
+        if failed:
             try:
                 await ssh_execute_async(host, f"ipmitool power {action}", user, pwd)
+                used_fallback = True
             except Exception:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"IPMI {action} failed"
-                )
-        LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip}: {result.stdout.strip()}")
+                raise HTTPException(status_code=500,
+                                    detail=f"IPMI {action} failed")
+
+        if used_fallback:
+            LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip} "
+                     f"via SSH fallback")
+        else:
+            LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip} "
+                     f"via local ipmitool")
+
     except Exception as e:
         LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
-        raise HTTPException(status_code=500, detail=f"IPMI {action} execution error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"IPMI {action} execution error: {e}")
 
 
 async def collect_device_info(ip, user, password):
@@ -743,21 +748,23 @@ def parse_bdf_from_upgrade(upgrade_output: str):
 
     bdf_list = []
 
-    # 1. Match pattern: |--[87:00.0]
-    pattern1 = r"\|\--\[[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]\]"
+    # 1. Match pattern: |--[87:00.0]  (no domain info available)
+    pattern1 = r"\|\--\[([0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9])\]"
     matches1 = re.findall(pattern1, upgrade_output)
     if matches1:
-        bdf_list.extend([m.replace("|--[", "").replace("]", "") for m in matches1])
+        bdf_list.extend(matches1)
 
-    # 2. If not found, match BDF:0000:xx:xx.x
+    # 2. Match BDF with optional domain: BDF:0000:87:00.0 or BDF:87:00.0
     if not bdf_list:
-        pattern2 = r"BDF:0000:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]"
+        pattern2 = r"BDF:([0-9a-fA-F]{4}:)?([0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9])"
         matches2 = re.findall(pattern2, upgrade_output)
         if matches2:
-            # Extract last two parts, e.g. 0000:87:00.0 → 87:00.0
-            bdf_list.extend([m.split(":")[2] + ":" + m.split(":")[3] for m in matches2])
+            for domain, bdf in matches2:
+                # keep full bdf if domain exists
+                full_bdf = f"{domain}{bdf}" if domain else bdf
+                bdf_list.append(full_bdf)
 
-    # 3. If still not found, match device: xx:xx.x
+    # 3. Match device: xx:xx.x (still no domain info)
     if not bdf_list:
         pattern3 = r"device:\s+([0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9])"
         matches3 = re.findall(pattern3, upgrade_output)
@@ -765,19 +772,22 @@ def parse_bdf_from_upgrade(upgrade_output: str):
             bdf_list.extend(matches3)
 
     # Remove duplicates
-    bdf_list = sorted(list(set(bdf_list)))
+    bdf_list = sorted(set(bdf_list))
 
-    # 4. If still empty, fallback to lspci Yunsilicon search
+    # 4. Fallback: scan via lspci (try to keep domain if possible)
     if not bdf_list:
         LOG.warning("No BDF found in upgrade output.")
         LOG.info("Trying to search Yunsilicon devices via lspci...")
 
         try:
-            lspci_output = subprocess.check_output(["lspci"], universal_newlines=True)
-            pattern4 = r"^([0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]).*Yunsilicon"
+            lspci_output = subprocess.check_output(
+                ["lspci", "-D"], universal_newlines=True
+            )
+            # -D ensures domain is included
+            pattern4 = r"^([0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]).*Yunsilicon"
             matches4 = re.findall(pattern4, lspci_output, re.MULTILINE)
             if matches4:
-                bdf_list.append(matches4[0])
+                bdf_list.extend(matches4)
         except Exception:
             LOG.exception("Failed to execute lspci for fallback scanning.")
 
