@@ -81,8 +81,6 @@ detect_os() {{
     fi
 }}
 
-OS=$(detect_os)
-
 ensure_repo() {{
     if echo "$OS" | grep -qiE "debian|ubuntu|kylin.*debian"; then
         # Debian/Ubuntu/Kylin Desktop
@@ -93,6 +91,7 @@ ensure_repo() {{
     elif echo "$OS" | grep -qiE "rhel|centos|fedora|openeuler|kylin"; then
         # RHEL/CentOS/Fedora/OpenEuler/Kylin Advanced Server
         if grep -q 'VERSION_ID="7"' /etc/os-release 2>/dev/null; then
+            rm -rf /etc/yum.repos.d/*
             curl -s -o /etc/yum.repos.d/centos.repo http://mirrors.yunsilicon.com/yum.repos.d/centos7.9.repo || true
             curl -s -o /etc/yum.repos.d/epel.repo http://mirrors.yunsilicon.com/yum.repos.d/epel7.repo || true
         elif grep -q 'VERSION_ID="8"' /etc/os-release 2>/dev/null; then
@@ -121,8 +120,13 @@ ensure_packages() {{
 
     if [ ${{#MISSING[@]}} -eq 0 ]; then
         echo "All packages already installed"
-        return
+        return 0
     fi
+
+    echo "Missing packages: ${{MISSING[@]}}"
+
+    OS=$(detect_os)
+    ensure_repo
 
     echo "Installing packages: ${{MISSING[@]}}"
 
@@ -141,7 +145,6 @@ ensure_packages() {{
     fi
 }}
 
-ensure_repo
 ensure_packages
 """  # noqa
 
