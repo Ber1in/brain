@@ -228,7 +228,8 @@ async def get_nics(
     ip: str,
     user: str,
     password: str,
-    vendor_id: str
+    vendor_id: str,
+    product_infos: dict = None
 ) -> List[Dict]:
     """
     Get NIC info from remote server, return in the same format as parse_nics_info.
@@ -239,17 +240,11 @@ async def get_nics(
     pci_res = await ssh_execute_async(ip, pci_cmd, user, password)
     pci_list = [pci.strip() for pci in pci_res.splitlines() if pci.strip()]
 
-    product_infos = {}
-    if vendor_id.lower() == "1f67":
-        part_num_cmd = 'yuncli fw --fru_info'
-        part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
-        product_infos = parse_bdf_partnum(part_num_res)
-
+    product_infos = product_infos or {}
     devices = []
 
     semaphore = asyncio.Semaphore(5) 
 
-    await ensure_packages_installed(ip, user, password, ["ethtool"])
     async def fetch_pci_info(pci: str) -> Dict:
         async with semaphore:
             detail_cmd = f"lspci -vvv -s {pci}"
@@ -616,7 +611,7 @@ async def collect_device_info(ip, user, password):
     }
 
 
-async def collect_nic_info(ip: str, user: str, password: str, check=True) -> list:
+async def collect_nic_info(ip: str, user: str, password: str) -> list:
     """
     Collect NIC info from remote server.
     - Parse PCI info
@@ -625,15 +620,20 @@ async def collect_nic_info(ip: str, user: str, password: str, check=True) -> lis
     - Merge into unified structure with type/mac/iface
     """
     merged = []
-    yunsilicon_nics = await get_nics(ip, user, password, vendor_id="1f67")
-    mellanox_nics = await get_nics(ip, user, password, vendor_id="15b3")
+
+    await ensure_packages_installed(ip, user, password, ["ethtool"])
+    part_num_cmd = 'yuncli fw --fru_info'
+    part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
+    product_infos = parse_bdf_partnum(part_num_res)
+    yunsilicon_nics = await get_nics(ip, user, password, "1f67", product_infos,)
+    mellanox_nics = await get_nics(ip, user, password, "15b3")
     merged = yunsilicon_nics + mellanox_nics
     return merged
 
 
 async def update_automatic_async(ip, user, password):
     device_info = await collect_device_info(ip, user, password)
-    nics = await collect_nic_info(ip, user, password, False)
+    nics = await collect_nic_info(ip, user, password)
     return device_info, nics
 
 

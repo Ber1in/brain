@@ -250,9 +250,9 @@
                 <span>{{ formatNicTypeForDisplay(row.type) }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="sn" label="序列号" width="170"/>
+            <el-table-column prop="sn" label="序列号" width="180"/>
             <!-- BDF列移到MAC地址前面 -->
-            <el-table-column label="BDF" width="80">
+            <el-table-column label="BDF" width="95">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
