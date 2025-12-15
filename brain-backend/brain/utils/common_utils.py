@@ -276,7 +276,8 @@ async def get_nics(
 
             if ifaces:
                 for iface in ifaces:
-                    mac = (await ssh_execute_async(ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
+                    mac = (await ssh_execute_async(
+                        ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
                     nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
             else:
                 nic_info.append({"bdf": pci, "iface": "", "mac": ""})
@@ -848,19 +849,19 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
         if data.update_options == "fw":
             # Step Group 2: Upgrade Fw
             update_task(task_id, stage="upgrading_fw", detail="Upgrading fw hw")
-            LOG.info(f"[{task_id}] run yun_upgrade.sh in {root_dir}/fw_hw/")
+            LOG.info(f"{host} run yun_upgrade.sh in {root_dir}/fw_hw/")
 
             uninstall_cmd = (f"cd {root_dir}/fw_hw/ && chmod +x yun_upgrade.sh"
                              " && ./yun_upgrade.sh 2>&1")
             upgrade_result = await ssh_execute_async(host, uninstall_cmd, user, pwd)
-            LOG.info(f"[{task_id}] fw hw upgraded")
+            LOG.info(f"{host} fw hw upgraded")
 
             bdf_list = parse_bdf_from_upgrade(upgrade_result)
             update_task(task_id, stage="erasing_bdf", detail=f"Erasing bdfs {bdf_list}")
             for bdf in bdf_list:
                 erase_cmd = (f'{root_dir}/fw_hw/tools/yuncli/yuncli fw -d "{bdf}" --config erase')
                 await ssh_execute_async(host, erase_cmd, user, pwd)
-            LOG.info(f"[{task_id}]All BDFs in {bdf_list} have been successfully erased.")
+            LOG.info(f"{host} All BDFs in {bdf_list} have been successfully erased.")
 
             update_task(task_id, stage="reboot", detail="The server is restarting")
             await ipmi_power_action(ipmi, "reset", host, user, pwd)
@@ -868,29 +869,22 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
             success = await wait_for_server_reboot(host)
             if success:
                 update_task(task_id, status="finished", detail="MCR update completed")
-                LOG.info(f"[{task_id}] Reset Fw task finished successfully")
+                LOG.info(f"{host} Reset Fw task finished successfully")
             else:
                 LOG.error(f"{host} did not come online within timeout")
                 update_task(task_id, status="reboot_timeout", detail="Server restart timeout")
 
         else:
-            # Step Group 2: Uninstall Old MCR
-            # update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
-            # LOG.info(f"[{task_id}] Uninstalling old MCR in {root_dir}")
-
-            # extra_args = " --ovs-dpdk --spdk" if aidpu else ""
-            # uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force{extra_args}"
-
-            # await ssh_execute_async(host, uninstall_cmd, user, pwd)
-            # LOG.info(f"[{task_id}] Old MCR uninstalled")
-
-            # Step Group 3: Install New MCR
+            # Step Group 2: Install New MCR
             update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
-            LOG.info(f"[{task_id}] Installing new MCR with option: {data.update_options}")
+            LOG.info(f"{host} Installing new MCR with option: {data.update_options}")
 
             if aidpu:
-                install_cmd = (f'cd {root_dir} &&./install.sh --ovs-dpdk --spdk '
-                               '--yun-upgrade-option "--dpu-blk-oprom --best-try" --dpuagent')
+                install_cmd = (
+                    f'cd {root_dir} && ./install.sh --force --ovs-dpdk --spdk '
+                    '--yun-upgrade-option "--dpu-blk-oprom --best-try" --dpuagent'
+                )
+                uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force --ovs-dpdk --spdk"
             else:
                 if data.update_options == "all":
                     install_cmd = f"cd {root_dir} && ./install.sh --force"
@@ -899,8 +893,39 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
                 else:
                     raise Exception("Invalid update option")
 
-            await ssh_execute_async(host, install_cmd, user, pwd)
-            LOG.info(f"[{task_id}] New MCR installed successfully")
+                uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force"
+
+            # ---------- first install attempt ----------
+            try:
+                LOG.info(f"{host} Trying initial MCR install")
+                await ssh_execute_async(host, install_cmd, user, pwd)
+                LOG.info(f"{host} New MCR installed successfully (first attempt)")
+            except Exception as e:
+                LOG.warning(
+                    f"{host} Initial MCR install failed, "
+                    f"trying uninstall + reinstall: {e}"
+                )
+
+                # ---------- uninstall ----------
+                try:
+                    update_task(task_id, stage="uninstalling_mcr", detail="Uninstalling old MCR")
+                    LOG.info(f"{host} Uninstalling old MCR")
+
+                    await ssh_execute_async(host, uninstall_cmd, user, pwd)
+
+                    LOG.info(f"{host} Old MCR uninstalled successfully")
+                except Exception as ue:
+                    LOG.error(f"{host} Uninstall MCR failed: {ue}")
+                    raise
+
+                # ---------- reinstall ----------
+                try:
+                    LOG.info(f"{host} Retrying MCR install after uninstall")
+                    await ssh_execute_async(host, install_cmd, user, pwd)
+                    LOG.info(f"{host} New MCR installed successfully (after uninstall)")
+                except Exception as e:
+                    LOG.error(f"{host} MCR install failed after uninstall: {e}")
+                    raise
 
             if aidpu:
                 update_task(task_id, status="finished",
@@ -913,12 +938,12 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
                 success = await wait_for_server_reboot(host)
                 if success:
                     update_task(task_id, status="finished", detail="MCR update completed")
-                    LOG.info(f"[{task_id}] Reset Fw task finished successfully")
+                    LOG.info(f"{host} Reset Fw task finished successfully")
                 else:
                     LOG.error(f"{host} did not come online within timeout")
                     update_task(task_id, status="reboot_timeout", detail="Server restart timeout")
 
-            LOG.info(f"[{task_id}] MCR update task finished successfully")
+            LOG.info(f"{host} MCR update task finished successfully")
 
     except Exception as e:
         update_task(task_id, status="failed", detail=str(e))
