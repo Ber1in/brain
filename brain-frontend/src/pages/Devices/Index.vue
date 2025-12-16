@@ -69,7 +69,6 @@
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @selection-change="handleSelectionChange"
-        :row-class-name="getRowClassName"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
@@ -88,14 +87,6 @@
               :underline="false"
             >
               {{ row.bmc.hostname }}
-              <el-tooltip 
-                v-if="hasDuplicateNicInfo(row)" 
-                effect="dark" 
-                :content="getDuplicateTooltip(row)"
-                placement="top"
-              >
-                <el-icon class="warning-icon"><Warning /></el-icon>
-              </el-tooltip>
             </el-link>
           </template>
         </el-table-column>
@@ -1203,9 +1194,12 @@ const loadingConditions = ref(false)
 
 // 加载用户保存的过滤条件
 const loadFilteringConditions = async () => {
+  console.time('loadFilteringConditions')
   try {
     loadingConditions.value = true
+    console.log('开始加载过滤条件...')
     const data = await filterApi.getFilteringConditions()
+    console.log('过滤条件数据获取完成:', data)
     
     // 更新本地状态
     filteringConditions.value = {
@@ -1216,6 +1210,8 @@ const loadFilteringConditions = async () => {
       nic_filtering_condition: data.nic_filtering_condition || 'or'
     }
     
+    console.log('过滤条件本地状态已更新:', filteringConditions.value)
+    
     // 同步到UI状态
     showOnlyFollowed.value = filteringConditions.value.only_focus === 1
     tagFilter.value = filteringConditions.value.tags
@@ -1223,15 +1219,21 @@ const loadFilteringConditions = async () => {
     tagFilterLogic.value = filteringConditions.value.tag_filtering_condition.toUpperCase() as 'AND' | 'OR'
     nicFilterLogic.value = filteringConditions.value.nic_filtering_condition.toUpperCase() as 'AND' | 'OR'
     
+    console.log('UI状态已同步: showOnlyFollowed=', showOnlyFollowed.value, 
+                'tagFilter=', tagFilter.value, 
+                'nicTypeFilter=', nicTypeFilter.value)
+    
   } catch (error) {
     console.error('加载过滤条件失败:', error)
   } finally {
     loadingConditions.value = false
+    console.timeEnd('loadFilteringConditions')
   }
 }
 
 // 保存过滤条件到后端
 const saveFilteringConditions = async () => {
+  console.time('saveFilteringConditions')
   try {
     const data: FilteringConditions = {
       only_focus: showOnlyFollowed.value ? 1 : 0,
@@ -1241,18 +1243,22 @@ const saveFilteringConditions = async () => {
       nic_filtering_condition: nicFilterLogic.value.toLowerCase()
     }
     
+    console.log('准备保存过滤条件:', data)
     await filterApi.updateFilteringConditions(data)
     filteringConditions.value = data
+    console.log('过滤条件保存成功')
     
   } catch (error) {
     console.error('保存过滤条件失败:', error)
     ElMessage.error('保存过滤条件失败')
+  } finally {
+    console.timeEnd('saveFilteringConditions')
   }
 }
 
-
 // 新增：计算所有网卡类型
 const allNicTypes = computed(() => {
+  console.time('computeAllNicTypes')
   const types = new Set<string>()
   devices.value.forEach(device => {
     const nicSummary = getNicSummary(device)
@@ -1260,62 +1266,84 @@ const allNicTypes = computed(() => {
       types.add(summary.type)
     })
   })
-  return Array.from(types).sort()
+  const result = Array.from(types).sort()
+  console.timeEnd('computeAllNicTypes')
+  console.log('计算所有网卡类型完成，共', result.length, '种类型:', result)
+  return result
 })
 
 // 新增：计算所有标签
 const allTags = computed(() => {
-  return availableTags.value.filter(tag => 
+  console.time('computeAllTags')
+  const result = availableTags.value.filter(tag => 
     devices.value.some(device => 
       device.tags && device.tags.includes(tag.name)
     )
   )
+  console.timeEnd('computeAllTags')
+  console.log('计算所有标签完成，共', result.length, '个标签')
+  return result
 })
 
 // 新增：获取网卡类型数量统计
 const getNicTypeCount = (nicType: string) => {
-  return devices.value.filter(device => {
+  console.time(`getNicTypeCount-${nicType}`)
+  const count = devices.value.filter(device => {
     const nicSummary = getNicSummary(device)
     return nicSummary.some(summary => summary.type === nicType)
   }).length
+  console.timeEnd(`getNicTypeCount-${nicType}`)
+  return count
 }
 
 // 新增：获取标签数量统计
 const getTagCount = (tagName: string) => {
-  return devices.value.filter(device => 
+  console.time(`getTagCount-${tagName}`)
+  const count = devices.value.filter(device => 
     device.tags && device.tags.includes(tagName)
   ).length
+  console.timeEnd(`getTagCount-${tagName}`)
+  return count
 }
 
 // 切换关注过滤
 const toggleFollowFilter = async () => {
+  console.log('切换关注过滤，当前值:', showOnlyFollowed.value, '=>', !showOnlyFollowed.value)
   showOnlyFollowed.value = !showOnlyFollowed.value
   await saveFilteringConditions()
 }
 
 // 应用网卡类型过滤
 const applyNicTypeFilter = async () => {
+  console.time('applyNicTypeFilter')
+  console.log('应用网卡类型过滤，过滤条件:', pendingNicTypeFilter.value, '逻辑:', pendingNicFilterLogic.value)
+  
   // 更新实际筛选条件
   nicTypeFilter.value = [...pendingNicTypeFilter.value]
   nicFilterLogic.value = pendingNicFilterLogic.value
   
   showNicTypeFilter.value = false
   await saveFilteringConditions()
+  console.timeEnd('applyNicTypeFilter')
 }
 
 // 应用标签过滤
 const applyTagFilter = async () => {
+  console.time('applyTagFilter')
+  console.log('应用标签过滤，过滤条件:', pendingTagFilter.value, '逻辑:', pendingTagFilterLogic.value)
+  
   // 更新实际筛选条件
   tagFilter.value = [...pendingTagFilter.value]
   tagFilterLogic.value = pendingTagFilterLogic.value
   
   showTagFilter.value = false
   await saveFilteringConditions()
+  console.timeEnd('applyTagFilter')
 }
-
 
 // 清空网卡类型过滤
 const clearNicTypeFilter = () => {
+  console.log('清空网卡类型过滤')
   // 同时清空实际状态和待应用状态
   nicTypeFilter.value = []
   pendingNicTypeFilter.value = []
@@ -1328,6 +1356,7 @@ const clearNicTypeFilter = () => {
 
 // 清空标签过滤
 const clearTagFilter = () => {
+  console.log('清空标签过滤')
   // 同时清空实际状态和待应用状态
   tagFilter.value = []
   pendingTagFilter.value = []
@@ -1339,12 +1368,14 @@ const clearTagFilter = () => {
 }
 
 const cancelNicTypeFilter = () => {
+  console.log('取消网卡类型过滤修改')
   showNicTypeFilter.value = false
   // 不清空 pending 状态，下次打开时会重新初始化
 }
 
 // 新增：取消标签过滤修改
 const cancelTagFilter = () => {
+  console.log('取消标签过滤修改')
   showTagFilter.value = false
   // 不清空 pending 状态，下次打开时会重新初始化
 }
@@ -1404,15 +1435,22 @@ const getStageText = (stage: string) => {
 
 // 检测服务器是否有重复的网卡信息
 const hasDuplicateNicInfo = (device: ServerDetailResponse): boolean => {
-  if (!device.nics || device.nics.length === 0) return false
+  console.time(`hasDuplicateNicInfo-${device.id}`)
+  if (!device.nics || device.nics.length === 0) {
+    console.timeEnd(`hasDuplicateNicInfo-${device.id}`)
+    return false
+  }
   
   // 检查内部重复
   if (hasInternalDuplicate(device)) {
+    console.timeEnd(`hasDuplicateNicInfo-${device.id}`)
     return true
   }
   
   // 检查跨服务器重复
-  return hasExternalDuplicate(device)
+  const result = hasExternalDuplicate(device)
+  console.timeEnd(`hasDuplicateNicInfo-${device.id}`)
+  return result
 }
 
 // 检查内部重复
@@ -1448,6 +1486,7 @@ const hasInternalDuplicate = (device: ServerDetailResponse): boolean => {
 
 // 检查跨服务器重复
 const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
+  console.time(`hasExternalDuplicate-${device.id}`)
   const allNicInfos = devices.value.flatMap(d => 
     (d.nics || []).flatMap(nic => {
       const infos = []
@@ -1467,7 +1506,7 @@ const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
     })
   )
   
-  return device.nics.some(nic => {
+  const result = device.nics.some(nic => {
     if (nic.sn) {
       const sameSnCount = allNicInfos.filter(info => 
         info.type === 'sn' && info.value === nic.sn && info.deviceId !== device.id
@@ -1486,11 +1525,17 @@ const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
       return false
     })
   })
+  console.timeEnd(`hasExternalDuplicate-${device.id}`)
+  return result
 }
 
 // 获取重复信息的详细提示
 const getDuplicateTooltip = (device: ServerDetailResponse): string => {
-  if (!device.nics) return ''
+  console.time(`getDuplicateTooltip-${device.id}`)
+  if (!device.nics) {
+    console.timeEnd(`getDuplicateTooltip-${device.id}`)
+    return ''
+  }
   
   const duplicates: string[] = []
   const allNicInfos = devices.value.flatMap(d => 
@@ -1568,6 +1613,7 @@ const getDuplicateTooltip = (device: ServerDetailResponse): string => {
     duplicates.push(...internalDuplicates)
   }
   
+  console.timeEnd(`getDuplicateTooltip-${device.id}`)
   return duplicates.length > 0 
     ? `网卡信息冲突:\n${duplicates.join('\n')}`
     : ''
@@ -1612,10 +1658,10 @@ const checkInternalDuplicates = (device: ServerDetailResponse): string[] => {
 
 // 根据是否有重复信息设置行样式
 const getRowClassName = ({ row }: { row: ServerDetailResponse }) => {
-  if (hasDuplicateNicInfo(row)) {
-    return 'warning-row'
-  }
-  return ''
+  console.time(`getRowClassName-${row.id}`)
+  const className = hasDuplicateNicInfo(row) ? 'warning-row' : ''
+  console.timeEnd(`getRowClassName-${row.id}`)
+  return className
 }
 
 const getMcrStatusType = (device: ServerDetailResponse) => {
@@ -1771,6 +1817,7 @@ watch(currentPath, (newPath) => {
 // 修改：显示网卡类型过滤弹窗时初始化待应用状态
 watch(showNicTypeFilter, (visible) => {
   if (visible) {
+    console.log('显示网卡类型过滤弹窗，初始化待应用状态')
     // 复制当前筛选条件到待应用状态
     pendingNicTypeFilter.value = [...nicTypeFilter.value]
     pendingNicFilterLogic.value = nicFilterLogic.value
@@ -1780,6 +1827,7 @@ watch(showNicTypeFilter, (visible) => {
 // 修改：显示标签过滤弹窗时初始化待应用状态
 watch(showTagFilter, (visible) => {
   if (visible) {
+    console.log('显示标签过滤弹窗，初始化待应用状态')
     // 复制当前筛选条件到待应用状态
     pendingTagFilter.value = [...tagFilter.value]
     pendingTagFilterLogic.value = tagFilterLogic.value
@@ -1847,21 +1895,24 @@ const handlePathInputBlur = () => {
 
 // 计算属性：筛选后的文件列表
 const filteredFileList = computed(() => {
+  console.time('computeFilteredFileList')
   if (!fileFilterText.value) {
+    console.timeEnd('computeFilteredFileList')
     return fileList.value
   }
   
   const keyword = fileFilterText.value.toLowerCase()
-  return fileList.value.filter(item => 
+  const result = fileList.value.filter(item => 
     item.name.toLowerCase().includes(keyword)
   )
+  console.timeEnd('computeFilteredFileList')
+  return result
 })
 
 // 添加获取完整路径的方法（因为item没有path属性）
 const getFullPath = (fileName: string) => {
   return currentPath.value === '/' ? `/${fileName}` : `${currentPath.value}/${fileName}`
 }
-
 
 // 计算属性：路径面包屑
 const currentPathParts = computed(() => {
@@ -1880,7 +1931,6 @@ const getFileName = (filePath: string) => {
 }
 
 // 方法：处理更新MCR包对话框
-// 处理更新MCR包对话框
 const handleUpdateMcrDialog = async (device: ServerDetailResponse) => {
   // 检查是否有正在运行的MCR任务
   if (isMcrTaskRunning(device)) {
@@ -1888,6 +1938,7 @@ const handleUpdateMcrDialog = async (device: ServerDetailResponse) => {
     return
   }
   
+  console.log('打开更新MCR包对话框，设备:', device.bmc.hostname)
   currentDevice.value = device
   currentPath.value = '/auto/asic-dump/meta_release'
   selectedMcrFile.value = ''
@@ -1899,15 +1950,19 @@ const handleUpdateMcrDialog = async (device: ServerDetailResponse) => {
 
 // 方法：加载目录
 const loadDirectory = async (path: string) => {
+  console.time(`loadDirectory-${path}`)
   // 检查缓存
   if (directoryCache.value[path]) {
     fileList.value = directoryCache.value[path]
+    console.timeEnd(`loadDirectory-${path}`)
     return
   }
 
   try {
     mcrLoading.value = true
+    console.log('开始加载远程目录:', path)
     const response = await remotefsApi.listRemoteDir(path)
+    console.log('远程目录加载完成，文件数量:', response.length)
     
     // 如果不是根目录，添加返回上一级选项
     if (path !== '/auto') {
@@ -1933,11 +1988,15 @@ const loadDirectory = async (path: string) => {
       }
       return a.name.localeCompare(b.name)
     })
+    console.log('目录排序完成，最终文件数量:', fileList.value.length)
+    
   } catch (error: any) {
+    console.error('加载目录失败:', error)
     ElMessage.error(`加载目录失败: ${error.response?.data?.detail || '网络错误'}`)
     fileList.value = []
   } finally {
     mcrLoading.value = false
+    console.timeEnd(`loadDirectory-${path}`)
   }
 }
 
@@ -2417,8 +2476,12 @@ const getBatchReleaseTooltip = () => {
 
 // 计算启动项列表
 const bootEntriesList = computed(() => {
+  console.time('computeBootEntriesList')
   const bootEntries = bootEntriesData.value
-  if (!bootEntries || !bootEntries.entries) return []
+  if (!bootEntries || !bootEntries.entries) {
+    console.timeEnd('computeBootEntriesList')
+    return []
+  }
 
   const { entries, current, next, default: defaultOs } = bootEntries
   const result = []
@@ -2433,6 +2496,7 @@ const bootEntriesList = computed(() => {
     })
   }
 
+  console.timeEnd('computeBootEntriesList')
   return result
 })
 
@@ -2449,7 +2513,9 @@ const isMcrTaskRunning = (device: ServerDetailResponse): boolean => {
 const loadBootEntries = async (deviceId: string) => {
   try {
     bootEntriesLoading.value = true
+    console.log('开始加载启动项信息，设备ID:', deviceId)
     const data = await deviceApi.getBootEntries(deviceId)
+    console.log('启动项信息加载完成:', data)
     bootEntriesData.value = data
     
     // 默认选中当前启动项
@@ -2519,8 +2585,12 @@ const handleSetBootEntry = async () => {
 
 // 获取标签样式
 const getTagStyle = (tagName: string) => {
+  console.time(`getTagStyle-${tagName}`)
   const tag = availableTags.value.find(t => t.name === tagName)
-  if (!tag || !tag.color) return {}
+  if (!tag || !tag.color) {
+    console.timeEnd(`getTagStyle-${tagName}`)
+    return {}
+  }
   
   const hexColor = tag.color.toUpperCase()
   
@@ -2532,16 +2602,22 @@ const getTagStyle = (tagName: string) => {
   const brightness = (r * 299 + g * 587 + b * 114) / 1000
   const textColor = brightness > 128 ? '#000000' : '#ffffff'
   
-  return {
+  const style = {
     backgroundColor: hexColor,
     borderColor: hexColor,
     color: textColor
   }
+  console.timeEnd(`getTagStyle-${tagName}`)
+  return style
 }
 
 // 获取网卡信息统计
 const getNicSummary = (device: ServerDetailResponse) => {
-  if (!device.nics || device.nics.length === 0) return []
+  console.time(`getNicSummary-${device.id}`)
+  if (!device.nics || device.nics.length === 0) {
+    console.timeEnd(`getNicSummary-${device.id}`)
+    return []
+  }
   
   const typeCount: Record<string, number> = {}
   
@@ -2557,7 +2633,7 @@ const getNicSummary = (device: ServerDetailResponse) => {
     }
   })
   
-  return Object.entries(typeCount)
+  const result = Object.entries(typeCount)
     .map(([type, count]) => ({
       type,
       displayType: type,
@@ -2571,6 +2647,9 @@ const getNicSummary = (device: ServerDetailResponse) => {
       // 如果类型相同，按数量降序排列
       return b.count - a.count
     })
+  
+  console.timeEnd(`getNicSummary-${device.id}`)
+  return result
 }
 
 // 获取网卡类型颜色
@@ -2579,6 +2658,7 @@ const getNicTypeColor = (nicType: string) => {
 }
 
 const getNicItemStyle = (nicType: string) => {
+  console.time(`getNicItemStyle-${nicType}`)
   const color = getNicTypeColor(nicType)
   
   // 计算文字颜色（根据背景色亮度决定用黑色还是白色文字）
@@ -2589,11 +2669,13 @@ const getNicItemStyle = (nicType: string) => {
   const brightness = (r * 299 + g * 587 + b * 114) / 1000
   const textColor = brightness > 128 ? '#000000' : '#ffffff'
   
-  return {
+  const style = {
     backgroundColor: `${color}15`, // 添加透明度
     borderColor: color,
     color: textColor
   }
+  console.timeEnd(`getNicItemStyle-${nicType}`)
+  return style
 }
 
 const getTagNames = (): string[] => {
@@ -2789,7 +2871,6 @@ const occupyDialogTitle = computed(() => {
   return isModifyMode.value ? '修改占用' : '占用服务器'
 })
 
-// 禁用超过3天的日期
 // 禁用超过3天的日期和时间
 const disabledDate = (time: Date) => {
   const now = new Date()
@@ -2959,14 +3040,18 @@ const getEndTimeDisplayFromForm = () => {
 
 // 加载标签列表
 const loadTags = async () => {
+  console.time('loadTags')
   try {
     tagsLoading.value = true
+    console.log('开始加载标签列表...')
     const response = await tagApi.getTags()
+    console.log('标签列表加载完成，标签数量:', response.tags?.length || 0)
     availableTags.value = response.tags || []
   } catch (error) {
     console.error('加载标签失败:', error)
   } finally {
     tagsLoading.value = false
+    console.timeEnd('loadTags')
   }
 }
 
@@ -3099,52 +3184,74 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
 
 // 检查设备是否符合网卡类型过滤条件
 const matchesNicTypeFilter = (device: ServerDetailResponse) => {
-  if (nicTypeFilter.value.length === 0) return true
+  console.time(`matchesNicTypeFilter-${device.id}`)
+  if (nicTypeFilter.value.length === 0) {
+    console.timeEnd(`matchesNicTypeFilter-${device.id}`)
+    return true
+  }
   
   const nicSummary = getNicSummary(device)
   const deviceNicTypes = nicSummary.map(summary => summary.type)
   
+  let result: boolean
   if (nicFilterLogic.value === 'AND') {
     // AND逻辑：设备必须包含所有选中的网卡类型
-    return nicTypeFilter.value.every(type => 
+    result = nicTypeFilter.value.every(type => 
       deviceNicTypes.includes(type)
     )
   } else {
     // OR逻辑：设备只要包含任意一个选中的网卡类型
-    return nicTypeFilter.value.some(type => 
+    result = nicTypeFilter.value.some(type => 
       deviceNicTypes.includes(type)
     )
   }
+  console.timeEnd(`matchesNicTypeFilter-${device.id}`)
+  return result
 }
 
 // 检查设备是否符合标签过滤条件
 const matchesTagFilter = (device: ServerDetailResponse) => {
-  if (tagFilter.value.length === 0) return true
+  console.time(`matchesTagFilter-${device.id}`)
+  if (tagFilter.value.length === 0) {
+    console.timeEnd(`matchesTagFilter-${device.id}`)
+    return true
+  }
   
   const deviceTags = device.tags || []
   
+  let result: boolean
   if (tagFilterLogic.value === 'AND') {
     // AND逻辑：设备必须包含所有选中的标签
-    return tagFilter.value.every(tag => 
+    result = tagFilter.value.every(tag => 
       deviceTags.includes(tag)
     )
   } else {
     // OR逻辑：设备只要包含任意一个选中的标签
-    return tagFilter.value.some(tag => 
+    result = tagFilter.value.some(tag => 
       deviceTags.includes(tag)
     )
   }
+  console.timeEnd(`matchesTagFilter-${device.id}`)
+  return result
 }
 
 // 检查设备是否符合关注过滤条件
 const matchesFollowFilter = (device: ServerDetailResponse) => {
-  if (!showOnlyFollowed.value) return true
-  return isFollowing(device)
+  console.time(`matchesFollowFilter-${device.id}`)
+  if (!showOnlyFollowed.value) {
+    console.timeEnd(`matchesFollowFilter-${device.id}`)
+    return true
+  }
+  const result = isFollowing(device)
+  console.timeEnd(`matchesFollowFilter-${device.id}`)
+  return result
 }
 
 // 计算属性：过滤设备列表
 const filteredDevices = computed(() => {
+  console.time('computeFilteredDevices')
   let filtered = devices.value
+  console.log('开始过滤设备列表，原始设备数量:', filtered.length)
   
   // 应用多重过滤
   filtered = filtered.filter(device => {
@@ -3176,14 +3283,19 @@ const filteredDevices = computed(() => {
     return true
   })
   
+  console.log('过滤完成，最终设备数量:', filtered.length)
+  console.timeEnd('computeFilteredDevices')
   return filtered
 })
 
 // 加载数据
 const loadData = async () => {
+  console.time('loadData')
   loading.value = true
+  console.log('开始加载设备数据...')
   try {
     const data = await deviceApi.getAll()
+    console.log('设备数据加载完成，设备数量:', data.length)
     devices.value = data
     
     // 为有task_id的设备启动状态查询
@@ -3194,18 +3306,22 @@ const loadData = async () => {
       }
     })
   } catch (error) {
+    console.error('加载设备数据失败:', error)
   } finally {
     loading.value = false
+    console.timeEnd('loadData')
   }
 }
 
 // 处理搜索
 const handleSearch = () => {
+  console.log('执行搜索，关键词:', searchKeyword.value)
   // 搜索逻辑已经在 computed 属性中处理
 }
 
 // 下拉菜单命令处理
 const handleCommand = (command: string, device: ServerDetailResponse) => {
+  console.log('处理命令:', command, '设备:', device.bmc.hostname)
   switch (command) {
     case 'detail':
       handleDetail(device)
@@ -3350,9 +3466,12 @@ const handleDelete = async (device: ServerDetailResponse) => {
 }
 
 onMounted(() => {
+  console.log('组件开始挂载...')
+  console.time('onMountedTotal')
   loadData()
   loadTags()
   loadFilteringConditions()
+  console.timeEnd('onMountedTotal')
 })
 </script>
 
