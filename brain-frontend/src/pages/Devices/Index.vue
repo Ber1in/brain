@@ -448,6 +448,7 @@
       width="500px"
       class="filter-dialog"
       :close-on-click-modal="false"
+      @close="cancelNicTypeFilter"
     >
       <div class="filter-dialog-content">
         <div class="filter-section">
@@ -461,7 +462,7 @@
               已选择: {{ nicTypeFilter.length }} 项
             </div>
             <div class="logic-selector">
-              <el-radio-group v-model="nicFilterLogic" size="small">
+              <el-radio-group v-model="pendingNicFilterLogic" size="small">
                 <el-radio label="AND">AND（同时满足）</el-radio>
                 <el-radio label="OR">OR（满足任意）</el-radio>
               </el-radio-group>
@@ -469,7 +470,7 @@
           </div>
           
           <div class="scrollable-list">
-            <el-checkbox-group v-model="nicTypeFilter" class="checkbox-group">
+            <el-checkbox-group v-model="pendingNicTypeFilter" class="checkbox-group">
               <div 
                 v-for="nicType in allNicTypes" 
                 :key="nicType"
@@ -504,6 +505,7 @@
       width="500px"
       class="filter-dialog"
       :close-on-click-modal="false"
+      @close="cancelTagFilter"
     >
       <div class="filter-dialog-content">
         <div class="filter-section">
@@ -517,7 +519,7 @@
               已选择: {{ tagFilter.length }} 项
             </div>
             <div class="logic-selector">
-              <el-radio-group v-model="tagFilterLogic" size="small">
+              <el-radio-group v-model="pendingTagFilterLogic" size="small">
                 <el-radio label="AND">AND（同时拥有）</el-radio>
                 <el-radio label="OR">OR（拥有任意）</el-radio>
               </el-radio-group>
@@ -525,7 +527,7 @@
           </div>
           
           <div class="scrollable-list">
-            <el-checkbox-group v-model="tagFilter" class="checkbox-group">
+            <el-checkbox-group v-model="pendingTagFilter" class="checkbox-group">
               <div 
                 v-for="tag in allTags" 
                 :key="tag.name"
@@ -1182,6 +1184,12 @@ const currentPathInput = ref('')
 const taskStatusMap = ref<Record<string, TaskStatusResponse>>({})
 const taskStatusTimers = ref<Record<string, number>>({})
 
+// 新增：筛选条件中间状态
+const pendingNicTypeFilter = ref<string[]>([])
+const pendingTagFilter = ref<string[]>([])
+const pendingTagFilterLogic = ref<'AND' | 'OR'>('OR')
+const pendingNicFilterLogic = ref<'AND' | 'OR'>('OR')
+
 // 过滤相关状态
 const filteringConditions = ref<FilteringConditions>({
   only_focus: 0,
@@ -1285,29 +1293,60 @@ const toggleFollowFilter = async () => {
   await saveFilteringConditions()
 }
 
+// 应用网卡类型过滤
 const applyNicTypeFilter = async () => {
+  // 更新实际筛选条件
+  nicTypeFilter.value = [...pendingNicTypeFilter.value]
+  nicFilterLogic.value = pendingNicFilterLogic.value
+  
   showNicTypeFilter.value = false
   await saveFilteringConditions()
 }
 
-// 修改现有方法：应用标签过滤并保存
+// 应用标签过滤
 const applyTagFilter = async () => {
+  // 更新实际筛选条件
+  tagFilter.value = [...pendingTagFilter.value]
+  tagFilterLogic.value = pendingTagFilterLogic.value
+  
   showTagFilter.value = false
   await saveFilteringConditions()
 }
 
-// 新增：清空网卡类型过滤
-const clearNicTypeFilter = async () => {
+
+// 清空网卡类型过滤
+const clearNicTypeFilter = () => {
+  // 同时清空实际状态和待应用状态
   nicTypeFilter.value = []
+  pendingNicTypeFilter.value = []
   showNicTypeFilter.value = false
-  await saveFilteringConditions()
+  
+  nextTick(() => {
+    saveFilteringConditions()
+  })
 }
 
-// 修改现有方法：清空标签过滤并保存
-const clearTagFilter = async () => {
+// 清空标签过滤
+const clearTagFilter = () => {
+  // 同时清空实际状态和待应用状态
   tagFilter.value = []
+  pendingTagFilter.value = []
   showTagFilter.value = false
-  await saveFilteringConditions()
+  
+  nextTick(() => {
+    saveFilteringConditions()
+  })
+}
+
+const cancelNicTypeFilter = () => {
+  showNicTypeFilter.value = false
+  // 不清空 pending 状态，下次打开时会重新初始化
+}
+
+// 新增：取消标签过滤修改
+const cancelTagFilter = () => {
+  showTagFilter.value = false
+  // 不清空 pending 状态，下次打开时会重新初始化
 }
 
 // MCR状态相关方法
@@ -1728,6 +1767,24 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
 watch(currentPath, (newPath) => {
   currentPathInput.value = newPath
 }, { immediate: true })
+
+// 修改：显示网卡类型过滤弹窗时初始化待应用状态
+watch(showNicTypeFilter, (visible) => {
+  if (visible) {
+    // 复制当前筛选条件到待应用状态
+    pendingNicTypeFilter.value = [...nicTypeFilter.value]
+    pendingNicFilterLogic.value = nicFilterLogic.value
+  }
+})
+
+// 修改：显示标签过滤弹窗时初始化待应用状态
+watch(showTagFilter, (visible) => {
+  if (visible) {
+    // 复制当前筛选条件到待应用状态
+    pendingTagFilter.value = [...tagFilter.value]
+    pendingTagFilterLogic.value = tagFilterLogic.value
+  }
+})
 
 // 方法：处理路径输入框回车
 const handlePathInputEnter = async () => {
