@@ -70,8 +70,6 @@
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @selection-change="handleSelectionChange"
         :row-class-name="getRowClassName"
-        v-if="!loading"
-        :row-key="row => row.id"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
@@ -1192,9 +1190,6 @@ const pendingTagFilter = ref<string[]>([])
 const pendingTagFilterLogic = ref<'AND' | 'OR'>('OR')
 const pendingNicFilterLogic = ref<'AND' | 'OR'>('OR')
 
-const nicSummaryCache = new Map<string, any[]>()
-const duplicateCheckCache = new Map<string, boolean>()
-
 // 过滤相关状态
 const filteringConditions = ref<FilteringConditions>({
   only_focus: 0,
@@ -1409,16 +1404,15 @@ const getStageText = (stage: string) => {
 
 // 检测服务器是否有重复的网卡信息
 const hasDuplicateNicInfo = (device: ServerDetailResponse): boolean => {
-  const cacheKey = `${device.id}_hasDuplicate`
+  if (!device.nics || device.nics.length === 0) return false
   
-  if (duplicateCheckCache.has(cacheKey)) {
-    return duplicateCheckCache.get(cacheKey)!
+  // 检查内部重复
+  if (hasInternalDuplicate(device)) {
+    return true
   }
   
-  // 简化为只检查内部重复（移除跨服务器检测）
-  const result = hasInternalDuplicate(device)
-  duplicateCheckCache.set(cacheKey, result)
-  return result
+  // 检查跨服务器重复
+  return hasExternalDuplicate(device)
 }
 
 // 检查内部重复
@@ -2095,38 +2089,83 @@ const handleFollow = async (device: ServerDetailResponse) => {
 
 class NicColorManager {
   private colorMap: Map<string, string> = new Map()
-  private availableColors = [
-    '#eb2f96', '#1890ff', '#fa8c16', '#52c41a', '#722ed1',
-    '#f56c6c', '#a0d911', '#2f54eb', '#fa541c', '#36cfc9',
-    '#389e0d', '#e6a23c', '#096dd9', '#faad14', '#7b1fa2',
-    '#13c2c2', '#d46b08', '#909399'
+  private availableColors: string[] = [
+    '#eb2f96', // 品红色
+    '#1890ff', // 亮蓝色
+    '#fa8c16', // 橙色
+    '#52c41a', // 鲜绿色
+    '#722ed1', // 紫色
+    '#f56c6c', // 红色
+    '#a0d911', // 黄绿色
+    '#2f54eb', // 深蓝色
+    '#fa541c', // 红橙色
+    '#36cfc9', // 青色
+    '#389e0d', // 深绿色
+    '#e6a23c', // 黄橙色
+    '#096dd9', // 宝蓝色
+    '#faad14', // 金黄色
+    '#7b1fa2', // 深紫色
+    '#13c2c2', // 青蓝色
+    '#d46b08', // 棕橙色
+    '#909399'  // 灰色
   ]
-  
-  // 预分配常用颜色
-  preAssignCommonTypes(types: string[]) {
-    types.forEach((type, index) => {
-      const colorIndex = index % this.availableColors.length
-      this.colorMap.set(type, this.availableColors[colorIndex])
-    })
-  }
-  
-  getColor(nicType: string): string {
+  private usedColors: Set<string> = new Set()
+
+  // 为网卡类型分配颜色
+  assignColor(nicType: string): string {
+    // 如果已经为该类型分配过颜色，直接返回
     if (this.colorMap.has(nicType)) {
       return this.colorMap.get(nicType)!
     }
+
+    // 寻找可用的颜色
+    let assignedColor: string | null = null
     
-    // 使用简单的哈希分配（避免复杂计算）
-    const hash = Array.from(nicType).reduce((acc, char) => 
-      acc + char.charCodeAt(0), 0)
-    const colorIndex = hash % this.availableColors.length
-    const color = this.availableColors[colorIndex]
-    
-    this.colorMap.set(nicType, color)
-    return color
+    // 首先尝试从未使用的颜色中选择
+    for (const color of this.availableColors) {
+      if (!this.usedColors.has(color)) {
+        assignedColor = color
+        this.usedColors.add(color)
+        break
+      }
+    }
+
+    // 如果所有颜色都被使用了，使用哈希算法分配（确保一致性）
+    if (!assignedColor) {
+      assignedColor = this.getColorByHash(nicType)
+    }
+
+    // 保存映射关系
+    this.colorMap.set(nicType, assignedColor)
+    return assignedColor
   }
-  
-  getColorMap() {
-    return this.colorMap
+
+  // 通过哈希算法为类型分配颜色（确保同一类型总是得到相同颜色）
+  private getColorByHash(nicType: string): string {
+    let hash = 0
+    for (let i = 0; i < nicType.length; i++) {
+      hash = nicType.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    
+    // 使用哈希值在可用颜色中选择
+    const index = Math.abs(hash) % this.availableColors.length
+    return this.availableColors[index]
+  }
+
+  // 获取指定类型的颜色
+  getColor(nicType: string): string {
+    return this.assignColor(nicType)
+  }
+
+  // 重置颜色管理器（可选）
+  reset() {
+    this.colorMap.clear()
+    this.usedColors.clear()
+  }
+
+  // 获取所有已分配的颜色映射
+  getColorMap(): Map<string, string> {
+    return new Map(this.colorMap)
   }
 }
 
@@ -2502,46 +2541,36 @@ const getTagStyle = (tagName: string) => {
 
 // 获取网卡信息统计
 const getNicSummary = (device: ServerDetailResponse) => {
-  const cacheKey = `${device.id}_nicSummary`
-  
-  if (nicSummaryCache.has(cacheKey)) {
-    return nicSummaryCache.get(cacheKey)!
-  }
-  
-  if (!device.nics || device.nics.length === 0) {
-    const result: any[] = []
-    nicSummaryCache.set(cacheKey, result)
-    return result
-  }
+  if (!device.nics || device.nics.length === 0) return []
   
   const typeCount: Record<string, number> = {}
   
   device.nics.forEach(nic => {
     if (nic.type) {
+      // 直接使用后端处理好的type，不需要再处理
       const displayType = nic.type
-      // 预加载颜色（但避免重复计算）
-      if (!nicColorManager.getColorMap().has(displayType)) {
-        nicColorManager.getColor(displayType)
-      }
+      
+      // 预先为这个类型分配颜色（确保颜色一致性）
+      nicColorManager.getColor(displayType)
+      
       typeCount[displayType] = (typeCount[displayType] || 0) + 1
     }
   })
   
-  const result = Object.entries(typeCount)
+  return Object.entries(typeCount)
     .map(([type, count]) => ({
       type,
       displayType: type,
       count
     }))
     .sort((a, b) => {
+      // 首先按类型名称字母顺序排序
       if (a.type !== b.type) {
         return a.type.localeCompare(b.type)
       }
+      // 如果类型相同，按数量降序排列
       return b.count - a.count
     })
-  
-  nicSummaryCache.set(cacheKey, result)
-  return result
 }
 
 // 获取网卡类型颜色
@@ -3076,10 +3105,12 @@ const matchesNicTypeFilter = (device: ServerDetailResponse) => {
   const deviceNicTypes = nicSummary.map(summary => summary.type)
   
   if (nicFilterLogic.value === 'AND') {
+    // AND逻辑：设备必须包含所有选中的网卡类型
     return nicTypeFilter.value.every(type => 
       deviceNicTypes.includes(type)
     )
   } else {
+    // OR逻辑：设备只要包含任意一个选中的网卡类型
     return nicTypeFilter.value.some(type => 
       deviceNicTypes.includes(type)
     )
@@ -3113,103 +3144,56 @@ const matchesFollowFilter = (device: ServerDetailResponse) => {
 
 // 计算属性：过滤设备列表
 const filteredDevices = computed(() => {
-  console.time('filteredDevices计算')
+  let filtered = devices.value
   
-  const devicesList = devices.value
-  const keyword = searchKeyword.value.toLowerCase()
-  const hasKeyword = keyword.length > 0
-  
-  // 如果没有过滤条件，直接返回原始数据
-  if (!hasKeyword && 
-      nicTypeFilter.value.length === 0 && 
-      tagFilter.value.length === 0 && 
-      !showOnlyFollowed.value) {
-    console.timeEnd('filteredDevices计算')
-    return devicesList
-  }
-  
-  const result = devicesList.filter(device => {
-    // 1. 搜索过滤（优化字符串操作）
-    if (hasKeyword) {
-      let matches = device.bmc.hostname.toLowerCase().includes(keyword) ||
-                    device.device.ip.toLowerCase().includes(keyword)
-      
-      if (!matches && device.notes) {
-        matches = device.notes.toLowerCase().includes(keyword)
-      }
-      
-      if (!matches && device.user) {
-        matches = device.user.toLowerCase().includes(keyword)
-      }
-      
-      if (!matches) {
-        // 使用缓存的网卡摘要
-        const nicSummary = getNicSummary(device)
-        matches = nicSummary.some(summary => 
+  // 应用多重过滤
+  filtered = filtered.filter(device => {
+    // 1. 搜索过滤
+    if (searchKeyword.value) {
+      const keyword = searchKeyword.value.toLowerCase()
+      const matchesSearch = 
+        device.bmc.hostname.toLowerCase().includes(keyword) ||
+        device.device.ip.toLowerCase().includes(keyword) ||
+        (device.notes && device.notes.toLowerCase().includes(keyword)) ||
+        (device.user && device.user.toLowerCase().includes(keyword)) ||
+        getNicSummary(device).some(summary => 
           summary.displayType.toLowerCase().includes(keyword)
-        )
-      }
+        ) ||
+        (device.tags && device.tags.some(tag => tag.toLowerCase().includes(keyword)))
       
-      if (!matches && device.tags) {
-        matches = device.tags.some(tag => tag.toLowerCase().includes(keyword))
-      }
-      
-      if (!matches) return false
+      if (!matchesSearch) return false
     }
     
     // 2. 网卡类型过滤
-    if (nicTypeFilter.value.length > 0 && !matchesNicTypeFilter(device)) {
-      return false
-    }
+    if (!matchesNicTypeFilter(device)) return false
     
     // 3. 标签过滤
-    if (tagFilter.value.length > 0 && !matchesTagFilter(device)) {
-      return false
-    }
+    if (!matchesTagFilter(device)) return false
     
     // 4. 关注过滤
-    if (showOnlyFollowed.value && !matchesFollowFilter(device)) {
-      return false
-    }
+    if (!matchesFollowFilter(device)) return false
     
     return true
   })
   
-  console.timeEnd('filteredDevices计算')
-  return result
+  return filtered
 })
 
 // 加载数据
 const loadData = async () => {
   loading.value = true
   try {
-    console.time('API调用')
     const data = await deviceApi.getAll()
-    console.timeEnd('API调用')
-    
-    // 立即设置数据，让页面快速显示
     devices.value = data
     
-    // 延迟执行计算密集的操作
-    setTimeout(() => {
-      console.time('延迟计算')
-      // 预计算并缓存网卡摘要
-      data.forEach(device => {
-        if (device.nics && device.nics.length > 0) {
-          getNicSummary(device) // 这会填充缓存
-        }
-      })
-      console.timeEnd('延迟计算')
-      
-      // 延迟启动任务状态查询
-      data.forEach(device => {
-        if (device.task_id) {
-          queryTaskStatus(device)
-        }
-      })
-    }, 100) // 100ms延迟，确保页面先渲染
+    // 为有task_id的设备启动状态查询
+    data.forEach(device => {
+      if (device.task_id) {
+        // 启动状态查询
+        queryTaskStatus(device)
+      }
+    })
   } catch (error) {
-    console.error('加载数据失败:', error)
   } finally {
     loading.value = false
   }
