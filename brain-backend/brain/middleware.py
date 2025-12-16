@@ -1,7 +1,6 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-import time
 import logging
 import uuid
 from contextvars import ContextVar
@@ -36,8 +35,6 @@ class RequestIdLogFilter(logging.Filter):
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
-
         req_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4()}"
         set_request_id(req_id)
 
@@ -64,11 +61,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             LOG.error(f"Failed to insert audit record for {req_id}: {e}")
 
-        end_time = time.time()
-        duration = (end_time - start_time) * 1000
-
-        response.headers["X-Request-Duration"] = f"{duration:.2f}ms"
-
         return response
 
     def get_current_user(self, token: str) -> str:
@@ -83,3 +75,5 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             return payload.get("sub", "")
         except Exception:
             return ""
+
+
