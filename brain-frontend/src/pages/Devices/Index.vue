@@ -70,6 +70,8 @@
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @selection-change="handleSelectionChange"
         :row-class-name="getRowClassName"
+        v-if="!loading"
+        :row-key="row => row.id"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
@@ -3183,17 +3185,33 @@ const filteredDevices = computed(() => {
 const loadData = async () => {
   loading.value = true
   try {
+    console.time('API调用')
     const data = await deviceApi.getAll()
+    console.timeEnd('API调用')
+    
+    // 立即设置数据，让页面快速显示
     devices.value = data
     
-    // 为有task_id的设备启动状态查询
-    data.forEach(device => {
-      if (device.task_id) {
-        // 启动状态查询
-        queryTaskStatus(device)
-      }
-    })
+    // 延迟执行计算密集的操作
+    setTimeout(() => {
+      console.time('延迟计算')
+      // 预计算并缓存网卡摘要
+      data.forEach(device => {
+        if (device.nics && device.nics.length > 0) {
+          getNicSummary(device) // 这会填充缓存
+        }
+      })
+      console.timeEnd('延迟计算')
+      
+      // 延迟启动任务状态查询
+      data.forEach(device => {
+        if (device.task_id) {
+          queryTaskStatus(device)
+        }
+      })
+    }, 100) // 100ms延迟，确保页面先渲染
   } catch (error) {
+    console.error('加载数据失败:', error)
   } finally {
     loading.value = false
   }
