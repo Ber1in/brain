@@ -2,7 +2,6 @@
 # All rights reserved.
 
 import time
-from fastapi.middleware.base import BaseHTTPMiddleware
 import logging
 import uuid
 from contextvars import ContextVar
