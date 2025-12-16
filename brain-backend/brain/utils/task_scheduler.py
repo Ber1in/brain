@@ -536,10 +536,10 @@ async def create_server_reminder_email(server_info, current_recipient, status: S
             .occupied {{
                 background-color: #e8f5e8;
                 padding: 15px;
-                border-left: 4px solid #4CAF50;
+                border-left: 4px solid #2196F3;
                 margin: 20px 0;
                 border-radius: 4px;
-                color: #2e7d32;
+                color: #2196F3;
                 font-weight: bold;
             }}
             .urgent {{
@@ -554,10 +554,10 @@ async def create_server_reminder_email(server_info, current_recipient, status: S
             .released {{
                 background-color: #e8f4fd;
                 padding: 15px;
-                border-left: 4px solid #2196F3;
+                border-left: 4px solid #4CAF50;
                 margin: 20px 0;
                 border-radius: 4px;
-                color: #2196F3;
+                color: #2e7d32;
                 font-weight: bold;
             }}
             .personal-note {{
