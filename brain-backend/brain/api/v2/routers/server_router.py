@@ -14,7 +14,7 @@ from brain.api.v2.schemas import common_schemas, server_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils, task_scheduler
-from brain.utils.task_scheduler import task_scheduler as scheduler
+from brain.utils.task_scheduler import ServerStatus, task_scheduler as scheduler
 
 
 LOG = logging.getLogger(__name__)
@@ -130,19 +130,13 @@ async def delete_device(device_id: str):
         LOG.info(f"Server deleted, ID: {device_id}")
 
     try:
+        warn_task_id = f"device_warn_{server['device']['ip'].replace('.', '_')}"
+        await scheduler.cancel_task(warn_task_id)
+        task_id = f"device_cleanup_{server['device']['ip'].replace('.', '_')}"
+        await scheduler.cancel_task(task_id)
         clean_command = "sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile"
         await ssh_execute_async(server["device"]["ip"], clean_command, server["device"]
                                 ["username"], server["device"]["password"])
-        warn_task_id = f"device_warn_{server['device']['ip'].replace('.', '_')}"
-        success = await scheduler.cancel_task(warn_task_id)
-        task_id = f"device_cleanup_{server['device']['ip'].replace('.', '_')}"
-        success = await scheduler.cancel_task(task_id)
-
-        if success:
-            LOG.info(f"Successfully cancelled auto cleanup for device {device_id}")
-        else:
-            LOG.info(f"No auto cleanup task found for device {device_id}")
-
     except Exception:
         LOG.warning("Failed to initialize the server usage warning message.")
 
@@ -274,6 +268,8 @@ async def occupy_server(
         end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
         await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
+        await task_scheduler.send_server_reminder(server, ServerStatus.OCCUPIED)
+        await task_scheduler.send_feishu_group_message(server, ServerStatus.OCCUPIED)
 
         warn_delay = max(time - 300, 0)
         if warn_delay > 0:
@@ -283,6 +279,7 @@ async def occupy_server(
                 delay_seconds=warn_delay,
                 task_func=task_scheduler.init_server_warning,
                 device_id=server_id,
+                status=ServerStatus.EXPIRING
             )
             if warn_success:
                 LOG.info(f"Scheduled warning task {warn_task_id} (delay={warn_delay}s)")
@@ -295,7 +292,7 @@ async def occupy_server(
             delay_seconds=time,
             task_func=task_scheduler.init_server_warning,
             device_id=server_id,
-            now=True
+            status=ServerStatus.RELEASED
         )
         if success:
             LOG.info(f"Scheduled cleanup task {task_id} (delay={time}s)")
@@ -306,21 +303,13 @@ async def occupy_server(
         await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
 
         warn_task_id = f"device_warn_{ip.replace('.', '_')}"
-        warn_success = await scheduler.cancel_task(warn_task_id)
-        if warn_success:
-            LOG.info(f"Cancelled warning task {warn_task_id}")
-        else:
-            LOG.info(f"Failed to cancel warning task {warn_task_id}")
+        await scheduler.cancel_task(warn_task_id)
 
         task_id = f"device_cleanup_{ip.replace('.', '_')}"
-        success = await scheduler.cancel_task(task_id)
-        if success:
-            LOG.info(f"Cancelled cleanup task {task_id}")
-        else:
-            LOG.info(f"Failed to cancel cleanup task {task_id}")
+        await scheduler.cancel_task(task_id)
 
-        await task_scheduler.send_server_reminder(server, True)
-        await task_scheduler.send_feishu_group_message(server, True)
+        await task_scheduler.send_server_reminder(server, ServerStatus.RELEASED)
+        await task_scheduler.send_feishu_group_message(server, ServerStatus.RELEASED)
         server["user"] = ""
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)

@@ -116,7 +116,7 @@ async def create_interface(data: network_schemas.InterfaceCreate, user=Depends(a
 
 
 @router.delete("/networks/{interface_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_interface(interface_id:str):
+async def delete_interface(interface_id: str):
     """Delete an existing network interface"""
 
     try:
@@ -169,7 +169,7 @@ async def delete_interface(interface_id:str):
 
 
 @router.put("/networks/{interface_id}", response_model=network_schemas.InterfaceInfo)
-async def update_interface_description(interface_id:str, data: network_schemas.InterfaceUpdate):
+async def update_interface_description(interface_id: str, data: network_schemas.InterfaceUpdate):
     """Update description of an existing interface"""
     LOG.info(f"Updating description for interface {interface_id}: {data.description}")
     updated = db.update(

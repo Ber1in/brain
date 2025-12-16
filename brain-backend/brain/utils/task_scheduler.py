@@ -2,6 +2,7 @@
 # All rights reserved.
 
 
+from enum import Enum
 import json
 import requests
 from email.mime.text import MIMEText
@@ -12,7 +13,6 @@ import asyncio
 from datetime import datetime
 import logging
 from typing import Dict, Callable
-from fastapi import HTTPException
 
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute_async
@@ -23,6 +23,12 @@ SERVER_COLLECTION = "servers"
 
 
 LOG = logging.getLogger(__name__)
+
+
+class ServerStatus(str, Enum):
+    OCCUPIED = "occupied"
+    EXPIRING = "expiring"
+    RELEASED = "released"
 
 
 class GenericTaskScheduler:
@@ -162,7 +168,14 @@ class GenericTaskScheduler:
 task_scheduler = GenericTaskScheduler()
 
 
-async def init_warning(ip, user, pwd):
+def get_end_time_display(server_info):
+    if server_info.get('time'):
+        end_timestamp = datetime.now().timestamp() + int(server_info['time'])
+        return datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+    return ""
+
+
+async def _try_init_warning(ip, user, pwd):
     init_command = f'''
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
@@ -177,13 +190,16 @@ EOF
 '''
     try:
         await ssh_execute_async(ip, init_command, user, pwd, False)
-    except HTTPException as e:
-        if e.status_code == 503:
-            LOG.warning(
-                f"The server {ip} is offline and the init_warning process has not been completed")
+    except Exception:
+        LOG.warning(
+            f"The server {ip} is offline and the init_warning process has not been completed")
 
 
-async def occupy_warning(ip, ssh_user, ssh_pass, occupy_user, end_time):
+async def init_warning(ip, user, pwd):
+    asyncio.create_task(_try_init_warning(ip, user, pwd))
+
+
+async def _try_occupy_warning(ip, ssh_user, ssh_pass, occupy_user, end_time):
     command = f'''
 sed -i '/# WARNING_MESSAGE_START/,/# WARNING_MESSAGE_END/d' /etc/profile
 
@@ -211,31 +227,33 @@ EOF
 '''
     try:
         await ssh_execute_async(ip, command, ssh_user, ssh_pass, False)
-    except HTTPException as e:
-        if e.status_code == 503:
-            LOG.warning(f"The server {ip} is offline and the occupy_warning"
-                        " process has not been completed")
+    except Exception:
+        LOG.warning(f"The server {ip} is offline and the occupy_warning"
+                    " process has not been completed")
 
 
-async def init_server_warning(device_id: str, now=False):
+async def occupy_warning(ip, ssh_user, ssh_pass, occupy_user, end_time):
+    asyncio.create_task(_try_occupy_warning(ip, ssh_user, ssh_pass, occupy_user, end_time))
+
+
+async def init_server_warning(device_id: str, status: ServerStatus):
     """
-    Task function for initing up warning messages on a server
+    Task function for sending server status notifications
     """
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": device_id})
         if not server:
-            LOG.error(f"Device not found for cleanup: {device_id}")
+            LOG.error(f"Device not found: {device_id}")
             return
 
-        # Execute cleanup command
         ip = server["device"]["ip"]
         ssh_user = server["device"].get("username", "")
         ssh_pass = server["device"].get("password", "")
 
-        # Update database state
-        await send_server_reminder(server, now)
-        await send_feishu_group_message(server, now)
-        if now:
+        await send_server_reminder(server, status)
+        await send_feishu_group_message(server, status)
+
+        if status == ServerStatus.RELEASED:
             await init_warning(ip, ssh_user, ssh_pass)
             server["time"] = 0
             server["user"] = ""
@@ -243,10 +261,10 @@ async def init_server_warning(device_id: str, now=False):
             server["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-        LOG.info(f"Automatically cleaned up warning messages for device: {ip}")
+        LOG.info(f"Sent {status.value} notification for device: {ip}")
 
     except Exception as e:
-        LOG.warning(f"Error in init_server_warning for {ip}: {str(e)}")
+        LOG.warning(f"Error in init_server_warning for {device_id}: {str(e)}")
 
 
 async def setup_server_occupancy(device_id: str, user: str, duration: int):
@@ -282,32 +300,47 @@ async def setup_server_occupancy(device_id: str, user: str, duration: int):
         return False
 
 
-async def send_feishu_group_message(server_info, now=False):
+async def send_feishu_group_message(server_info, status: ServerStatus):
     """
     Send Feishu group reminder message.
-    The message content remains in Chinese (intended for end users).
     """
     try:
-        # 根据 now 参数决定消息内容
-        if now:
-            title = f"🖥️ 服务器已释放 - {server_info['device']['ip']}"
-            content_lines = [
-                f"**服务器IP:** {server_info['device']['ip']}",
-                f"**原占用人:** {server_info['user']}",
-                f"**释放时间:** ✅ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                "**当前状态:** 🆓 空闲可用"
-            ]
-            note_text = "📋 服务器已释放，现在可以重新分配使用"
-            template = "green"  # 绿色表示已完成
-        else:
-            title = f"🖥️ 服务器占用到期提醒 - {server_info['device']['ip']}"
-            content_lines = [
-                f"**服务器IP:** {server_info['device']['ip']}",
-                f"**占用人:** {server_info['user']}",
-                "**剩余时间:** 🚨 5分钟"
-            ]
-            note_text = "📋 请登录管理页面，在【服务器管理】中查看其余可用服务器"
-            template = "red"  # 红色表示紧急
+        # 根据状态设置不同的消息内容
+        status_configs = {
+            ServerStatus.OCCUPIED: {
+                "title": f"🖥️ 服务器已被占用 - {server_info['device']['ip']}",
+                "template": "blue",
+                "content_lines": [
+                    f"**占用人:** 👤 {server_info['user']}",
+                    f"**截止时间:** ⏰ {get_end_time_display(server_info)}",
+                    f"**服务器:** 🖥️ {server_info['bmc']['hostname']}"
+                ],
+                "note_text": "📋 服务器已被占用，请在占用期间合理使用"
+            },
+            ServerStatus.EXPIRING: {
+                "title": f"🖥️ 服务器占用到期提醒 - {server_info['device']['ip']}",
+                "template": "red",
+                "content_lines": [
+                    f"**占用人:** 👤 {server_info['user']}",
+                    "**剩余时间:** 🚨 5分钟",
+                    f"**服务器:** 🖥️ {server_info['bmc']['hostname']}"
+                ],
+                "note_text": "📋 请及时处理服务器续期或释放"
+            },
+            ServerStatus.RELEASED: {
+                "title": f"🖥️ 服务器已释放 - {server_info['device']['ip']}",
+                "template": "green",
+                "content_lines": [
+                    f"**原占用人:** 👤 {server_info['user']}",
+                    f"**释放时间:** ✅ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    f"**服务器:** 🖥️ {server_info['bmc']['hostname']}",
+                    "**当前状态:** 🆓 空闲可用"
+                ],
+                "note_text": "📋 服务器已释放，现在可以重新分配使用"
+            }
+        }
+
+        config = status_configs[status]
 
         # Build Feishu interactive card payload
         message_content = {
@@ -319,16 +352,16 @@ async def send_feishu_group_message(server_info, now=False):
                 "header": {
                     "title": {
                         "tag": "plain_text",
-                        "content": title
+                        "content": config["title"]
                     },
-                    "template": template
+                    "template": config["template"]
                 },
                 "elements": [
                     {
                         "tag": "div",
                         "text": {
                             "tag": "lark_md",
-                            "content": "\n".join(content_lines)
+                            "content": "\n".join(config["content_lines"])
                         }
                     },
                     {
@@ -357,7 +390,7 @@ async def send_feishu_group_message(server_info, now=False):
                             {
                                 "tag": "plain_text",
                                 "content": (
-                                    f"{note_text}\n"
+                                    f"{config['note_text']}\n"
                                     f"发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                                 )
                             }
@@ -367,29 +400,28 @@ async def send_feishu_group_message(server_info, now=False):
             }
         }
 
-        def send_feishu(webhook: str, payload: dict, action: str) -> bool:
-            headers = {'Content-Type': 'application/json'}
+        def send_feishu(webhook: str, payload: dict, status: ServerStatus) -> bool:
             try:
+                headers = {'Content-Type': 'application/json'}
                 resp = requests.post(webhook, headers=headers, data=json.dumps(payload), timeout=15)
+
+                if resp.status_code != 200:
+                    LOG.error(f"Feishu failed with status code: {resp.status_code}")
+                    return False
+
+                result = resp.json()
+                if result.get("code") == 0:
+                    LOG.info(f"Feishu {status.value} message sent successfully.")
+                    return True
+                else:
+                    LOG.error(f"Feishu message failed: {result}")
+                    return False
             except Exception as e:
                 LOG.error(f"Feishu request error: {e}")
                 return False
 
-            if resp.status_code != 200:
-                LOG.error(f"Feishu failed with status code: {resp.status_code}")
-                return False
-
-            result = resp.json()
-            if result.get("code") == 0:
-                LOG.info(f"Feishu {action} message sent successfully.")
-                return True
-            else:
-                LOG.error(f"Feishu message failed: {result}")
-                return False
         # Send Feishu request
         release_notices = settings.release_notices
-        action = "cleanup" if now else "warning"
-
         matched_webhooks = [
             notice.webhook
             for notice in release_notices
@@ -400,49 +432,62 @@ async def send_feishu_group_message(server_info, now=False):
             matched_webhooks = [settings.default_webhook]
 
         for webhook in matched_webhooks:
-            if send_feishu(webhook, message_content, action):
-                return True
-
-        LOG.error("No Feishu webhook succeeded.")
-
-        return False
+            asyncio.get_running_loop().run_in_executor(
+                None, send_feishu, webhook, message_content, status)
 
     except Exception as e:
         LOG.error(f"Feishu message exception: {e}")
-        return False
 
 
-async def create_server_reminder_email(server_info, current_recipient, now=False):
+async def create_server_reminder_email(server_info, current_recipient, status: ServerStatus):
     """
-    Create personalized email reminder for server expiration.
+    Create personalized email reminder for server status changes.
     Email content remains Chinese because it's user-facing.
     """
     # Determine whether the recipient is the server owner
     is_owner = current_recipient.split('@')[0].lower() == server_info['user'].lower()
 
-    if now:
-        # 已释放的通知
-        reminder_title = f"🖥️ 服务器释放通知 - {server_info['device']['ip']}"
-        if is_owner:
-            reminder_text = "您占用的服务器已按时释放"
-        else:
-            reminder_text = "您关注的服务器已释放"
-        status_info = "已释放"
-        status_class = "released"  # 可以添加不同的样式类
-        operation_guide = "服务器现已空闲，可供重新分配使用"
-    else:
-        # 即将到期的提醒
-        reminder_title = f"🖥️ 服务器占用到期提醒 - {server_info['device']['ip']}"
-        if is_owner:
-            reminder_text = "您的服务器占用即将到期，请及时处理"
-        else:
-            reminder_text = "您关注的服务器占用即将到期，请及时处理"
-        status_info = "5分钟"
-        status_class = "urgent"
-        operation_guide = "请及时处理服务器续期或释放资源" if is_owner else "请关注服务器状态变化"
+    status_configs = {
+        ServerStatus.OCCUPIED: {
+            "title": f"🖥️ 服务器占用通知 - {server_info['device']['ip']}",
+            "owner_text": "您已成功占用服务器",
+            "follower_text": "您关注的服务器已被占用",
+            "time_info": (
+                f"截止时间: {get_end_time_display(server_info)}" if server_info.get('time') else ""),
+            "status_text": "已占用",
+            "status_class": "occupied",
+            "operation_guide": "请在占用期间合理使用服务器资源",
+            "template_color": "#2196F3"
+        },
+        ServerStatus.EXPIRING: {
+            "title": f"🖥️ 服务器占用到期提醒 - {server_info['device']['ip']}",
+            "owner_text": "您的服务器占用即将到期，请及时处理",
+            "follower_text": "您关注的服务器占用即将到期",
+            "time_info": "剩余时间: 5分钟",
+            "status_text": "即将到期",
+            "status_class": "urgent",
+            "operation_guide": "请及时处理服务器续期或释放资源" if is_owner else "请关注服务器状态变化",
+            "template_color": "#FF9800"
+        },
+        ServerStatus.RELEASED: {
+            "title": f"🖥️ 服务器释放通知 - {server_info['device']['ip']}",
+            "owner_text": "您占用的服务器已按时释放",
+            "follower_text": "您关注的服务器已释放",
+            "time_info": f"释放时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "status_text": "已释放",
+            "status_class": "released",
+            "operation_guide": "服务器现已空闲，可供重新分配使用",
+            "template_color": "#4CAF50"
+        }
+    }
+
+    config = status_configs[status]
+    reminder_text = config["owner_text"] if is_owner else config["follower_text"]
 
     # Email subject
-    subject = f"{reminder_title.split(' ')[1]} - {server_info['device']['ip']}"
+    subject = f"{config['title'].split(' ')[1]} - {server_info['device']['ip']}"
+
+    show_occupier = status != ServerStatus.RELEASED
 
     # HTML content (Chinese)
     html_content = f"""
@@ -468,7 +513,7 @@ async def create_server_reminder_email(server_info, current_recipient, now=False
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }}
             .header {{
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, {config['template_color']} 0%, #764ba2 100%);
                 color: white;
                 padding: 20px;
                 border-radius: 8px 8px 0 0;
@@ -488,20 +533,31 @@ async def create_server_reminder_email(server_info, current_recipient, now=False
                 width: 120px;
                 color: #666;
             }}
-            .highlight {{
-                background-color: #fff8e1;
-                padding: 15px;
-                border-left: 4px solid #ffc107;
-                margin: 20px 0;
-                border-radius: 4px;
-            }}
-            .released {{
+            .occupied {{
                 background-color: #e8f5e8;
                 padding: 15px;
                 border-left: 4px solid #4CAF50;
                 margin: 20px 0;
                 border-radius: 4px;
                 color: #2e7d32;
+                font-weight: bold;
+            }}
+            .urgent {{
+                background-color: #fff8e1;
+                padding: 15px;
+                border-left: 4px solid #ffc107;
+                margin: 20px 0;
+                border-radius: 4px;
+                color: #e74c3c;
+                font-weight: bold;
+            }}
+            .released {{
+                background-color: #e8f4fd;
+                padding: 15px;
+                border-left: 4px solid #2196F3;
+                margin: 20px 0;
+                border-radius: 4px;
+                color: #2196F3;
                 font-weight: bold;
             }}
             .personal-note {{
@@ -527,14 +583,6 @@ async def create_server_reminder_email(server_info, current_recipient, now=False
                 border-radius: 4px;
                 margin: 10px 0;
             }}
-            .urgent {{
-                color: #e74c3c;
-                font-weight: bold;
-            }}
-            .released-status {{
-                color: #4CAF50;
-                font-weight: bold;
-            }}
             .owner-badge {{
                 background: #e74c3c;
                 color: white;
@@ -548,20 +596,25 @@ async def create_server_reminder_email(server_info, current_recipient, now=False
     <body>
         <div class="container">
             <div class="header">
-                <h1>{reminder_title}</h1>
+                <h1>{config['title']}</h1>
                 <p>{reminder_text}</p>
             </div>
 
             <h2>服务器信息</h2>
             <table class="info-table">
                 <tr><td>服务器IP:</td><td><strong>{server_info['device']['ip']}</strong></td></tr>
-                <tr><td>{'原占用人:' if now else '占用人:'}</td><td><strong>{server_info['user']}</strong>{('<span class="owner-badge">您</span>' if is_owner else '')}</td></tr>
-                <tr><td>{'释放时间:' if now else '剩余时间:'}</td><td class="{status_class}">{status_info}</td></tr>
+                {"<tr><td>占用人:</td><td><strong>{}</strong>{}</td></tr>".format(
+                    server_info['user'],
+                    ('<span class="owner-badge">您</span>' if is_owner else '')
+                ) if show_occupier and server_info.get('user') else ""}
+                <tr><td>状态:</td><td class="{config['status_class']}">{config['status_text']}</td></tr>
+                {"<tr><td>时间信息:</td><td>{}</td></tr>".format(config['time_info']) if config['time_info'] else ""}
+                {"<tr><td>服务器名称:</td><td>{}</td></tr>".format(server_info['bmc']['hostname']) if server_info.get('bmc', {}).get('hostname') else ""}
             </table>
 
-            <div class="highlight">
+            <div class="{config['status_class']}">
                 <strong>📋 操作指引:</strong><br>
-                {operation_guide}<br>
+                {config['operation_guide']}<br>
                 登录管理页面，在<strong>【服务器管理】</strong>中查看详情
             </div>
 
@@ -593,40 +646,46 @@ async def create_server_reminder_email(server_info, current_recipient, now=False
     return msg
 
 
-async def send_server_reminder(server_info, now=False):
+async def send_server_reminder(server_info, status: ServerStatus):
     """
-    Send server expiration reminder emails to all recipients.
+    Fire-and-forget server status change email notifications.
     """
-    success_count = 0
-    total_count = len(server_info.get("recipients", []))
 
-    # Send email to each recipient
+    messages = []
+
     for recipient in server_info.get("recipients", []):
         if recipient == "admin":
             continue
 
         try:
-            # Create personalized email for each recipient
-            msg = await create_server_reminder_email(server_info, recipient, now)
-
-            # Send via SMTP
-            with smtplib.SMTP_SSL(settings.smtp.host, settings.smtp.port) as server_smtp:
-                server_smtp.login(settings.smtp.user, settings.smtp.password)
-                server_smtp.sendmail(
-                    settings.smtp.user, [f'{recipient}@yunsilicon.com'], msg.as_string())
-
-            # Check ownership for proper logging
-            is_owner = recipient.split('@')[0].lower() == server_info['user'].lower()
-            action = "cleanup" if now else "warning"
-            role = "Owner" if is_owner else "Follower"
-            LOG.info(f"{role} {action} email sent successfully: {recipient}")
-
-            success_count += 1
-
+            msg = await create_server_reminder_email(server_info, recipient, status)
+            messages.append((recipient, msg))
         except Exception as e:
-            LOG.error(f"Email failed to: {recipient}, error: {e}")
+            LOG.error(f"Create email failed for {recipient}: {e}")
 
-    action = "cleanup" if now else "warning"
-    LOG.info(f"{action} email summary: success {success_count}/{total_count}")
+    def _send_server_reminder_sync(messages, status: ServerStatus):
+        for recipient, msg in messages:
+            try:
+                with smtplib.SMTP_SSL(
+                    settings.smtp.host,
+                    settings.smtp.port,
+                    timeout=15
+                ) as server_smtp:
+                    server_smtp.login(settings.smtp.user, settings.smtp.password)
+                    server_smtp.sendmail(
+                        settings.smtp.user,
+                        [f'{recipient}@yunsilicon.com'],
+                        msg.as_string()
+                    )
 
-    return success_count == total_count
+                LOG.info(f"{status.value} email sent: {recipient}")
+
+            except Exception as e:
+                LOG.error(f"Email failed to {recipient}: {e}")
+
+    asyncio.get_running_loop().run_in_executor(
+        None,
+        _send_server_reminder_sync,
+        messages,
+        status
+    )
