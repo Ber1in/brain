@@ -128,10 +128,10 @@ async def startup_event():
         logger.error(f"Error while restoring device timers: {str(e)}")
 
     try:
-        cancelled_task = db.find(TEST_HISTORY_COLLECTION, {"cancel": 1, "status": "running"})
+        cancelled_task = db.find(TEST_HISTORY_COLLECTION, {"status": "running"})
         task_ids = [task["id"] for task in cancelled_task]
-        db.update(TEST_HISTORY_COLLECTION, {"cancel": 1, "status": "running"},
-                  {"status": "cancelled"})
+        db.update(TEST_HISTORY_COLLECTION, {"status": "running"},
+                  {"status": "cancelled", "cancel": 1})
         logger.info("The following test tasks have been automatically canceled due to a service"
                     f" restart: {task_ids}")
     except Exception as e:
