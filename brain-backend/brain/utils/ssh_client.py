@@ -45,8 +45,10 @@ def ssh_execute(host: str, command: str, user: str, pwd: str, check=True) -> str
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(host, username=user, password=pwd, timeout=6)
         stdin, stdout, stderr = ssh.exec_command(command)
-        out = stdout.read().decode()
-        err = stderr.read().decode()
+
+        out = stdout.read().decode('latin-1')
+        err = stderr.read().decode('latin-1')
+
         exit_code = stdout.channel.recv_exit_status()
         ssh.close()
 
