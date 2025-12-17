@@ -65,7 +65,7 @@
       </template>
 
       <el-table 
-        :data="filteredDevices" 
+        :data="devices"
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @selection-change="handleSelectionChange"
@@ -1248,11 +1248,16 @@ const saveFilteringConditions = async () => {
     await filterApi.updateFilteringConditions(data)
     filteringConditions.value = data
     
+    // 关键：保存筛选条件后，重新加载服务器数据
+    await loadData()
+    
+    ElMessage.success('筛选条件已保存')
   } catch (error) {
     console.error('保存过滤条件失败:', error)
     ElMessage.error('保存过滤条件失败')
   }
 }
+
 
 // 添加加载网卡类型的方法
 const loadNicTypes = async () => {
@@ -1291,47 +1296,32 @@ const toggleFollowFilter = async () => {
 
 // 应用网卡类型过滤
 const applyNicTypeFilter = async () => {
-  // 更新实际筛选条件
   nicTypeFilter.value = [...pendingNicTypeFilter.value]
   nicFilterLogic.value = pendingNicFilterLogic.value
-  
   showNicTypeFilter.value = false
   await saveFilteringConditions()
 }
 
 // 应用标签过滤
 const applyTagFilter = async () => {
-  // 更新实际筛选条件
   tagFilter.value = [...pendingTagFilter.value]
   tagFilterLogic.value = pendingTagFilterLogic.value
-  
   showTagFilter.value = false
   await saveFilteringConditions()
 }
 
-
-// 清空网卡类型过滤
-const clearNicTypeFilter = () => {
-  // 同时清空实际状态和待应用状态
+const clearNicTypeFilter = async () => {
   nicTypeFilter.value = []
   pendingNicTypeFilter.value = []
   showNicTypeFilter.value = false
-  
-  nextTick(() => {
-    saveFilteringConditions()
-  })
+  await saveFilteringConditions()
 }
 
-// 清空标签过滤
-const clearTagFilter = () => {
-  // 同时清空实际状态和待应用状态
+const clearTagFilter = async () => {
   tagFilter.value = []
   pendingTagFilter.value = []
   showTagFilter.value = false
-  
-  nextTick(() => {
-    saveFilteringConditions()
-  })
+  await saveFilteringConditions()
 }
 
 const cancelNicTypeFilter = () => {
@@ -3096,88 +3086,6 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
   const timeB = b.time || 0;
   return timeA - timeB;
 };
-
-// 检查设备是否符合网卡类型过滤条件
-const matchesNicTypeFilter = (device: ServerDetailResponse) => {
-  if (nicTypeFilter.value.length === 0) return true
-  
-  const nicSummary = getNicSummary(device)
-  const deviceNicTypes = nicSummary.map(summary => summary.type)
-  
-  if (nicFilterLogic.value === 'AND') {
-    // AND逻辑：设备必须包含所有选中的网卡类型
-    return nicTypeFilter.value.every(type => 
-      deviceNicTypes.includes(type)
-    )
-  } else {
-    // OR逻辑：设备只要包含任意一个选中的网卡类型
-    return nicTypeFilter.value.some(type => 
-      deviceNicTypes.includes(type)
-    )
-  }
-}
-
-// 检查设备是否符合标签过滤条件
-const matchesTagFilter = (device: ServerDetailResponse) => {
-  if (tagFilter.value.length === 0) return true
-  
-  const deviceTags = device.tags || []
-  
-  if (tagFilterLogic.value === 'AND') {
-    // AND逻辑：设备必须包含所有选中的标签
-    return tagFilter.value.every(tag => 
-      deviceTags.includes(tag)
-    )
-  } else {
-    // OR逻辑：设备只要包含任意一个选中的标签
-    return tagFilter.value.some(tag => 
-      deviceTags.includes(tag)
-    )
-  }
-}
-
-// 检查设备是否符合关注过滤条件
-const matchesFollowFilter = (device: ServerDetailResponse) => {
-  if (!showOnlyFollowed.value) return true
-  return isFollowing(device)
-}
-
-// 计算属性：过滤设备列表
-const filteredDevices = computed(() => {
-  let filtered = devices.value
-  
-  // 应用多重过滤
-  filtered = filtered.filter(device => {
-    // 1. 搜索过滤
-    if (searchKeyword.value) {
-      const keyword = searchKeyword.value.toLowerCase()
-      const matchesSearch = 
-        device.bmc.hostname.toLowerCase().includes(keyword) ||
-        device.device.ip.toLowerCase().includes(keyword) ||
-        (device.notes && device.notes.toLowerCase().includes(keyword)) ||
-        (device.user && device.user.toLowerCase().includes(keyword)) ||
-        getNicSummary(device).some(summary => 
-          summary.displayType.toLowerCase().includes(keyword)
-        ) ||
-        (device.tags && device.tags.some(tag => tag.toLowerCase().includes(keyword)))
-      
-      if (!matchesSearch) return false
-    }
-    
-    // 2. 网卡类型过滤
-    if (!matchesNicTypeFilter(device)) return false
-    
-    // 3. 标签过滤
-    if (!matchesTagFilter(device)) return false
-    
-    // 4. 关注过滤
-    if (!matchesFollowFilter(device)) return false
-    
-    return true
-  })
-  
-  return filtered
-})
 
 // 加载数据
 const loadData = async () => {

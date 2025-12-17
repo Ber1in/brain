@@ -23,6 +23,7 @@ BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
+TASK_DIY_CONFIG = "users"
 ALIAS_NAMES = {
     "metaConnect-400S 400GbE, Single-port QSFP112, PCIe 5.0 x16": "MC400S",
     "metaScale-200 100GbE OCP3.0, Dual-port DSFP, Multi Host, PCIe 4.0 x16": "MS200-OCP",
@@ -142,18 +143,60 @@ async def delete_device(device_id: str):
 
 
 @router.get("/servers", response_model=list[server_schemas.ServerDetailResponse])
-async def get_all_devices():
+async def get_all_devices(user=Depends(authenticate_user)):
+    filter_conditions = {}
+    try:
+        user_info = db.find_one(TASK_DIY_CONFIG, {"user": user})
+        filter_conditions = user_info["prefer_servers"]
+    except Exception:
+        LOG.debug(f"User {user} has not customized server filtering conditions")
+
     LOG.info("Fetching all servers.")
-    devices = db.find(SERVER_COLLECTION, {})
+    devices = db.find(SERVER_COLLECTION)
+    result = []
+    now = datetime.now().timestamp()
+
+    filter_tags = filter_conditions.get("tags") or []
+    tag_condition = filter_conditions.get("tag_filtering_condition", "or")
+    filter_nics = filter_conditions.get("nics") or []
+    nic_condition = filter_conditions.get("nic_filtering_condition", "or")
+    only_focus = filter_conditions.get("only_focus", False)
+
     for i in devices:
-        if i["time"]:
-            now = datetime.now().timestamp()
-            start = i.get("start")
+        if i.get("time"):
+            start = i.get("start", now)
             passed = int(now - start)
-            remaining = i["time"] - passed
-            i["time"] = max(remaining, 0)
+            i["time"] = max(i["time"] - passed, 0)
+
+        if only_focus and user not in i.get("recipients", []):
+            continue
+
+        if filter_tags:
+            device_tags = set(i.get("tags", []))
+            filter_set = set(filter_tags)
+
+            if tag_condition == "or":
+                if not device_tags & filter_set:
+                    continue
+            elif tag_condition == "and":
+                if not filter_set.issubset(device_tags):
+                    continue
+
+        if filter_nics:
+            nic_types = [nic.get("type") for nic in i.get("nics", []) if nic.get("type")]
+            device_nics = set(nic_types)
+            filter_set = set(filter_nics)
+
+            if nic_condition == "or":
+                if not device_nics & filter_set:
+                    continue
+            elif nic_condition == "and":
+                if not filter_set.issubset(device_nics):
+                    continue
+
+        result.append(i)
     LOG.info(f"Total servers fetched: {len(devices)}")
-    return devices
+    return result
 
 
 @router.get("/servers/nic_types", response_model=List[str])
