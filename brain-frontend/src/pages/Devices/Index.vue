@@ -430,6 +430,19 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.page_size"
+          :page-sizes="[15, 30, 50]"
+          :background="true"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="pagination.total"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+          class="device-pagination"
+        />
+      </div>
     </el-card>
 
     <!-- 网卡类型过滤面板 - 改为弹窗 -->
@@ -1120,6 +1133,16 @@ const devices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
 const selectedDevices = ref<ServerDetailResponse[]>([])
 
+// 新增：分页相关状态
+const pagination = reactive({
+  page: 1,
+  page_size: 15,
+  total: 0,
+  total_pages: 0,
+  has_next: false,
+  has_prev: false
+})
+
 // 当前用户信息
 const currentUser = computed(() => authStore.username)
 
@@ -1227,6 +1250,7 @@ const loadFilteringConditions = async () => {
     tagFilterLogic.value = filteringConditions.value.tag_filtering_condition.toUpperCase() as 'AND' | 'OR'
     nicFilterLogic.value = filteringConditions.value.nic_filtering_condition.toUpperCase() as 'AND' | 'OR'
     
+    loadData()
   } catch (error) {
     console.error('加载过滤条件失败:', error)
   } finally {
@@ -1251,7 +1275,6 @@ const saveFilteringConditions = async () => {
     // 关键：保存筛选条件后，重新加载服务器数据
     await loadData()
     
-    ElMessage.success('筛选条件已保存')
   } catch (error) {
     console.error('保存过滤条件失败:', error)
     ElMessage.error('保存过滤条件失败')
@@ -3088,23 +3111,76 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
 };
 
 // 加载数据
-const loadData = async () => {
+const loadData = async (page?: number) => {
   loading.value = true
   try {
-    const data = await deviceApi.getAll()
-    devices.value = data
+    // Jump to specified page if provided
+    if (page !== undefined) {
+      pagination.page = page
+    }
     
-    // 为有task_id的设备启动状态查询
-    data.forEach(device => {
+    // Build filter conditions - 直接使用 filteringConditions
+    const filterConditions = { ...filteringConditions.value }
+    
+    // Check if any filter condition is active
+    const hasActiveFilters = 
+      filterConditions.only_focus === 1 ||
+      filterConditions.tags.length > 0 ||
+      filterConditions.nics.length > 0
+    
+    // Build request parameters
+    const requestParams: any = {
+      page: pagination.page,
+      page_size: pagination.page_size
+    }
+    
+    // Only send filter conditions if any filter is active
+    if (hasActiveFilters) {
+      requestParams.filter_conditions = filterConditions
+    }
+    
+    const response = await deviceApi.getAllWithPagination(requestParams)
+    
+    devices.value = response.data
+    
+    // Update pagination info if exists
+    if (response.pagination) {
+      Object.assign(pagination, response.pagination)
+    } else {
+      // 如果没有分页信息，重置分页状态
+      Object.assign(pagination, {
+        page: 1,
+        page_size: 15,
+        total: response.data.length,
+        total_pages: 1,
+        has_next: false,
+        has_prev: false
+      })
+    }
+    
+    // Start task status query for devices with task_id
+    response.data.forEach(device => {
       if (device.task_id) {
-        // 启动状态查询
         queryTaskStatus(device)
       }
     })
   } catch (error) {
+    console.error('Failed to load device list:', error)
+    ElMessage.error('Failed to load device list')
   } finally {
     loading.value = false
   }
+}
+
+// 在 loadData 方法后面添加翻页方法
+const handlePageChange = (page: number) => {
+  loadData(page)
+}
+
+const handleSizeChange = (size: number) => {
+  pagination.page_size = size
+  pagination.page = 1
+  loadData()
 }
 
 // 处理搜索
@@ -3258,14 +3334,32 @@ const handleDelete = async (device: ServerDetailResponse) => {
 }
 
 onMounted(() => {
-  loadData()
-  loadTags()
   loadFilteringConditions()
+  loadTags()
   loadNicTypes()
 })
 </script>
 
 <style scoped>
+/* 在现有的样式最后添加 */
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.device-pagination {
+  flex: 1;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #606266;
+  margin-left: 20px;
+  white-space: nowrap;
+}
 
 /* 添加加载状态样式 */
 .loading-state {

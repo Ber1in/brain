@@ -3,10 +3,12 @@
 
 import asyncio
 from datetime import datetime
+import json
 import re
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException, Query
+from fastapi.responses import JSONResponse
 import logging
 
 from brain.auth import authenticate_user
@@ -143,36 +145,61 @@ async def delete_device(device_id: str):
 
 
 @router.get("/servers", response_model=list[server_schemas.ServerDetailResponse])
-async def get_all_devices(user=Depends(authenticate_user)):
-    filter_conditions = {}
-    try:
-        user_info = db.find_one(TASK_DIY_CONFIG, {"user": user})
-        filter_conditions = user_info["prefer_servers"]
-    except Exception:
-        LOG.debug(f"User {user} has not customized server filtering conditions")
+async def get_all_devices(
+    # Optional pagination parameters
+    page: Optional[int] = Query(None, ge=1, description="Page number"),
+    page_size: Optional[int] = Query(None, ge=1, le=100, description="Items per page"),
+
+    # Optional filter parameters - maintain backward compatibility
+    filter_conditions: Optional[str] = Query(
+        None, 
+        description="Filter conditions, JSON string format, includes tags, nics, only_focus, etc."
+    ),
+    user=Depends(authenticate_user)
+):
+    # Priority: use frontend filter conditions, otherwise read from database
+    filter_data = {}
+    if filter_conditions:
+        try:
+            # Parse JSON filter conditions from frontend
+            filter_data = json.loads(filter_conditions)
+        except (json.JSONDecodeError, TypeError):
+            LOG.warning(f"Invalid filter_conditions format from user {user}")
+            raise
 
     LOG.info("Fetching all servers.")
     devices = db.find(SERVER_COLLECTION)
     result = []
     now = datetime.now().timestamp()
 
-    filter_tags = filter_conditions.get("tags") or []
-    tag_condition = filter_conditions.get("tag_filtering_condition", "or")
-    filter_nics = filter_conditions.get("nics") or []
-    nic_condition = filter_conditions.get("nic_filtering_condition", "or")
-    only_focus = filter_conditions.get("only_focus", False)
+    # Extract parameters from filter conditions, support dynamic expansion
+    filter_tags = filter_data.get("tags") or []
+    tag_condition = filter_data.get("tag_filtering_condition", "or")
+    filter_nics = filter_data.get("nics") or []
+    nic_condition = filter_data.get("nic_filtering_condition", "or")
+    only_focus = filter_data.get("only_focus", False)
 
-    for i in devices:
-        if i.get("time"):
-            start = i.get("start", now)
+    # Can add more filter conditions here
+    # filter_field_x = filter_data.get("field_x") or []
+    # filter_field_y = filter_data.get("field_y") or []
+
+    for device in devices:
+        if device.get("time"):
+            start = device.get("start", now)
             passed = int(now - start)
-            i["time"] = max(i["time"] - passed, 0)
+            device["time"] = max(device["time"] - passed, 0)
 
-        if only_focus and user not in i.get("recipients", []):
+        if filter_data.get("occupyed"):
+            if device["user"] != user or device["time"] <= 0:
+                continue
+
+        # Focus filter
+        if only_focus and user not in device.get("recipients", []):
             continue
 
+        # Tag filter
         if filter_tags:
-            device_tags = set(i.get("tags", []))
+            device_tags = set(device.get("tags", []))
             filter_set = set(filter_tags)
 
             if tag_condition == "or":
@@ -182,8 +209,9 @@ async def get_all_devices(user=Depends(authenticate_user)):
                 if not filter_set.issubset(device_tags):
                     continue
 
+        # NIC type filter
         if filter_nics:
-            nic_types = [nic.get("type") for nic in i.get("nics", []) if nic.get("type")]
+            nic_types = [nic.get("type") for nic in device.get("nics", []) if nic.get("type")]
             device_nics = set(nic_types)
             filter_set = set(filter_nics)
 
@@ -194,9 +222,47 @@ async def get_all_devices(user=Depends(authenticate_user)):
                 if not filter_set.issubset(device_nics):
                     continue
 
-        result.append(i)
-    LOG.info(f"Total servers fetched: {len(devices)}")
-    return result
+        # Can add more filter logic here
+        # if filter_field_x:
+        #     # Handle other filter conditions
+        #     pass
+
+        result.append(device)
+
+    # Apply pagination if parameters provided
+    if page is not None and page_size is not None:
+        total_count = len(result)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+
+        # Calculate pagination start position
+        start_idx = (page - 1) * page_size
+        end_idx = min(start_idx + page_size, total_count)
+
+        # Paginated result
+        paged_result = result[start_idx:end_idx]
+
+        LOG.info(f"Total servers after filtering: {total_count}, "
+                 f"showing {len(paged_result)} on page {page}")
+
+        # Set response headers
+        headers = {
+            "X-Total-Count": str(total_count),
+            "X-Page": str(page),
+            "X-Page-Size": str(page_size),
+            "X-Total-Pages": str(total_pages),
+            "X-Has-Next": str(page < total_pages).lower(),
+            "X-Has-Prev": str(page > 1).lower()
+        }
+
+        return JSONResponse(
+            content=paged_result,
+            headers=headers,
+            media_type="application/json"
+        )
+    else:
+        # No pagination parameters, return all results (backward compatibility)
+        LOG.info(f"Total servers fetched: {len(result)}")
+        return result
 
 
 @router.get("/servers/nic_types", response_model=List[str])

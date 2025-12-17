@@ -2,9 +2,100 @@ import apiClient from './client'
 import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest, ResetFwRequest, NicResponse, DeviceResponse, GrubConfig } from '@/types/api'
 
 export const deviceApi = {
-  // 获取所有设备
-  getAll(): Promise<ServerDetailResponse[]> {
-    return apiClient.get('/api/servers')
+  getAllWithPagination(params?: {
+    page?: number;
+    page_size?: number;
+    filter_conditions?: {
+      [key: string]: any;
+    };
+  }): Promise<{
+    data: ServerDetailResponse[];
+    pagination?: {
+      page: number;
+      page_size: number;
+      total: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  }> {
+    const requestParams: any = { ...params }
+    
+    // Convert filter conditions to JSON string if exists
+    if (params?.filter_conditions) {
+      requestParams.filter_conditions = JSON.stringify(params.filter_conditions)
+    }
+    
+    // 确保 apiClient.get 返回完整的响应对象
+    return apiClient.get('/api/servers', { 
+      params: requestParams,
+      // 如果需要，添加配置以确保返回完整响应
+      // transformResponse: (res) => res, // 不自动解析响应
+      // headers: { 'Accept': 'application/json' }
+    }).then((response: any) => {
+      // 调试日志：查看响应结构
+      console.log('API Response:', response)
+      console.log('Response headers:', response.headers)
+      
+      const result: any = {
+        data: response.data || response // 兼容不同格式
+      }
+      
+      // 安全地从响应头中提取分页信息
+      const headers = response.headers || {}
+      
+      // 检查是否有分页头信息（处理大小写不敏感）
+      const getHeader = (key: string): string | undefined => {
+        const lowerKey = key.toLowerCase()
+        for (const [headerKey, value] of Object.entries(headers)) {
+          if (headerKey.toLowerCase() === lowerKey) {
+            return value as string
+          }
+        }
+        return undefined
+      }
+      
+      const totalCount = getHeader('x-total-count')
+      const pageHeader = getHeader('x-page')
+      const pageSize = getHeader('x-page-size')
+      const totalPages = getHeader('x-total-pages')
+      const hasNext = getHeader('x-has-next')
+      const hasPrev = getHeader('x-has-prev')
+      
+      // 如果存在任何分页头信息，就设置分页
+      if (totalCount || pageHeader || pageSize) {
+        result.pagination = {
+          page: parseInt(pageHeader || (params?.page?.toString() || '1')),
+          page_size: parseInt(pageSize || (params?.page_size?.toString() || '20')),
+          total: parseInt(totalCount || '0'),
+          total_pages: parseInt(totalPages || '1'),
+          has_next: hasNext?.toLowerCase() === 'true' || false,
+          has_prev: hasPrev?.toLowerCase() === 'true' || false
+        }
+      }
+      
+      return result
+    }).catch((error: any) => {
+      console.error('API Error:', error)
+      throw error
+    })
+  },
+
+  getAll(params?: {
+    filter_conditions?: {
+      [key: string]: any;
+    };
+  }): Promise<ServerDetailResponse[]> {
+    const requestParams: any = {}
+    
+    // Convert filter conditions to JSON string if exists
+    if (params?.filter_conditions) {
+      requestParams.filter_conditions = JSON.stringify(params.filter_conditions)
+    }
+    
+    return apiClient.get('/api/servers', { 
+      params: requestParams
+    })
   },
 
   // 获取设备详情

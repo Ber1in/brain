@@ -3601,7 +3601,6 @@ const loadAndUpdateServers = async () => {
     await loadAvailableServers()
     
     if (availableServers.value.length === 0) {
-      ElMessage.warning('没有可用的服务器，请先占用服务器')
       return
     }
     
@@ -3734,13 +3733,13 @@ const updateAllServersHardwareInfo = async () => {
 // 修改 loadAvailableServers 方法
 const loadAvailableServers = async () => {
   try {
-    const servers = await deviceApi.getAll()
-    const currentUser = authStore.username
+    const servers = await deviceApi.getAll({
+      filter_conditions: {
+        occupyed: true
+      }
+    })
     
-    // 过滤出当前用户占用的服务器
-    availableServers.value = servers.filter(server => 
-      server.user === currentUser && server.time && server.time > 0
-    )
+    availableServers.value = servers
     
     // 为每个网卡的每个网口初始化选择属性
     availableServers.value.forEach(server => {
