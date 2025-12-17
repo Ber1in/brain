@@ -156,6 +156,18 @@ async def get_all_devices():
     return devices
 
 
+@router.get("/servers/nic_types", response_model=List[str])
+async def get_all_nic_types():
+    devices = db.find(SERVER_COLLECTION, {})
+    result = set()
+    for device in devices:
+        for nic in device["nics"]:
+            if nic["type"]:
+                result.add(nic["type"])
+    LOG.info(f"Total servers fetched: {len(devices)}")
+    return list(result)
+
+
 @router.get("/servers/{device_id}", response_model=server_schemas.ServerDetailResponse)
 async def get_device(device_id: str):
     LOG.info(f"Fetching device, ID: {device_id}")
@@ -542,7 +554,7 @@ async def power_reset_server(server_id: str):
 
     bmcip = server["bmc"]["ip"]
     LOG.info(f"Power resetting server {server_id} via BMC {bmcip}")
-    
+
     await common_utils.ipmi_power_action(
         bmcip, "reset", server["device"]["ip"],
         server["device"]["username"], server["device"]["password"])

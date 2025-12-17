@@ -87,5 +87,9 @@ export const deviceApi = {
 
   occupyServer(serverId: string, time: number): Promise<ServerDetailResponse> {
     return apiClient.patch(`/api/servers/${serverId}/occupy`, { time })
-  }
+  },
+
+  getAllNicTypes(): Promise<string[]> {
+    return apiClient.get('/api/servers/nic_types')
+  },
 }

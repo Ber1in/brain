@@ -442,7 +442,12 @@
       @close="cancelNicTypeFilter"
     >
       <div class="filter-dialog-content">
-        <div class="filter-section">
+        <div v-if="loadingNicTypes" class="loading-state">
+          <el-icon class="loading-icon"><Loading /></el-icon>
+          <span>正在加载网卡类型...</span>
+        </div>
+        
+        <div v-else class="filter-section">
           <div class="section-title">
             <el-icon><Connection /></el-icon>
             <span>选择网卡类型</span>
@@ -470,9 +475,6 @@
                 <el-checkbox :label="nicType">
                   <div class="nic-type-option">
                     <span class="nic-type-name">{{ nicType }}</span>
-                    <el-tag size="small" type="info">
-                      {{ getNicTypeCount(nicType) }}
-                    </el-tag>
                   </div>
                 </el-checkbox>
               </div>
@@ -483,8 +485,15 @@
       
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="clearNicTypeFilter" size="default">清空</el-button>
-          <el-button type="primary" @click="applyNicTypeFilter" size="default">确定</el-button>
+          <el-button @click="clearNicTypeFilter" size="default" :disabled="loadingNicTypes">清空</el-button>
+          <el-button 
+            type="primary" 
+            @click="applyNicTypeFilter" 
+            size="default"
+            :disabled="loadingNicTypes"
+          >
+            确定
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -1181,6 +1190,10 @@ const pendingTagFilter = ref<string[]>([])
 const pendingTagFilterLogic = ref<'AND' | 'OR'>('OR')
 const pendingNicFilterLogic = ref<'AND' | 'OR'>('OR')
 
+ // 从后端获取的网卡类型列表
+const allNicTypes = ref<string[]>([]) 
+const loadingNicTypes = ref(false)   
+
 // 过滤相关状态
 const filteringConditions = ref<FilteringConditions>({
   only_focus: 0,
@@ -1241,18 +1254,18 @@ const saveFilteringConditions = async () => {
   }
 }
 
-
-// 新增：计算所有网卡类型
-const allNicTypes = computed(() => {
-  const types = new Set<string>()
-  devices.value.forEach(device => {
-    const nicSummary = getNicSummary(device)
-    nicSummary.forEach(summary => {
-      types.add(summary.type)
-    })
-  })
-  return Array.from(types).sort()
-})
+// 添加加载网卡类型的方法
+const loadNicTypes = async () => {
+  try {
+    loadingNicTypes.value = true
+    allNicTypes.value = await deviceApi.getAllNicTypes()
+  } catch (error) {
+    console.error('加载网卡类型失败:', error)
+    ElMessage.error('加载网卡类型失败')
+  } finally {
+    loadingNicTypes.value = false
+  }
+}
 
 // 新增：计算所有标签
 const allTags = computed(() => {
@@ -1262,14 +1275,6 @@ const allTags = computed(() => {
     )
   )
 })
-
-// 新增：获取网卡类型数量统计
-const getNicTypeCount = (nicType: string) => {
-  return devices.value.filter(device => {
-    const nicSummary = getNicSummary(device)
-    return nicSummary.some(summary => summary.type === nicType)
-  }).length
-}
 
 // 新增：获取标签数量统计
 const getTagCount = (tagName: string) => {
@@ -1760,8 +1765,12 @@ watch(currentPath, (newPath) => {
 }, { immediate: true })
 
 // 修改：显示网卡类型过滤弹窗时初始化待应用状态
-watch(showNicTypeFilter, (visible) => {
+watch(showNicTypeFilter, async (visible) => {
   if (visible) {
+    if (allNicTypes.value.length === 0 && !loadingNicTypes.value) {
+      await loadNicTypes()
+    }
+    
     // 复制当前筛选条件到待应用状态
     pendingNicTypeFilter.value = [...nicTypeFilter.value]
     pendingNicFilterLogic.value = nicFilterLogic.value
@@ -3344,10 +3353,33 @@ onMounted(() => {
   loadData()
   loadTags()
   loadFilteringConditions()
+  loadNicTypes()
 })
 </script>
 
 <style scoped>
+
+/* 添加加载状态样式 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  gap: 12px;
+}
+
+.loading-icon {
+  font-size: 24px;
+  color: #409eff;
+  animation: spin 1s linear infinite;
+}
+
+.loading-state span {
+  color: #606266;
+  font-size: 14px;
+}
+
 /* 表头过滤器按钮样式 - 新增 */
 .column-header-with-filter {
   display: flex;
