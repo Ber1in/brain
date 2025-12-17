@@ -69,7 +69,6 @@
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @selection-change="handleSelectionChange"
-        :row-class-name="getRowClassName"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
@@ -88,14 +87,6 @@
               :underline="false"
             >
               {{ row.bmc.hostname }}
-              <el-tooltip 
-                v-if="hasDuplicateNicInfo(row)" 
-                effect="dark" 
-                :content="getDuplicateTooltip(row)"
-                placement="top"
-              >
-                <el-icon class="warning-icon"><Warning /></el-icon>
-              </el-tooltip>
             </el-link>
           </template>
         </el-table-column>
