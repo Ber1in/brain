@@ -146,53 +146,12 @@ async def delete_device(device_id: str):
 
 @router.get("/servers", response_model=list[server_schemas.ServerDetailResponse])
 async def get_all_devices(
-    # Optional pagination parameters
-    page: Optional[int] = Query(None, ge=1, description="Page number"),
-    page_size: Optional[int] = Query(None, ge=1, le=100, description="Items per page"),
-
-    # Optional filter parameters - maintain backward compatibility
-    filter_conditions: Optional[str] = Query(
-        None, 
-        description="Filter conditions, JSON string format, includes tags, nics, only_focus, etc."
-    ),
-    user=Depends(authenticate_user)
+    page: Optional[int] = Query(None, ge=1), page_size: Optional[int] = Query(None, ge=1, le=100),
+    sort_by: Optional[str] = Query(None), 
+    sort_order: Optional[str] = Query("asc", regex="^(asc|desc)$"),
+    filter_conditions: Optional[str] = Query(None), user=Depends(authenticate_user)
 ):
 
-    def matches_keyword(device, keyword):
-        # 1. Search server name
-        hostname = device.get("bmc", {}).get("hostname", "")
-        if hostname and keyword in hostname.lower():
-            return True
-
-        # 2. Search management IP
-        device_ip = device.get("device", {}).get("ip", "")
-        if device_ip and keyword in device_ip:
-            return True
-
-        # 3. Search in notes
-        notes = device.get("notes", "")
-        if notes and keyword in notes.lower():
-            return True
-
-        # 4. Search in tags
-        tags = device.get("tags", [])
-        if tags and any(keyword in tag.lower() for tag in tags):
-            return True
-
-        # 5. Search in user 
-        user_field = device.get("user", "")
-        if user_field and keyword in user_field.lower() and device.get("time") > 0:
-            return True
-
-        # 6. Search in NIC information
-        nics = device.get("nics", [])
-        for nic in nics:
-            # Search NIC type
-            nic_type = nic.get("type", "")
-            if nic_type and keyword in nic_type.lower():
-                return True
-
-        return False
     # Priority: use frontend filter conditions, otherwise read from database
     filter_data = {}
     if filter_conditions:
@@ -205,102 +164,40 @@ async def get_all_devices(
 
     LOG.info("Fetching all servers.")
     devices = db.find(SERVER_COLLECTION)
-    result = []
-    now = datetime.now().timestamp()
+    result = common_utils.filter_devices(devices, filter_data, user)
 
-    # Extract parameters from filter conditions, support dynamic expansion
-    filter_tags = filter_data.get("tags") or []
-    tag_condition = filter_data.get("tag_filtering_condition", "or")
-    filter_nics = filter_data.get("nics") or []
-    nic_condition = filter_data.get("nic_filtering_condition", "or")
-    only_focus = filter_data.get("only_focus", False)
-
-    search_keyword_value = filter_data.get("search_keyword")
-    # Can add more filter conditions here
-    # filter_field_x = filter_data.get("field_x") or []
-    # filter_field_y = filter_data.get("field_y") or []
-
-    for device in devices:
-        if device.get("time"):
-            start = device.get("start", now)
-            passed = int(now - start)
-            device["time"] = max(device["time"] - passed, 0)
-
-        if filter_data.get("occupyed"):
-            if device["user"] != user or device["time"] <= 0:
-                continue
-
-        # Focus filter
-        if only_focus and user not in device.get("recipients", []):
-            continue
-
-        # Tag filter
-        if filter_tags:
-            device_tags = set(device.get("tags", []))
-            filter_set = set(filter_tags)
-
-            if tag_condition == "or":
-                if not device_tags & filter_set:
-                    continue
-            elif tag_condition == "and":
-                if not filter_set.issubset(device_tags):
-                    continue
-
-        # NIC type filter
-        if filter_nics:
-            nic_types = [nic.get("type") for nic in device.get("nics", []) if nic.get("type")]
-            device_nics = set(nic_types)
-            filter_set = set(filter_nics)
-
-            if nic_condition == "or":
-                if not device_nics & filter_set:
-                    continue
-            elif nic_condition == "and":
-                if not filter_set.issubset(device_nics):
-                    continue
-
-        if search_keyword_value:
-            keyword = search_keyword_value.lower()
-
-            if not matches_keyword(device, keyword):
-                continue
-
-        # Can add more filter logic here
-        # if filter_field_x:
-        #     # Handle other filter conditions
-        #     pass
-
-        result.append(device)
+    if sort_by and sort_order:
+        result = common_utils.apply_sorting(result, sort_by, sort_order)
+        LOG.info(f"Applied sorting: field={sort_by}, order={sort_order}")
 
     # Apply pagination if parameters provided
     if page is not None and page_size is not None:
         total_count = len(result)
         total_pages = max(1, (total_count + page_size - 1) // page_size)
 
-        # Calculate pagination start position
         start_idx = (page - 1) * page_size
         end_idx = min(start_idx + page_size, total_count)
 
-        # Paginated result
         paged_result = result[start_idx:end_idx]
 
-        LOG.info(f"Total servers after filtering: {total_count}, "
-                 f"showing {len(paged_result)} on page {page}")
+        LOG.info(
+            f"Total servers after filtering: {total_count}, "
+            f"showing {len(paged_result)} on page {page}"
+        )
 
-        # Set response headers
         headers = {
             "X-Total-Count": str(total_count),
             "X-Page": str(page),
             "X-Page-Size": str(page_size),
             "X-Total-Pages": str(total_pages),
             "X-Has-Next": str(page < total_pages).lower(),
-            "X-Has-Prev": str(page > 1).lower()
+            "X-Has-Prev": str(page > 1).lower(),
         }
 
         return JSONResponse(
             content=paged_result,
             headers=headers,
-            media_type="application/json"
+            media_type="application/json",
         )
     else:
         # No pagination parameters, return all results (backward compatibility)

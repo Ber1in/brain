@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import Dict, List
+from typing import Any, Dict, List
 from uuid import uuid4
 from fastapi import HTTPException
 
@@ -951,3 +951,157 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 
     except Exception as e:
         update_task(task_id, status="failed", detail=str(e))
+
+
+def matches_keyword(device, keyword):
+    # 1. Search server name
+    hostname = device.get("bmc", {}).get("hostname", "")
+    if hostname and keyword in hostname.lower():
+        return True
+
+    # 2. Search management IP
+    device_ip = device.get("device", {}).get("ip", "")
+    if device_ip and keyword in device_ip:
+        return True
+
+    # 3. Search in notes
+    notes = device.get("notes", "")
+    if notes and keyword in notes.lower():
+        return True
+
+    # 4. Search in tags
+    tags = device.get("tags", [])
+    if tags and any(keyword in tag.lower() for tag in tags):
+        return True
+
+    # 5. Search in user 
+    user_field = device.get("user", "")
+    if user_field and keyword in user_field.lower() and device.get("time") > 0:
+        return True
+
+    # 6. Search in NIC information
+    nics = device.get("nics", [])
+    for nic in nics:
+        # Search NIC type
+        nic_type = nic.get("type", "")
+        if nic_type and keyword in nic_type.lower():
+            return True
+
+    return False
+
+
+def filter_devices(devices: List[Dict[str, Any]], filter_data: Dict[str, Any], 
+                   user: str) -> List[Dict[str, Any]]:
+    result = []
+    now = datetime.now().timestamp()
+
+    filter_tags = filter_data.get("tags") or []
+    tag_condition = filter_data.get("tag_filtering_condition", "or")
+
+    filter_nics = filter_data.get("nics") or []
+    nic_condition = filter_data.get("nic_filtering_condition", "or")
+
+    only_focus = filter_data.get("only_focus", False)
+    search_keyword_value = filter_data.get("search_keyword")
+
+    for device in devices:
+        if device.get("time"):
+            start = device.get("start", now)
+            passed = int(now - start)
+            device["time"] = max(device["time"] - passed, 0)
+
+        if filter_data.get("occupyed"):
+            if device.get("user") != user or device.get("time", 0) <= 0:
+                continue
+
+        if only_focus and user not in device.get("recipients", []):
+            continue
+
+        if filter_tags:
+            device_tags = set(device.get("tags", []))
+            filter_set = set(filter_tags)
+
+            if tag_condition == "or":
+                if not device_tags & filter_set:
+                    continue
+            elif tag_condition == "and":
+                if not filter_set.issubset(device_tags):
+                    continue
+
+        if filter_nics:
+            nic_types = [
+                nic.get("type")
+                for nic in device.get("nics", [])
+                if nic.get("type")
+            ]
+            device_nics = set(nic_types)
+            filter_set = set(filter_nics)
+
+            if nic_condition == "or":
+                if not device_nics & filter_set:
+                    continue
+            elif nic_condition == "and":
+                if not filter_set.issubset(device_nics):
+                    continue
+
+        if search_keyword_value:
+            keyword = search_keyword_value.lower()
+            if not matches_keyword(device, keyword):
+                continue
+
+        result.append(device)
+
+    return result
+
+
+def apply_sorting(devices: list, sort_by: str, sort_order: str) -> list:
+    """
+    Sort device list
+    """
+    if not sort_by or not sort_order:
+        return devices
+
+    sort_order = sort_order.lower()
+    reverse = sort_order == 'desc'
+
+    # Define sortable fields and corresponding extraction functions
+    sort_functions = {
+        'hostname': lambda x: x.get('bmc', {}).get('hostname', '').lower(),
+        'ip': lambda x: x.get('device', {}).get('ip', ''),
+        'user': lambda x: x.get('user', '').lower(),
+        'time': lambda x: x.get('time', 0),
+    }
+
+    if sort_by not in sort_functions:
+        LOG.warning(f"Unknown sort field: {sort_by}")
+        return devices
+
+    extract_func = sort_functions[sort_by]
+
+    try:
+        # Special handling for IP address sorting
+        if sort_by == 'ip':
+            def ip_key_func(item):
+                ip = extract_func(item)
+                if not ip:
+                    return (0, 0, 0, 0)  # Empty IP at the front
+
+                # Convert IP address to comparable numeric tuple
+                parts = ip.split('.')
+                if len(parts) != 4:
+                    return (0, 0, 0, 0)
+
+                try:
+                    return tuple(int(part) for part in parts)
+                except ValueError:
+                    return (0, 0, 0, 0)
+
+            sorted_devices = sorted(devices, key=ip_key_func, reverse=reverse)
+        else:
+            # Other fields sorted directly
+            sorted_devices = sorted(devices, key=extract_func, reverse=reverse)
+
+        return sorted_devices
+    except Exception as e:
+        LOG.error(f"Sorting failed: {e}")
+        return devices
