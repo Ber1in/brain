@@ -68,6 +68,7 @@
         :data="devices"
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
+        @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
       >
         <!-- 多选列 -->
@@ -76,7 +77,7 @@
         <el-table-column 
           prop="bmc.hostname" 
           label="服务器名称"
-          sortable
+          sortable="custom"
           width="120"
         >
           <template #default="{ row }">
@@ -93,7 +94,7 @@
         <el-table-column 
           prop="device.ip" 
           label="管理IP"
-          sortable
+          sortable="custom"
           :sort-method="ipSortMethod"
           width="110"
         >
@@ -260,7 +261,7 @@
         <el-table-column 
           prop="user" 
           label="占用人"
-          sortable
+          sortable="custom"
           width="90"
         >
           <template #default="{ row }">
@@ -270,7 +271,7 @@
         </el-table-column>
         <el-table-column 
           label="占用截至时间"
-          sortable
+          sortable="custom"
           :sort-method="timeSortMethod"
           width="150"
         >
@@ -3110,19 +3111,63 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
   return timeA - timeB;
 };
 
+
+// 添加排序相关状态
+const sortParams = reactive({
+  sort_by: 'ip',
+  sort_order: 'asc'  // asc 或 desc
+})
+
+// 处理排序变化
+const handleSortChange = ({ prop, order }: { 
+  prop: string; 
+  order: 'ascending' | 'descending' | null 
+}) => {
+  if (prop && order) {
+    // 映射前端字段名到后端字段名
+    const fieldMapping: Record<string, string> = {
+      'bmc.hostname': 'hostname',
+      'device.ip': 'ip',
+      'user': 'user',
+      'time': 'time'
+    }
+    
+    sortParams.sort_by = fieldMapping[prop] || prop
+    sortParams.sort_order = order === 'ascending' ? 'asc' : 'desc'
+  } else {
+    // 清空排序
+    sortParams.sort_by = ''
+    sortParams.sort_order = 'asc'
+  }
+  
+  // 重置到第一页并重新加载数据
+  pagination.page = 1
+  loadData()
+}
+
 const loadData = async (page?: number) => { 
   loading.value = true
   try {
-    // Jump to specified page if provided
     if (page !== undefined) {
       pagination.page = page
     }
     
-    // Build filter conditions - 直接使用 filteringConditions
     const filterConditions = { ...filteringConditions.value }
     
     if (searchKeyword.value.trim()) {
       filterConditions.search_keyword = searchKeyword.value.trim()
+    }
+    
+    // 构建请求参数
+    const requestParams: any = {
+      page: pagination.page,
+      page_size: pagination.page_size
+    }
+    
+    // 添加排序参数（如果有）
+    if (sortParams.sort_by) {
+      requestParams.sort_by = sortParams.sort_by
+      requestParams.sort_order = sortParams.sort_order
     }
     
     // Check if any filter condition is active
@@ -3131,12 +3176,6 @@ const loadData = async (page?: number) => {
       filterConditions.tags.length > 0 ||
       filterConditions.nics.length > 0 ||
       filterConditions.search_keyword
-    
-    // Build request parameters
-    const requestParams: any = {
-      page: pagination.page,
-      page_size: pagination.page_size
-    }
     
     // Only send filter conditions if any filter is active
     if (hasActiveFilters) {
@@ -3147,7 +3186,6 @@ const loadData = async (page?: number) => {
     
     devices.value = response.data
     
-    // 关键：正确处理分页数据
     if (response.pagination) {    
       pagination.total = response.pagination.total
       pagination.total_pages = response.pagination.total_pages
@@ -3155,12 +3193,6 @@ const loadData = async (page?: number) => {
       pagination.page_size = response.pagination.page_size
       pagination.has_next = response.pagination.has_next
       pagination.has_prev = response.pagination.has_prev
-    } else {
-      // 手动计算作为后备方案
-      pagination.total = devices.value.length
-      pagination.total_pages = Math.ceil(devices.value.length / pagination.page_size)
-      pagination.has_next = pagination.page < pagination.total_pages
-      pagination.has_prev = pagination.page > 1
     }
     
     // Start task status query for devices with task_id

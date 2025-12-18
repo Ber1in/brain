@@ -5,6 +5,8 @@ export const deviceApi = {
   getAllWithPagination(params?: {
     page?: number;
     page_size?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
     filter_conditions?: {
       [key: string]: any;
     };
@@ -25,7 +27,13 @@ export const deviceApi = {
       requestParams.filter_conditions = JSON.stringify(params.filter_conditions)
     }
     
-    // 关键：使用配置 {responseType: 'json', transformResponse: undefined}
+    if (params?.sort_by) {
+      requestParams.sort_by = params.sort_by
+    }
+    if (params?.sort_order) {
+      requestParams.sort_order = params.sort_order
+    }
+    
     return apiClient.get('/api/servers', { 
       params: requestParams,
       // 确保返回完整响应
