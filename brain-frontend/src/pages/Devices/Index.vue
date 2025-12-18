@@ -434,7 +434,7 @@
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
-          :page-sizes="[15, 30, 50]"
+          :page-sizes="[5, 15, 30, 50]"
           :background="true"
           layout="total, sizes, prev, pager, next, jumper"
           :total="pagination.total"
@@ -3111,7 +3111,7 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
 };
 
 // 加载数据
-const loadData = async (page?: number) => {
+const loadData = async (page?: number) => { 
   loading.value = true
   try {
     // Jump to specified page if provided
@@ -3143,19 +3143,20 @@ const loadData = async (page?: number) => {
     
     devices.value = response.data
     
-    // Update pagination info if exists
-    if (response.pagination) {
-      Object.assign(pagination, response.pagination)
+    // 关键：正确处理分页数据
+    if (response.pagination) {    
+      pagination.total = response.pagination.total
+      pagination.total_pages = response.pagination.total_pages
+      pagination.page = response.pagination.page
+      pagination.page_size = response.pagination.page_size
+      pagination.has_next = response.pagination.has_next
+      pagination.has_prev = response.pagination.has_prev
     } else {
-      // 如果没有分页信息，重置分页状态
-      Object.assign(pagination, {
-        page: 1,
-        page_size: 15,
-        total: response.data.length,
-        total_pages: 1,
-        has_next: false,
-        has_prev: false
-      })
+      // 手动计算作为后备方案
+      pagination.total = devices.value.length
+      pagination.total_pages = Math.ceil(devices.value.length / pagination.page_size)
+      pagination.has_next = pagination.page < pagination.total_pages
+      pagination.has_prev = pagination.page > 1
     }
     
     // Start task status query for devices with task_id
@@ -3164,6 +3165,7 @@ const loadData = async (page?: number) => {
         queryTaskStatus(device)
       }
     })
+    
   } catch (error) {
     console.error('Failed to load device list:', error)
     ElMessage.error('Failed to load device list')

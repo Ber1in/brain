@@ -21,63 +21,58 @@ export const deviceApi = {
   }> {
     const requestParams: any = { ...params }
     
-    // Convert filter conditions to JSON string if exists
     if (params?.filter_conditions) {
       requestParams.filter_conditions = JSON.stringify(params.filter_conditions)
     }
     
-    // 确保 apiClient.get 返回完整的响应对象
+    // 关键：使用配置 {responseType: 'json', transformResponse: undefined}
     return apiClient.get('/api/servers', { 
       params: requestParams,
-      // 如果需要，添加配置以确保返回完整响应
-      // transformResponse: (res) => res, // 不自动解析响应
-      // headers: { 'Accept': 'application/json' }
-    }).then((response: any) => {
-      // 调试日志：查看响应结构
-      console.log('API Response:', response)
-      console.log('Response headers:', response.headers)
-      
-      const result: any = {
-        data: response.data || response // 兼容不同格式
+      // 确保返回完整响应
+      transformResponse: (data, headers) => {
+        // 返回一个对象，包含数据和 headers
+        return {
+          data: JSON.parse(data),
+          headers: headers
+        }
       }
+    }).then((response: any) => {
       
-      // 安全地从响应头中提取分页信息
-      const headers = response.headers || {}
-      
-      // 检查是否有分页头信息（处理大小写不敏感）
-      const getHeader = (key: string): string | undefined => {
-        const lowerKey = key.toLowerCase()
-        for (const [headerKey, value] of Object.entries(headers)) {
-          if (headerKey.toLowerCase() === lowerKey) {
-            return value as string
+      // 处理 transformResponse 返回的结构
+      if (response && response.data && response.headers) {
+        const data = response.data
+        const headers = response.headers
+        
+        // 提取分页信息
+        const totalCount = headers['x-total-count'] || headers['X-Total-Count']
+        const pageHeader = headers['x-page'] || headers['X-Page']
+        const pageSize = headers['x-page-size'] || headers['X-Page-Size']
+        const totalPages = headers['x-total-pages'] || headers['X-Total-Pages']
+        const hasNext = headers['x-has-next'] || headers['X-Has-Next']
+        const hasPrev = headers['x-has-prev'] || headers['X-Has-Prev']
+        
+        const result: any = {
+          data: data
+        }
+        
+        if (totalCount || pageHeader || pageSize) {
+          result.pagination = {
+            page: parseInt(pageHeader || (params?.page?.toString() || '1')),
+            page_size: parseInt(pageSize || (params?.page_size?.toString() || '5')),
+            total: parseInt(totalCount || '0'),
+            total_pages: parseInt(totalPages || '1'),
+            has_next: (hasNext?.toString().toLowerCase() === 'true') || false,
+            has_prev: (hasPrev?.toString().toLowerCase() === 'true') || false
           }
         }
-        return undefined
+        
+        return result
       }
       
-      const totalCount = getHeader('x-total-count')
-      const pageHeader = getHeader('x-page')
-      const pageSize = getHeader('x-page-size')
-      const totalPages = getHeader('x-total-pages')
-      const hasNext = getHeader('x-has-next')
-      const hasPrev = getHeader('x-has-prev')
-      
-      // 如果存在任何分页头信息，就设置分页
-      if (totalCount || pageHeader || pageSize) {
-        result.pagination = {
-          page: parseInt(pageHeader || (params?.page?.toString() || '1')),
-          page_size: parseInt(pageSize || (params?.page_size?.toString() || '20')),
-          total: parseInt(totalCount || '0'),
-          total_pages: parseInt(totalPages || '1'),
-          has_next: hasNext?.toLowerCase() === 'true' || false,
-          has_prev: hasPrev?.toLowerCase() === 'true' || false
-        }
+      // 如果 transformResponse 没有工作，返回原始数据
+      return {
+        data: response || []
       }
-      
-      return result
-    }).catch((error: any) => {
-      console.error('API Error:', error)
-      throw error
     })
   },
 
