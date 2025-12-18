@@ -434,7 +434,7 @@
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
-          :page-sizes="[5, 15, 30, 50]"
+          :page-sizes="[5, 10, 20, 35, 50, 100]"
           :background="true"
           layout="total, sizes, prev, pager, next, jumper"
           :total="pagination.total"
@@ -1133,7 +1133,7 @@ const selectedDevices = ref<ServerDetailResponse[]>([])
 // 新增：分页相关状态
 const pagination = reactive({
   page: 1,
-  page_size: 15,
+  page_size: 20,
   total: 0,
   total_pages: 0,
   has_next: false,
