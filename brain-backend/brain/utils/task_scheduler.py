@@ -603,10 +603,11 @@ async def create_server_reminder_email(server_info, current_recipient, status: S
             <h2>服务器信息</h2>
             <table class="info-table">
                 <tr><td>服务器IP:</td><td><strong>{server_info['device']['ip']}</strong></td></tr>
-                {"<tr><td>占用人:</td><td><strong>{}</strong>{}</td></tr>".format(
-                    server_info['user'],
-                    ('<span class="owner-badge">您</span>' if is_owner else '')
-                ) if show_occupier and server_info.get('user') else ""}
+                {"<tr><td>{}:</td><td><strong>{}</strong>{}</td></tr>".format(
+                    "占用人" if show_occupier else "原占用人",
+                    server_info["user"],
+                    '<span class="owner-badge">您</span>' if is_owner else ""
+                ) if server_info.get("user") else ""}
                 <tr><td>状态:</td><td class="{config['status_class']}">{config['status_text']}</td></tr>
                 {"<tr><td>时间信息:</td><td>{}</td></tr>".format(config['time_info']) if config['time_info'] else ""}
                 {"<tr><td>服务器名称:</td><td>{}</td></tr>".format(server_info['bmc']['hostname']) if server_info.get('bmc', {}).get('hostname') else ""}
