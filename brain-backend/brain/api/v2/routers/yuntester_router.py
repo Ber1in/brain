@@ -78,8 +78,11 @@ async def get_current_code_and_commit(user):
         )
         current = matched_tag or current_commit
     else:
-        repo.git.pull()
         current = repo.active_branch.name
+        try:
+            repo.git.pull()
+        except Exception as e:
+            LOG.warning(f"Failed to pull the latest code from the branch {current} from GitLab")
 
     latest_commit = repo.head.commit.hexsha
     return current, latest_commit 
