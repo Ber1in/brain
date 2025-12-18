@@ -1063,7 +1063,7 @@
                 v-if="selectedServers.includes(server.id) && serverUpdatingStatus[server.id!] === false && getTestableNicCount(server) === 0"
               >
                 <el-alert
-                  :title="`服务器 ${server.bmc.hostname} 没有可测试的网卡（所有网卡均为MV200类型或无可测试网口）`"
+                  :title="`服务器 ${server.bmc.hostname} 没有可测试的网卡`"
                   type="info"
                   :closable="false"
                   show-icon
