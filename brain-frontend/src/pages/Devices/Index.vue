@@ -2051,6 +2051,9 @@ onUnmounted(() => {
   Object.values(taskStatusTimers.value).forEach(timer => {
     clearTimeout(timer)
   })
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
   taskStatusTimers.value = {}
   taskStatusMap.value = {}
 })
@@ -3107,7 +3110,6 @@ const timeSortMethod = (a: ServerDetailResponse, b: ServerDetailResponse) => {
   return timeA - timeB;
 };
 
-// 加载数据
 const loadData = async (page?: number) => { 
   loading.value = true
   try {
@@ -3119,11 +3121,16 @@ const loadData = async (page?: number) => {
     // Build filter conditions - 直接使用 filteringConditions
     const filterConditions = { ...filteringConditions.value }
     
+    if (searchKeyword.value.trim()) {
+      filterConditions.search_keyword = searchKeyword.value.trim()
+    }
+    
     // Check if any filter condition is active
     const hasActiveFilters = 
       filterConditions.only_focus === 1 ||
       filterConditions.tags.length > 0 ||
-      filterConditions.nics.length > 0
+      filterConditions.nics.length > 0 ||
+      filterConditions.search_keyword
     
     // Build request parameters
     const requestParams: any = {
@@ -3182,9 +3189,30 @@ const handleSizeChange = (size: number) => {
   loadData()
 }
 
-// 处理搜索
+// 处理搜索防抖相关变量
+let searchTimeout: NodeJS.Timeout | null = null
+
+// handleSearch 方法
 const handleSearch = () => {
-  // 搜索逻辑已经在 computed 属性中处理
+  // 清除之前的定时器
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+    searchTimeout = null
+  }
+  
+  // 重置到第一页
+  pagination.page = 1
+  
+  // 如果是清空操作，立即执行搜索
+  if (!searchKeyword.value.trim()) {
+    loadData()
+    return
+  }
+  
+  // 正常输入，延迟500ms执行搜索
+  searchTimeout = setTimeout(() => {
+    loadData()
+  }, 500)
 }
 
 // 下拉菜单命令处理

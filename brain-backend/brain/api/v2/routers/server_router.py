@@ -157,6 +157,42 @@ async def get_all_devices(
     ),
     user=Depends(authenticate_user)
 ):
+
+    def matches_keyword(device, keyword):
+        # 1. Search server name
+        hostname = device.get("bmc", {}).get("hostname", "")
+        if hostname and keyword in hostname.lower():
+            return True
+
+        # 2. Search management IP
+        device_ip = device.get("device", {}).get("ip", "")
+        if device_ip and keyword in device_ip:
+            return True
+
+        # 3. Search in notes
+        notes = device.get("notes", "")
+        if notes and keyword in notes.lower():
+            return True
+
+        # 4. Search in tags
+        tags = device.get("tags", [])
+        if tags and any(keyword in tag.lower() for tag in tags):
+            return True
+
+        # 5. Search in user 
+        user_field = device.get("user", "")
+        if user_field and keyword in user_field.lower() and device.get("time") > 0:
+            return True
+
+        # 6. Search in NIC information
+        nics = device.get("nics", [])
+        for nic in nics:
+            # Search NIC type
+            nic_type = nic.get("type", "")
+            if nic_type and keyword in nic_type.lower():
+                return True
+
+        return False
     # Priority: use frontend filter conditions, otherwise read from database
     filter_data = {}
     if filter_conditions:
@@ -179,6 +215,7 @@ async def get_all_devices(
     nic_condition = filter_data.get("nic_filtering_condition", "or")
     only_focus = filter_data.get("only_focus", False)
 
+    search_keyword_value = filter_data.get("search_keyword")
     # Can add more filter conditions here
     # filter_field_x = filter_data.get("field_x") or []
     # filter_field_y = filter_data.get("field_y") or []
@@ -221,6 +258,12 @@ async def get_all_devices(
             elif nic_condition == "and":
                 if not filter_set.issubset(device_nics):
                     continue
+
+        if search_keyword_value:
+            keyword = search_keyword_value.lower()
+
+            if not matches_keyword(device, keyword):
+                continue
 
         # Can add more filter logic here
         # if filter_field_x:
