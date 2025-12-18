@@ -555,9 +555,6 @@
                     >
                       {{ tag.name }}
                     </el-tag>
-                    <el-tag size="small" type="info">
-                      {{ getTagCount(tag.name) }}
-                    </el-tag>
                   </div>
                 </el-checkbox>
               </div>
