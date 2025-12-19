@@ -879,8 +879,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
                 update_task(task_id, status="reboot_timeout", detail="Server restart timeout")
 
         else:
-            # Step Group 2: Install New MCR
-            update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
+
             LOG.info(f"{host} Installing new MCR with option: {data.update_options}")
 
             if aidpu:
@@ -899,8 +898,10 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 
                 uninstall_cmd = f"cd {root_dir} && ./uninstall.sh --force"
 
+            # Step Group 2: Install New MCR
             # ---------- first install attempt ----------
             try:
+                update_task(task_id, stage="installing_mcr", detail="Installing new MCR")
                 LOG.info(f"{host} Trying initial MCR install")
                 await ssh_execute_async(host, install_cmd, user, pwd)
                 LOG.info(f"{host} New MCR installed successfully (first attempt)")
@@ -924,6 +925,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 
                 # ---------- reinstall ----------
                 try:
+                    update_task(task_id, stage="installing_mcr", detail=f"Retrying MCR install after uninstall")
                     LOG.info(f"{host} Retrying MCR install after uninstall")
                     await ssh_execute_async(host, install_cmd, user, pwd)
                     LOG.info(f"{host} New MCR installed successfully (after uninstall)")
