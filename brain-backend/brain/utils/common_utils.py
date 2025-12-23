@@ -1055,7 +1055,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 def matches_keyword(device, keyword):
     # 1. Search server name
     hostname = device.get("bmc", {}).get("hostname", "")
-    if hostname and keyword in hostname.lower():
+    if hostname and keyword in str(hostname).lower():
         return True
 
     # 2. Search management IP
@@ -1065,17 +1065,17 @@ def matches_keyword(device, keyword):
 
     # 3. Search in notes
     notes = device.get("notes", "")
-    if notes and keyword in notes.lower():
+    if notes and keyword in str(notes).lower():
         return True
 
     # 4. Search in tags
     tags = device.get("tags", [])
-    if tags and any(keyword in tag.lower() for tag in tags):
+    if tags and any(keyword in str(tag).lower() for tag in tags):
         return True
 
     # 5. Search in user 
     user_field = device.get("user", "")
-    if user_field and keyword in user_field.lower() and device.get("time") > 0:
+    if user_field and keyword in str(user_field).lower() and device.get("time") > 0:
         return True
 
     # 6. Search in NIC information
@@ -1083,7 +1083,7 @@ def matches_keyword(device, keyword):
     for nic in nics:
         # Search NIC type
         nic_type = nic.get("type", "")
-        if nic_type and keyword in nic_type.lower():
+        if nic_type and keyword in str(nic_type).lower():
             return True
 
     return False
