@@ -181,7 +181,7 @@
               style="width: 100%"
               :max-height="400"
             >
-              <el-table-column prop="created_at" label="执行时间" width="155" sortable>
+              <el-table-column prop="created_at" label="执行时间" width="165" sortable>
                 <template #default="{ row }">
                   {{ formatTime(row.created_at) }}
                 </template>
