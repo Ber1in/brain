@@ -152,6 +152,10 @@ ensure_packages
     await ssh_execute_async(host, cmd, user, pwd)
 
 
+async def ensure_server_active(host, user, password, services: list):
+    await ssh_execute_async(host, f"systemctl start {' '.join(services)}", user, password)
+
+
 def parse_nics_info(output: str) -> List[Dict[str, str]]:
     """
     Parse yuncli lspci output and return a list of devices.
@@ -703,7 +707,7 @@ def parse_lldpctl_output(lldpctl_output: str) -> Dict[str, Dict[str, str]]:
         # Extract PortID
         elif line.startswith('PortID:'):
             portid_line = line.replace('PortID:', '').strip()
-            
+
             if portid_line.startswith('ifname '):
                 current_neighbor['port'] = portid_line[7:]
             else:
@@ -724,10 +728,10 @@ def parse_lldpctl_output(lldpctl_output: str) -> Dict[str, Dict[str, str]]:
 async def collect_switch_info(ip, user, password):
     try:
         await ensure_packages_installed(ip, user, password, ["lldpd"])
+        await ensure_server_active(ip, user, password, ["lldpd"])
     except Exception:
         LOG.error("The command to ensure package lldpctl failed, "
                   "and switch information could not be retrieved")
-        return {"status": "failed"}
     switch_res = await ssh_execute_async(ip, "lldpctl", user, password, False)
     switchs = parse_lldpctl_output(switch_res)
     return switchs
