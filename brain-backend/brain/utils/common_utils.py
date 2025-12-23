@@ -720,7 +720,11 @@ def parse_lldpctl_output(lldpctl_output: str) -> Dict[str, Dict[str, str]]:
 
 
 async def collect_switch_info(ip, user, password):
-    await ensure_packages_installed(ip, user, password, ["lldpctl"])
+    try:
+        await ensure_packages_installed(ip, user, password, ["lldpctl"])
+    except Exception:
+        LOG.error("The command to ensure package lldpctl failed, "
+                  "and switch information could not be retrieved")
     switch_res = await ssh_execute_async(ip, "lldpctl", user, password, False)
     switchs = parse_lldpctl_output(switch_res)
     return switchs
