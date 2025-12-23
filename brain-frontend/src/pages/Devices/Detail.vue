@@ -297,7 +297,7 @@
             </el-table-column>
 
             <!-- 交换机信息列 -->
-            <el-table-column label="上行交换机" width="225">
+            <el-table-column label="上行交换机" width="230">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
@@ -323,7 +323,7 @@
             </el-table-column>
 
             <!-- SOC IP列 - 已添加匹配异常提示 -->
-            <el-table-column label="SOC IP" width="140">
+            <el-table-column label="SOC IP">
               <template #default="{ row }">
                 <div v-if="getMv200StatusForNic(row)" class="soc-ip-status">
                   <!-- 非MV200网卡，显示横线 -->
