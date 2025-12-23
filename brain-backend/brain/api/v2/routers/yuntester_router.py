@@ -3,6 +3,7 @@
 
 import asyncio
 from contextlib import contextmanager
+import json
 import subprocess
 from typing import Dict, List
 from datetime import datetime
@@ -198,6 +199,7 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
 
     executed_cases = 0
     all_cases = len(cases)
+    statistic = {}
 
     with working_directory(test_base_dir):
         # Ensure log directory exists
@@ -260,11 +262,21 @@ def run_sync_pytest(task_id, cases, test_base_dir, log_path, env_topo_path, resu
         except Exception as e:
             LOG.warning(f"Allure report generation error: {e}")
 
+        try:
+            summary_file = os.path.join(allure_report_dir, "widgets/summary.json")
+            with open(summary_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            if "statistic" in data:
+                statistic = data["statistic"]
+        except Exception:
+            LOG.warning()
+
     end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     status = "cancelled" if task.get("cancel", 0) == 1 else "success"
-    db.update(
-        TEST_HISTORY_COLLECTION, {"id": task_id}, {"status": status, "end_time": end_time})
+    db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, 
+              {"status": status, "end_time": end_time, "statistic": statistic})
 
     LOG.info(f"Task {task_id} finished with status: {status}")
 
@@ -382,7 +394,8 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(aut
         "url": f"{settings.file_server}/qa-auto-files/{user}/results/{dt}/allure-report/index.html",
         "topo": f"{settings.file_server}/qa-auto-files/{user}/topo/{env_topo_filename}",
         "log": f"{settings.file_server}/qa-auto-files/{user}/logs/{log_filename}",
-        "cancel": 0
+        "cancel": 0,
+        "statistic": {}
     }
 
     db.insert(TEST_HISTORY_COLLECTION, task_record)

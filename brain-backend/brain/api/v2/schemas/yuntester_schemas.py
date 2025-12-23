@@ -1,8 +1,9 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from dataclasses import Field
 from pydantic import BaseModel, validator, root_validator
-from typing import List
+from typing import Any, Dict, List, Optional
 
 
 class CheckoutRequest(BaseModel):
@@ -88,17 +89,18 @@ class ExecuteResponse(BaseModel):
 
 
 class ExecuteHistoryResponse(BaseModel):
-    url: str = None
-    created_at: str = None
-    end_time: str = None
-    current: str = None
-    latest_commit: str = None
+    url: Optional[str] = None
+    created_at: Optional[str] = None
+    end_time: Optional[str] = None
+    current: Optional[str] = None
+    latest_commit: Optional[str] = None
     id: str
     topo: str
     log: str
     user: str
     executed: str
     status: str
+    statistic: Optional[Dict[str, Any]] = None
 
 
 class CaseCombinationsResponse(BaseModel):

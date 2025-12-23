@@ -32,7 +32,7 @@ export const testApi = {
   },
 
   
-  getExecuteStatus(task_id: string): Promise<ExecuteResponse[]> {
+  getExecuteStatus(task_id: string): Promise<ExecuteResponse> {
     return apiClient.get(`/api/yuntester/task/${task_id}`)
   },
 

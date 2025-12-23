@@ -3093,7 +3093,7 @@ const getStatusText = (status: string): string => {
     case 'running':
       return '执行中'
     case 'success':
-      return '执行成功'
+      return '执行完成'
     case 'failed':
       return '执行失败'
     case 'cancelled':

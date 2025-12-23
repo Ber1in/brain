@@ -34,7 +34,7 @@ def collect_tests_with_detailed_report(dirs: list, root_dir):
     ]
 
     LOG.info(f"Scanning test directories: {dirs}")
-    all_test_dirs = find_all_test_directories(parent_dirs, exclude_dirs, root_dir)
+    all_test_dirs = find_all_test_directories(parent_dirs, exclude_dirs)
     LOG.info(f"Found {len(all_test_dirs)} test directories")
 
     scanned_tests = []
@@ -58,7 +58,7 @@ def collect_tests_with_detailed_report(dirs: list, root_dir):
                 LOG.info(f"Collected {len(tests)} tests from {test_dir}")
             else:
                 err = stderr.decode('utf-8').strip().splitlines()[-1:]
-                LOG.warning(f"Failed to collect tests from {test_dir}: {' '.join(err)}")
+                LOG.error(f"Failed to collect tests from {test_dir}: {' '.join(err)}")
 
         except Exception as e:
             LOG.error(f"Error collecting tests in {test_dir}: {e}")
@@ -68,7 +68,7 @@ def collect_tests_with_detailed_report(dirs: list, root_dir):
     return scanned_tests
 
 
-def find_all_test_directories(parent_dirs, exclude_dirs, root_dir):
+def find_all_test_directories(parent_dirs, exclude_dirs):
     """Find all directories that contain pytest test files"""
     all_test_dirs = set()
 

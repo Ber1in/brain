@@ -311,7 +311,8 @@ class SQLiteDocumentDB:
             "topo": "",
             "log": "",
             "executed": "",
-            "cancel": 0
+            "cancel": 0,
+            "statistic": {}
         }, 
         TASK_POOL_COLLECTION: {
             "id": "",

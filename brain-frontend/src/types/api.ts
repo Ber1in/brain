@@ -358,6 +358,7 @@ export interface ExecuteResponse {
   user: string;
   status: string
   executed: string
+  statistic?: Record<string, any>; 
 }
 
 export interface BranchAndTagResponse {
