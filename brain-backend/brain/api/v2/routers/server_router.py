@@ -369,7 +369,7 @@ async def occupy_server(
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
-    LOG.info("occupy_server finished.")
+    LOG.info(f"{user} occupy server {ip} finished.")
     return server
 
 

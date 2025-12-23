@@ -650,7 +650,10 @@ def parse_lldpctl_output(lldpctl_output: str) -> Dict[str, Dict[str, str]]:
 
     Returns:
         Dict[str, Dict[str, str]]: Mapping from interface name to switch info
-        Example: {'ens2f0': {'switch': 'H3C-S9850-32H-G', 'port': 'HundredGigE1/0/5'}}
+        Example: {
+            'ens2f0': {'switch': 'H3C-S9850-32H-G', 'port': 'HundredGigabitEthernet 0/27'},
+            'enp65s0np0': {'switch': 'RJ-S6580-LAB-YLF025', 'port': 'HundredGigabitEthernet 0/27'}
+        }
     """
     interface_map = {}
     current_neighbor = {}
@@ -700,10 +703,9 @@ def parse_lldpctl_output(lldpctl_output: str) -> Dict[str, Dict[str, str]]:
         # Extract PortID
         elif line.startswith('PortID:'):
             portid_line = line.replace('PortID:', '').strip()
-            # Extract only the port part, removing 'ifname ' prefix
-            if ' ' in portid_line:
-                portid_parts = portid_line.split()
-                current_neighbor['port'] = portid_parts[-1]
+            
+            if portid_line.startswith('ifname '):
+                current_neighbor['port'] = portid_line[7:]
             else:
                 current_neighbor['port'] = portid_line
 

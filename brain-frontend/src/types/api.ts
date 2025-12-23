@@ -261,6 +261,8 @@ export interface NicInfo {
   mac?: string
   bdf?: string
   iface?: string
+  switch?: string
+  port?: string
 }
 
 export interface NicBase {

@@ -245,7 +245,7 @@
             class="compact-table"
             :show-header="nicsData && nicsData.length > 0"
           >
-            <el-table-column prop="type" label="类型" width="110">
+            <el-table-column prop="type" label="类型" width="140">
               <template #default="{ row }">
                 <span>{{ formatNicTypeForDisplay(row.type) }}</span>
               </template>
@@ -281,7 +281,7 @@
                 <span v-else class="empty-text">-</span>
               </template>
             </el-table-column>
-            <el-table-column label="MAC地址">
+            <el-table-column label="MAC地址" width="150">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
@@ -295,6 +295,33 @@
                 <span v-else class="empty-text">-</span>
               </template>
             </el-table-column>
+
+            <!-- 交换机信息列 -->
+            <el-table-column label="上行交换机" width="225">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="switch-port-pair"
+                  >
+                    <div v-if="info.switch && info.port" class="switch-port-info">
+                      <el-tooltip 
+                        :content="`交换机: ${info.switch}\n端口: ${info.port}`" 
+                        placement="top"
+                      >
+                        <span class="switch-port-text">{{ info.port }}</span>
+                      </el-tooltip>
+                    </div>
+                    <div v-else class="switch-port-info">
+                      <span class="empty-text">-</span>
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+
             <!-- SOC IP列 - 已添加匹配异常提示 -->
             <el-table-column label="SOC IP" width="140">
               <template #default="{ row }">
@@ -1561,6 +1588,47 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.switch-port-pair {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.switch-port-pair:last-child {
+  border-bottom: none;
+}
+
+.switch-port-info {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 0;
+}
+
+.switch-port-text {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3b82f6;
+  cursor: help;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.switch-port-text:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* 调整表格列宽，确保布局合理 */
+:deep(.nic-card .el-table .el-table__header-wrapper th:nth-child(5)) {
+  /* 交换机信息列 */
+  background: #f8fafc;
+}
+
 /* 关注按钮样式 */
 .follow-btn {
   min-width: 80px;
@@ -2023,6 +2091,17 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .switch-port-pair {
+    align-items: flex-start;
+  }
+  
+  .switch-port-text {
+    font-size: 11px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .card-header {
     flex-direction: column;
     gap: 16px;
