@@ -777,13 +777,27 @@ const isFollowing = computed(() => {
 
 // 根据网卡序列号获取对应的MV200匹配状态（支持多种状态）
 const getMv200StatusForNic = (nic: any): any => {
-  // 首先检查是否是MV200类型的网卡
-  const isMv200Nic = nic.type && (
-    nic.type.toLowerCase().includes('mv200')
-  )
+  // 首先检查是否是MV200类型的网卡 - 修改这里
+  const isMv200Nic = (nicType: string | undefined): boolean => {
+    if (!nicType) return false
+    const typeLower = nicType.toLowerCase()
+    
+    // 支持多种MV200标识，包括metaVisor-200等变体
+    const mv200Patterns = [
+      'mv200',
+      'metavisor-200',
+      'metavisor200',
+      'meta visor 200',
+      'meta-visor-200',
+    ]
+    
+    return mv200Patterns.some(pattern => typeLower.includes(pattern))
+  }
   
-  // 如果不是MV200网卡，直接返回 null
-  if (!isMv200Nic) {
+  const isMv200 = isMv200Nic(nic.type)
+  
+  // 如果不是MV200网卡，直接返回
+  if (!isMv200) {
     return {
       status: 'not_mv200',
       message: '非MV200网卡'

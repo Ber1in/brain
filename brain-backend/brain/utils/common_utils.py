@@ -727,6 +727,7 @@ async def collect_switch_info(ip, user, password):
     except Exception:
         LOG.error("The command to ensure package lldpctl failed, "
                   "and switch information could not be retrieved")
+        return {"status": "failed"}
     switch_res = await ssh_execute_async(ip, "lldpctl", user, password, False)
     switchs = parse_lldpctl_output(switch_res)
     return switchs
