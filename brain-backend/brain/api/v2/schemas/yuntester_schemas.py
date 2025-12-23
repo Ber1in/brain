@@ -40,6 +40,8 @@ class ExecuteNicInfo(BaseModel):
     type: str
     mac: str = None
     soc: str = None
+    switch: str = None
+    port: str = None
 
     @validator("type", pre=True)
     def normalize_type(cls, v):

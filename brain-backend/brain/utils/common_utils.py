@@ -631,7 +631,99 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
     yunsilicon_nics = await get_nics(ip, user, password, "1f67", product_infos,)
     mellanox_nics = await get_nics(ip, user, password, "15b3")
     merged = yunsilicon_nics + mellanox_nics
+    interface_map = await collect_switch_info(ip, user, password)
+
+    for nic in merged:
+        for nic_info in nic['nic_info']:
+            iface = nic_info['iface']
+            if iface in interface_map:
+                nic_info.update(interface_map[iface])
     return merged
+
+
+def parse_lldpctl_output(lldpctl_output: str) -> Dict[str, Dict[str, str]]:
+    """
+    Parse lldpctl output and return a map from interface name to switch info
+
+    Args:
+        lldpctl_output: Output string from lldpctl command
+
+    Returns:
+        Dict[str, Dict[str, str]]: Mapping from interface name to switch info
+        Example: {'ens2f0': {'switch': 'H3C-S9850-32H-G', 'port': 'HundredGigE1/0/5'}}
+    """
+    interface_map = {}
+    current_neighbor = {}
+
+    lines = lldpctl_output.strip().split('\n')
+
+    for line in lines:
+        line = line.strip()
+
+        # Skip separator lines and empty lines
+        if re.match(r'-{20,}', line) or not line:
+            # Save current neighbor to map if valid
+            if current_neighbor and 'interface' in current_neighbor:
+                interface = current_neighbor['interface']
+                # Add switch and port info if available
+                switch_info = {
+                    'switch': current_neighbor.get('switch', ''),
+                    'port': current_neighbor.get('port', '')
+                }
+                interface_map[interface] = switch_info
+                current_neighbor = {}
+            continue
+
+        # Check if this is the start of a new neighbor block
+        if line.startswith('Interface:'):
+            # Save previous neighbor if exists
+            if current_neighbor and 'interface' in current_neighbor:
+                interface = current_neighbor['interface']
+                switch_info = {
+                    'switch': current_neighbor.get('switch', ''),
+                    'port': current_neighbor.get('port', '')
+                }
+                interface_map[interface] = switch_info
+
+            # Start new neighbor
+            current_neighbor = {}
+            # Extract interface name
+            match = re.match(r'Interface:\s+([^,]+)', line)
+            if match:
+                current_neighbor['interface'] = match.group(1).strip()
+
+        # Extract SysName as switch name
+        elif line.startswith('SysName:'):
+            switch = line.replace('SysName:', '').strip()
+            current_neighbor['switch'] = switch
+
+        # Extract PortID
+        elif line.startswith('PortID:'):
+            portid_line = line.replace('PortID:', '').strip()
+            # Extract only the port part, removing 'ifname ' prefix
+            if ' ' in portid_line:
+                portid_parts = portid_line.split()
+                current_neighbor['port'] = portid_parts[-1]
+            else:
+                current_neighbor['port'] = portid_line
+
+    # Add the last neighbor to map
+    if current_neighbor and 'interface' in current_neighbor:
+        interface = current_neighbor['interface']
+        switch_info = {
+            'switch': current_neighbor.get('switch', ''),
+            'port': current_neighbor.get('port', '')
+        }
+        interface_map[interface] = switch_info
+
+    return interface_map
+
+
+async def collect_switch_info(ip, user, password):
+    await ensure_packages_installed(ip, user, password, ["lldpctl"])
+    switch_res = await ssh_execute_async(ip, "lldpctl", user, password, False)
+    switchs = parse_lldpctl_output(switch_res)
+    return switchs
 
 
 async def update_automatic_async(ip, user, password):
@@ -925,7 +1017,8 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 
                 # ---------- reinstall ----------
                 try:
-                    update_task(task_id, stage="installing_mcr", detail=f"Retrying MCR install after uninstall")
+                    update_task(task_id, stage="installing_mcr",
+                                detail="Retrying MCR install after uninstall")
                     LOG.info(f"{host} Retrying MCR install after uninstall")
                     await ssh_execute_async(host, install_cmd, user, pwd)
                     LOG.info(f"{host} New MCR installed successfully (after uninstall)")

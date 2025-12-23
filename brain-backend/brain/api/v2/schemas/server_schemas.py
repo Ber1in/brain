@@ -35,6 +35,8 @@ class NicInfo(BaseModel):
     mac: str = None
     bdf: str = None
     iface: str = None
+    switch: str = None
+    port: str = None
 
 
 class NicBase(BaseModel):

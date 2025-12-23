@@ -81,7 +81,7 @@ async def get_current_code_and_commit(user):
         current = repo.active_branch.name
         try:
             repo.git.pull()
-        except Exception as e:
+        except Exception:
             LOG.warning(f"Failed to pull the latest code from the branch {current} from GitLab")
 
     latest_commit = repo.head.commit.hexsha
@@ -324,6 +324,10 @@ async def prepare_test_environment(data: yuntester_schemas.ExecuteRequest, user,
                 nic_info["mac"] = nic.mac
             if nic.soc:
                 nic_info["soc_ip"] = nic.soc
+            if nic.switch:
+                nic_info["switch"] = nic.switch
+            if nic.port:
+                nic_info["port"] = nic.port
 
             nics.append(nic_info)
         if nics:

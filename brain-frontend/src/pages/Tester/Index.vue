@@ -3825,7 +3825,9 @@ const handleExecuteConfirm = async () => {
                     iface: nicInfo.iface,
                     bdf: nicInfo.bdf,
                     type: nic.type,
-                    mac: nicInfo.mac
+                    mac: nicInfo.mac,
+                    switch: nicInfo.switch,
+                    port: nicInfo.port
                   }
                   selectedNics.push(caseNicInfo)
                 }
