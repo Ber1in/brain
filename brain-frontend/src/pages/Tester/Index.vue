@@ -217,7 +217,7 @@
               </el-table-column>
               
               <!-- 执行状态列 -->
-              <el-table-column prop="status" label="任务状态" width="100">
+              <el-table-column prop="status" label="执行进度" width="120">
                 <template #default="{ row }">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <!-- 状态标签 -->
