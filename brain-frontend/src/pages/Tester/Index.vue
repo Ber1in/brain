@@ -217,7 +217,7 @@
               </el-table-column>
               
               <!-- 执行状态列 -->
-              <el-table-column prop="status" label="执行状态" width="120">
+              <el-table-column prop="status" label="任务状态" width="100">
                 <template #default="{ row }">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <!-- 状态标签 -->
@@ -256,7 +256,33 @@
                   </div>
                 </template>
               </el-table-column>
-              
+
+              <el-table-column label="测试结果" width="100">
+                <template #default="{ row }">
+                  <div v-if="row.statistic">
+                    <el-tooltip
+                      placement="top"
+                      :content="getStatisticTooltip(row.statistic)"
+                      raw-content
+                    >
+                      <el-tag
+                        :type="getTestResultStatus(row.statistic).type"
+                        size="small"
+                        class="result-tag"
+                        style="cursor: help;"
+                      >
+                        {{ getTestResultStatus(row.statistic).text }}
+                      </el-tag>
+                    </el-tooltip>
+                  </div>
+                  <div v-else>
+                    <el-tooltip content="无测试统计信息" placement="top">
+                      <span class="no-statistic">-</span>
+                    </el-tooltip>
+                  </div>
+                </template>
+              </el-table-column>
+
               <!-- 新增拓扑列 -->
               <el-table-column prop="topo" label="拓扑信息" width="105">
                 <template #default="{ row }">
@@ -274,7 +300,7 @@
                   <span v-else class="no-data">-</span>
                 </template>
               </el-table-column>
-              
+
               <!-- 新增日志列 -->
               <el-table-column prop="log" label="执行日志" width="100">
                 <template #default="{ row }">
@@ -1988,6 +2014,81 @@ const loadBranchAndTag = async () => {
     ElMessage.error('加载分支标签列表失败')
   }
 }
+
+// 新增工具函数：计算测试结果状态
+const getTestResultStatus = (statistic?: TestStatistic): {
+  text: string;
+  type: string;
+  tooltip: string;
+} => {
+  if (!statistic) {
+    return {
+      text: '无数据',
+      type: 'info',
+      tooltip: '测试统计信息为空'
+    };
+  }
+
+  const { total, passed, failed, broken, skipped, unknown } = statistic;
+
+  if (total === 0) {
+    return {
+      text: '无测试',
+      type: 'info',
+      tooltip: '总测试数为0'
+    };
+  }
+
+  // total == passed，其他都为0
+  if (total === passed && failed === 0 && broken === 0 && skipped === 0 && unknown === 0) {
+    return {
+      text: '全部通过',
+      type: 'success',
+      tooltip: `全部通过\n总计: ${total}, 通过: ${passed}`
+    };
+  }
+
+  // 有 failed
+  if (failed > 0) {
+    return {
+      text: '部分失败',
+      type: 'danger',
+      tooltip: `有失败用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
+    };
+  }
+
+  // 有 broken、skipped 或 unknown
+  if (broken > 0 || skipped > 0 || unknown > 0) {
+    return {
+      text: '部分忽略',
+      type: 'warning',
+      tooltip: `有跳过/中断用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
+    };
+  }
+
+  // 其他情况
+  return {
+    text: '未知结果',
+    type: 'info',
+    tooltip: `总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
+  };
+};
+
+// 新增工具函数：获取详细的统计工具提示
+const getStatisticTooltip = (statistic?: TestStatistic): string => {
+  if (!statistic) return '无测试统计信息';
+  
+  const { total, passed, failed, broken, skipped, unknown } = statistic;
+  return `
+总计: ${total}
+通过: ${passed}
+失败: ${failed}
+中断: ${broken}
+跳过: ${skipped}
+未知: ${unknown}
+通过率: ${total > 0 ? ((passed / total) * 100).toFixed(1) : 0}%
+  `.trim();
+};
 
 // 检查是否为MV200网卡
 const isMv200Nic = (nicType: string | undefined): boolean => {
@@ -3909,6 +4010,31 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 在 style 部分添加以下样式 */
+.result-tag {
+  font-weight: 500;
+  min-width: 60px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.result-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.no-statistic {
+  color: #c0c4cc;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* 调整表格列的宽度，确保布局合理 */
+:deep(.history-content .el-table .el-table__header-wrapper th:nth-child(4)) {
+  /* 测试结果列 */
+  background: #f8fafc;
+}
+
 :deep(.navigation-confirm-dialog) {
   border-radius: 8px;
 }

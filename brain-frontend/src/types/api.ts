@@ -346,19 +346,28 @@ export interface ExecuteTaskResponse {
 }
 
 
+export interface TestStatistic {
+  total: number;
+  passed: number;
+  failed: number;
+  broken: number;
+  skipped: number;
+  unknown: number;
+}
+
 export interface ExecuteResponse {
   url?: string;
   created_at?: string;
-  end_time?: string
+  end_time?: string;
   current?: string;
   latest_commit?: string;
   id: string;
   topo: string;
   log: string;
   user: string;
-  status: string
-  executed: string
-  statistic?: Record<string, any>; 
+  status: string;
+  executed: string;
+  statistic?: TestStatistic;
 }
 
 export interface BranchAndTagResponse {
