@@ -70,7 +70,6 @@
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
-        :row-class-name="getRowClassName"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
