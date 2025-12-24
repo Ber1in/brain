@@ -2099,14 +2099,13 @@ const getStatisticTooltip = (statistic?: TestStatistic): string => {
   
   const { total, passed, failed, broken, skipped, unknown } = statistic;
   return `
-总计: ${total}
-通过: ${passed}
-失败: ${failed}
-中断: ${broken}
-跳过: ${skipped}
-未知: ${unknown}
-通过率: ${total > 0 ? ((passed / total) * 100).toFixed(1) : 0}%
-  `.trim();
+总计: ${total}&nbsp;&nbsp
+通过: ${passed}&nbsp;&nbsp;
+失败: ${failed}&nbsp;&nbsp;
+中断: ${broken}&nbsp;&nbsp;
+跳过: ${skipped}&nbsp;&nbsp;
+未知: ${unknown}&nbsp;&nbsp;
+通过率: ${total > 0 ? ((passed / total) * 100).toFixed(1) : 0}%`;
 };
 
 // 检查是否为MV200网卡
