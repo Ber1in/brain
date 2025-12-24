@@ -1778,17 +1778,28 @@ onMounted(() => {
 .bdf-mac-pair {
   display: flex;
   flex-direction: column;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .bdf-mac-pair:last-child {
   border-bottom: none;
+}
+  
+.bdf-item {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  width: 100%;
 }
 
 .mac-address {
   font-family: 'Courier New', monospace;
   font-size: 12px;
   font-weight: 500;
-  color: #1f2937;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  width: 100%;
 }
 
 /* 空文本样式 */
@@ -1926,10 +1937,10 @@ onMounted(() => {
 }
 
 .iface-name {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 500;
-  color: #475569;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  width: 100%;
 }
 
 /* 紧凑信息列表样式 */
@@ -2259,6 +2270,7 @@ onMounted(() => {
   
   .bdf-item {
     font-size: 10px;
+    min-height: 32px;
   }
   
   .soc-ip-status {
