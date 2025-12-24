@@ -2061,7 +2061,7 @@ const getTestResultStatus = (statistic?: TestStatistic): {
   if (total === broken && passed === 0 && failed === 0 && skipped === 0  && unknown === 0) {
     return {
       text: '全部中断',
-      type: 'warning',
+      type: 'primary',
       tooltip: `全部中断\n总计: ${total}, 跳过: ${skipped}`
     };
   }
@@ -2088,8 +2088,8 @@ const getTestResultStatus = (statistic?: TestStatistic): {
   if (broken > 0) {
     return {
       text: '部分中断',
-      type: 'warning',
-      tooltip: `有跳过/中断用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
+      type: 'primary',
+      tooltip: `有中断用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
     };
   }
 
@@ -2099,7 +2099,7 @@ const getTestResultStatus = (statistic?: TestStatistic): {
     return {
       text: '部分跳过',
       type: 'warning',
-      tooltip: `有跳过/中断用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
+      tooltip: `有跳过用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
     };
   }
 
