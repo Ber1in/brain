@@ -1450,6 +1450,9 @@ const hasInternalDuplicate = (device: ServerDetailResponse): boolean => {
     // 检查MAC地址重复
     const nicInfo = (nic as any).nic_info || []
     for (const info of nicInfo) {
+      if (info.mac && isZeroMac(info.mac)) {
+        continue
+      }
       if (info.mac && seenMACs.has(info.mac)) {
         return true
       }
@@ -1460,6 +1463,14 @@ const hasInternalDuplicate = (device: ServerDetailResponse): boolean => {
   }
   
   return false
+}
+
+function isZeroMac(mac: string): boolean {
+  if (!mac) return false
+  // 去除分隔符，转换为小写
+  const cleanMac = mac.replace(/[:\-\s]/g, '').toLowerCase()
+  // 检查是否全部为0
+  return /^0+$/.test(cleanMac)
 }
 
 // 检查跨服务器重复
