@@ -345,7 +345,7 @@
               </template>
             </el-table-column>
             <!-- BDF列移到MAC地址前面 -->
-            <el-table-column label="BDF" width="115">
+            <el-table-column label="BDF" width="95">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
@@ -422,7 +422,7 @@
             </el-table-column>
 
             <!-- IPv6列 -->
-            <el-table-column label="IPv6地址" width="220">
+            <el-table-column label="IPv6地址" width="195">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
@@ -1778,9 +1778,6 @@ onMounted(() => {
 .bdf-mac-pair {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 0;
-  border-bottom: 1px solid #f0f0f0;
 }
 
 .bdf-mac-pair:last-child {
@@ -1911,21 +1908,21 @@ onMounted(() => {
 }
 
 .server-info-card {
-  flex: 1.2;
+  flex: 1.0;
   min-width: 0;
-  max-width: calc(20% ); /* 1.2/6 = 20% */
+  max-width: calc(16.67%); /* 1.0/6 ≈ 16.67% */
 }
 
 .cpu-info-card {
-  flex: 1.4;
+  flex: 1.2;
   min-width: 0;
-  max-width: calc(23% + 10px); /* 1.4/6 = 20% */
+  max-width: calc(20% - 10px); /* 1.2/6 = 20% */
 }
 
 .nic-card {
-  flex: 3.4;
+  flex: 3.8;
   min-width: 0;
-  max-width: calc(60% - 11px); /* 3.6/6 = 60% */
+  max-width: calc(63.33% + 10px); /* 3.8/6 ≈ 63.33% */
 }
 
 .iface-name {
