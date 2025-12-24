@@ -1485,7 +1485,8 @@ const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
       
       const nicInfo = (nic as any).nic_info || []
       nicInfo.forEach((info: any) => {
-        if (info.mac) {
+        // 跳过纯0的MAC地址
+        if (info.mac && !isZeroMac(info.mac)) {
           infos.push({ type: 'mac', value: info.mac, deviceId: d.id })
         }
       })
@@ -1504,7 +1505,8 @@ const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
     
     const nicInfo = (nic as any).nic_info || []
     return nicInfo.some((info: any) => {
-      if (info.mac) {
+      // 跳过纯0的MAC地址
+      if (info.mac && !isZeroMac(info.mac)) {
         const sameMacCount = allNicInfos.filter(nicInfo => 
           nicInfo.type === 'mac' && nicInfo.value === info.mac && nicInfo.deviceId !== device.id
         ).length
