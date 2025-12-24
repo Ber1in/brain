@@ -322,6 +322,70 @@
               </template>
             </el-table-column>
 
+            <!-- IPv4列 -->
+            <el-table-column label="IPv4地址" width="145">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="ipv4-pair"
+                  >
+                    <div class="ipv4-addresses">
+                      <div 
+                        v-if="info.ipv4 && info.ipv4.length > 0"
+                        class="ipv4-list"
+                      >
+                        <div 
+                          v-for="(ip, ipIndex) in info.ipv4" 
+                          :key="ipIndex"
+                          class="ipv4-item"
+                        >
+                          {{ ip }}
+                        </div>
+                      </div>
+                      <div v-else class="empty-ip">
+                        <span class="empty-text">-</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+
+            <!-- IPv6列 -->
+            <el-table-column label="IPv6地址" width="220">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="ipv6-pair"
+                  >
+                    <div class="ipv6-addresses">
+                      <div 
+                        v-if="info.ipv6 && info.ipv6.length > 0"
+                        class="ipv6-list"
+                      >
+                        <div 
+                          v-for="(ip, ipIndex) in info.ipv6" 
+                          :key="ipIndex"
+                          class="ipv6-item"
+                        >
+                          {{ ip }}
+                        </div>
+                      </div>
+                      <div v-else class="empty-ip">
+                        <span class="empty-text">-</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+
             <!-- SOC IP列 - 已添加匹配异常提示 -->
             <el-table-column label="SOC IP">
               <template #default="{ row }">
@@ -1602,6 +1666,43 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.ipv4-pair, .ipv6-pair {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ipv4-pair:last-child, .ipv6-pair:last-child {
+  border-bottom: none;
+}
+
+.ipv4-addresses, .ipv6-addresses {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  width: 100%;
+}
+
+.ipv4-list, .ipv6-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ipv4-item, .ipv6-item {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.3;
+  word-break: break-all;
+}
+
+.empty-ip {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  width: 100%;
+}
+
 .switch-port-pair {
   display: flex;
   flex-direction: column;

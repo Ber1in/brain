@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from typing import Dict, List
 import asyncio
 from collections import OrderedDict, defaultdict
 from datetime import datetime
@@ -57,6 +58,50 @@ PRODUCT_PART_NUMBER_DICT = {
     "90-0029-01": "MC400S-Verdi",
     "90-0030-01": "MC400-Verdi"
 }
+
+
+def parse_ip_br_output(output: str) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Parse the output of ip -br addr show command
+
+    Args:
+        output: Output string from ip -br addr show command
+
+    Returns:
+        Dict[str, Dict[str, List[str]]]: interface name -> {'ipv4': [], 'ipv6': []}
+        Only includes interfaces that have at least one IP address (IPv4 or IPv6)
+    """
+    interfaces = {}
+
+    for line in output.strip().split('\n'):
+        if not line:
+            continue
+
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+
+        ifname = parts[0]  # Interface name
+        ipv4_addresses = []
+        ipv6_addresses = []
+
+        # Extract IP addresses
+        for part in parts[2:]:  # Skip interface name and status
+            # IPv4 address pattern
+            if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+$', part):
+                ipv4_addresses.append(part)
+            # IPv6 address pattern (contains colon)
+            elif ':' in part:
+                ipv6_addresses.append(part)
+
+        # Only record interfaces with IP addresses
+        if ipv4_addresses or ipv6_addresses:
+            interfaces[ifname] = {
+                'ipv4': ipv4_addresses,
+                'ipv6': ipv6_addresses
+            }
+
+    return interfaces
 
 
 async def ensure_packages_installed(host: str, user: str, pwd: str, packages: list):
@@ -257,13 +302,30 @@ async def get_nics(
             detail_cmd = f"lspci -vvv -s {pci}"
             detail_res = await ssh_execute_async(ip, detail_cmd, user, password)
 
-            current = {"bdf": pci, "type": "", "sn": ""}
+            current = {"bdf": pci, "type": "", "sn": "", "pcie_width": ""}
+
             for line in detail_res.splitlines():
                 line = line.strip()
                 if line.startswith("Product Name:"):
                     current["type"] = line.replace("Product Name:", "").strip()
                 elif "[SN]" in line and "Serial number:" in line:
                     current["sn"] = line.split(":")[-1].strip()
+
+                elif "LnkSta:" in line and "Width" in line:
+                    import re
+                    match = re.search(r'Width\s+(x\d+)', line)
+                    if match:
+                        current["pcie_width"] = match.group(1)
+
+            if current["pcie_width"] == "":
+                try:
+                    width_cmd = f"cat /sys/bus/pci/devices/{pci}/current_link_width 2>/dev/null"
+                    width_res = await ssh_execute_async(ip, width_cmd, user, password, False)
+                    sys_width = width_res.strip()
+                    if sys_width.isdigit():
+                        current["pcie_width"] = f"x{sys_width}"
+                except:
+                    pass
 
             nic_info = []
 
@@ -316,6 +378,7 @@ async def get_nics(
             merged_pf[pf_key] = {
                 "type": dev.get("type", ""),
                 "sn": dev.get("sn", ""),
+                "pcie_width": dev.get("pcie_width", ""),
                 "nic_info": []
             }
 
@@ -332,6 +395,7 @@ async def get_nics(
             merged_sn[sn_key] = {
                 "type": item.get("type", ""),
                 "sn": item.get("sn", ""),
+                "pcie_width": item.get("pcie_width", ""),
                 "nic_info": []
             }
 
@@ -632,16 +696,23 @@ async def collect_nic_info(ip: str, user: str, password: str) -> list:
     part_num_cmd = 'yuncli fw --fru_info'
     part_num_res = await ssh_execute_async(ip, part_num_cmd, user, password, False)
     product_infos = parse_bdf_partnum(part_num_res)
-    yunsilicon_nics = await get_nics(ip, user, password, "1f67", product_infos,)
+    yunsilicon_nics = await get_nics(ip, user, password, "1f67", product_infos)
     mellanox_nics = await get_nics(ip, user, password, "15b3")
     merged = yunsilicon_nics + mellanox_nics
-    interface_map = await collect_switch_info(ip, user, password)
+    switchs_map = await collect_switch_info(ip, user, password)
+
+    ipaddress_res = await ssh_execute_async(ip, "ip -br addr show", user, password, False)
+    ipaddress_map = parse_ip_br_output(ipaddress_res)
 
     for nic in merged:
         for nic_info in nic['nic_info']:
             iface = nic_info['iface']
-            if iface in interface_map:
-                nic_info.update(interface_map[iface])
+            if iface in switchs_map:
+                nic_info.update(switchs_map[iface])
+
+            if iface in ipaddress_map:
+                nic_info.update(ipaddress_map[iface])
+
     return merged
 
 

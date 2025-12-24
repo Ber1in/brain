@@ -37,12 +37,15 @@ class NicInfo(BaseModel):
     iface: str = None
     switch: str = None
     port: str = None
+    ipv4: List[str] = []
+    ipv6: List[str] = []
 
 
 class NicBase(BaseModel):
     type: str
     nic_info: List[NicInfo] = None
     sn: str
+    pcie_width: str = None
 
 
 class AIDPU_Nic(NicBase):

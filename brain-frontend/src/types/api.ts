@@ -263,6 +263,8 @@ export interface NicInfo {
   iface?: string
   switch?: string
   port?: string
+  ipv4?: string[]
+  ipv6?: string[]
 }
 
 export interface NicBase {
