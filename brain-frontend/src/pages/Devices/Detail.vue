@@ -250,143 +250,19 @@
                 <span>{{ formatNicTypeForDisplay(row.type) }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="sn" label="序列号" width="180"/>
-            <!-- BDF列移到MAC地址前面 -->
-            <el-table-column label="BDF" width="95">
+            <el-table-column prop="sn" label="序列号" width="175"/>
+
+            <el-table-column prop="pcie_width" label="PCIe宽度" width="75">
               <template #default="{ row }">
-                <div v-if="row.nic_info && row.nic_info.length > 0">
-                  <div 
-                    v-for="(info, index) in row.nic_info" 
-                    :key="index" 
-                    class="bdf-mac-pair"
-                  >
-                    <div class="bdf-item">{{ info.bdf || '-' }}</div>
-                  </div>
-                </div>
-                <span v-else class="empty-text">-</span>
-              </template>
-            </el-table-column>
-            <!-- 网口名列 -->
-            <el-table-column label="网口名" width="120">
-              <template #default="{ row }">
-                <div v-if="row.nic_info && row.nic_info.length > 0">
-                  <div 
-                    v-for="(info, index) in row.nic_info" 
-                    :key="index" 
-                    class="bdf-mac-pair"
-                  >
-                    <div class="iface-name">{{ info.iface !== null ? info.iface : '-' }}</div>
-                  </div>
-                </div>
-                <span v-else class="empty-text">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="MAC地址" width="150">
-              <template #default="{ row }">
-                <div v-if="row.nic_info && row.nic_info.length > 0">
-                  <div 
-                    v-for="(info, index) in row.nic_info" 
-                    :key="index" 
-                    class="bdf-mac-pair"
-                  >
-                    <div class="mac-address">{{ info.mac || '-' }}</div>
-                  </div>
-                </div>
+                <span v-if="row.pcie_width && row.pcie_width !== ''" 
+                      class="pcie-width">
+                  {{ row.pcie_width }}
+                </span>
                 <span v-else class="empty-text">-</span>
               </template>
             </el-table-column>
 
-            <!-- 交换机信息列 -->
-            <el-table-column label="上行交换机" width="230">
-              <template #default="{ row }">
-                <div v-if="row.nic_info && row.nic_info.length > 0">
-                  <div 
-                    v-for="(info, index) in row.nic_info" 
-                    :key="index" 
-                    class="switch-port-pair"
-                  >
-                    <div v-if="info.switch && info.port" class="switch-port-info">
-                      <el-tooltip 
-                        :content="`交换机: ${info.switch}\n端口: ${info.port}`" 
-                        placement="top"
-                      >
-                        <span class="switch-port-text">{{ info.port }}</span>
-                      </el-tooltip>
-                    </div>
-                    <div v-else class="switch-port-info">
-                      <span class="empty-text">-</span>
-                    </div>
-                  </div>
-                </div>
-                <span v-else class="empty-text">-</span>
-              </template>
-            </el-table-column>
-
-            <!-- IPv4列 -->
-            <el-table-column label="IPv4地址" width="145">
-              <template #default="{ row }">
-                <div v-if="row.nic_info && row.nic_info.length > 0">
-                  <div 
-                    v-for="(info, index) in row.nic_info" 
-                    :key="index" 
-                    class="ipv4-pair"
-                  >
-                    <div class="ipv4-addresses">
-                      <div 
-                        v-if="info.ipv4 && info.ipv4.length > 0"
-                        class="ipv4-list"
-                      >
-                        <div 
-                          v-for="(ip, ipIndex) in info.ipv4" 
-                          :key="ipIndex"
-                          class="ipv4-item"
-                        >
-                          {{ ip }}
-                        </div>
-                      </div>
-                      <div v-else class="empty-ip">
-                        <span class="empty-text">-</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <span v-else class="empty-text">-</span>
-              </template>
-            </el-table-column>
-
-            <!-- IPv6列 -->
-            <el-table-column label="IPv6地址" width="220">
-              <template #default="{ row }">
-                <div v-if="row.nic_info && row.nic_info.length > 0">
-                  <div 
-                    v-for="(info, index) in row.nic_info" 
-                    :key="index" 
-                    class="ipv6-pair"
-                  >
-                    <div class="ipv6-addresses">
-                      <div 
-                        v-if="info.ipv6 && info.ipv6.length > 0"
-                        class="ipv6-list"
-                      >
-                        <div 
-                          v-for="(ip, ipIndex) in info.ipv6" 
-                          :key="ipIndex"
-                          class="ipv6-item"
-                        >
-                          {{ ip }}
-                        </div>
-                      </div>
-                      <div v-else class="empty-ip">
-                        <span class="empty-text">-</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <span v-else class="empty-text">-</span>
-              </template>
-            </el-table-column>
-
-            <!-- SOC IP列 - 已添加匹配异常提示 -->
+            <!-- SOC IP列 -->
             <el-table-column label="SOC IP">
               <template #default="{ row }">
                 <div v-if="getMv200StatusForNic(row)" class="soc-ip-status">
@@ -464,6 +340,140 @@
                   
                   <!-- 默认状态 -->
                   <span v-else class="empty-text">-</span>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <!-- BDF列移到MAC地址前面 -->
+            <el-table-column label="BDF" width="115">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="bdf-item">{{ info.bdf || '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <!-- 网口名列 -->
+            <el-table-column label="网口名" width="120">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="iface-name">{{ info.iface !== null ? info.iface : '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="MAC地址" width="150">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="bdf-mac-pair"
+                  >
+                    <div class="mac-address">{{ info.mac || '-' }}</div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+
+            <!-- IPv4列 -->
+            <el-table-column label="IPv4地址" width="145">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="ipv4-pair"
+                  >
+                    <div class="ipv4-addresses">
+                      <div 
+                        v-if="info.ipv4 && info.ipv4.length > 0"
+                        class="ipv4-list"
+                      >
+                        <div 
+                          v-for="(ip, ipIndex) in info.ipv4" 
+                          :key="ipIndex"
+                          class="ipv4-item"
+                        >
+                          {{ ip }}
+                        </div>
+                      </div>
+                      <div v-else class="empty-ip">
+                        <span class="empty-text">-</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+
+            <!-- IPv6列 -->
+            <el-table-column label="IPv6地址" width="220">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="ipv6-pair"
+                  >
+                    <div class="ipv6-addresses">
+                      <div 
+                        v-if="info.ipv6 && info.ipv6.length > 0"
+                        class="ipv6-list"
+                      >
+                        <div 
+                          v-for="(ip, ipIndex) in info.ipv6" 
+                          :key="ipIndex"
+                          class="ipv6-item"
+                        >
+                          {{ ip }}
+                        </div>
+                      </div>
+                      <div v-else class="empty-ip">
+                        <span class="empty-text">-</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="empty-text">-</span>
+              </template>
+            </el-table-column>
+
+            <!-- 交换机信息列 -->
+            <el-table-column label="上行交换机" width="230">
+              <template #default="{ row }">
+                <div v-if="row.nic_info && row.nic_info.length > 0">
+                  <div 
+                    v-for="(info, index) in row.nic_info" 
+                    :key="index" 
+                    class="switch-port-pair"
+                  >
+                    <div v-if="info.switch && info.port" class="switch-port-info">
+                      <el-tooltip 
+                        :content="`交换机: ${info.switch}\n端口: ${info.port}`" 
+                        placement="top"
+                      >
+                        <span class="switch-port-text">{{ info.port }}</span>
+                      </el-tooltip>
+                    </div>
+                    <div v-else class="switch-port-info">
+                      <span class="empty-text">-</span>
+                    </div>
+                  </div>
                 </div>
                 <span v-else class="empty-text">-</span>
               </template>
@@ -1794,7 +1804,6 @@ onMounted(() => {
 .soc-ip-status {
   display: flex;
   align-items: center;
-  min-height: 40px;
 }
 
 /* 错误信息样式（与MV200详情页保持一致） */

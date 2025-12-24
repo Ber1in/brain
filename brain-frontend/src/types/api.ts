@@ -271,6 +271,7 @@ export interface NicBase {
   type: string
   nic_info?: NicInfo[]
   sn: string
+  pcie_width?: string
 }
 
 export interface AIDPUNic extends NicBase {
