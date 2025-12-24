@@ -2057,9 +2057,17 @@ const getTestResultStatus = (statistic?: TestStatistic): {
     };
   }
 
-  // 场景3: 全部跳过（全部都是跳过）
-  const ignoredTotal = broken + skipped + unknown;
-  if (total === ignoredTotal && passed === 0 && failed === 0) {
+  // 场景3: 全部中断
+  if (total === broken && passed === 0 && failed === 0 && skipped === 0  && unknown === 0) {
+    return {
+      text: '全部中断',
+      type: 'warning',
+      tooltip: `全部中断\n总计: ${total}, 跳过: ${skipped}`
+    };
+  }
+
+  // 场景4: 全部跳过（全部都是跳过）
+  if (total === skipped && passed === 0 && failed === 0 && broken === 0  && unknown === 0) {
     return {
       text: '全部跳过',
       type: 'warning',
@@ -2076,8 +2084,18 @@ const getTestResultStatus = (statistic?: TestStatistic): {
     };
   }
 
-  // 有 broken、skipped 或 unknown
-  if (broken > 0 || skipped > 0 || unknown > 0) {
+  // 有 broken
+  if (broken > 0) {
+    return {
+      text: '部分中断',
+      type: 'warning',
+      tooltip: `有跳过/中断用例\n总计: ${total}, 通过: ${passed}, 失败: ${failed}, 中断: ${broken}, 跳过: ${skipped}, 未知: ${unknown}`
+    };
+  }
+
+
+  // 有 skipped
+  if (skipped > 0) {
     return {
       text: '部分跳过',
       type: 'warning',
