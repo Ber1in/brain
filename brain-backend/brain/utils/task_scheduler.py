@@ -403,7 +403,7 @@ async def send_feishu_group_message(server_info, status: ServerStatus):
         def send_feishu(webhook: str, payload: dict, status: ServerStatus) -> bool:
             try:
                 headers = {'Content-Type': 'application/json'}
-                resp = requests.post(webhook, headers=headers, data=json.dumps(payload), timeout=15)
+                resp = requests.post(webhook, headers=headers, data=json.dumps(payload), timeout=25)
 
                 if resp.status_code != 200:
                     LOG.error(f"Feishu failed with status code: {resp.status_code}")

@@ -319,13 +319,13 @@ async def occupy_server(
     ssh_pass = server["device"].get("password", "")
     time = int(data.time)
 
-    LOG.info(f"occupy_server called: ip={ip}, user={user}, time={data.time}")
     if time > 0:
         server["user"] = user
         server["recipients"] = list(set(server.get("recipients", []) + [user]))
 
         end_timestamp = server["start"] + time
         end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        LOG.info(f"occupy_server : ip={ip}, user={user}, time={end_time}")
 
         await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
         await task_scheduler.send_server_reminder(server, ServerStatus.OCCUPIED)
@@ -360,6 +360,7 @@ async def occupy_server(
             LOG.error(f"Failed to schedule auto cleanup task {task_id}")
 
     else:
+        LOG.info(f"release_server : ip={ip}, user={user}")
         await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
 
         warn_task_id = f"device_warn_{ip.replace('.', '_')}"
@@ -374,7 +375,7 @@ async def occupy_server(
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
-    LOG.info(f"{user} occupy server {ip} finished.")
+    LOG.info(f"update server {ip} occupy info  by {user} finished.")
     return server
 
 
@@ -400,7 +401,7 @@ async def focus_server(server_id: str, data: server_schemas.FocusRequest,
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
 
-@router.patch("/servers/{server_id}/lock")
+@router.patch("/servers/{server_id}/lock", status_code=204)
 async def lock_server(server_id: str, data: server_schemas.LockRequest,
                       user=Depends(authenticate_user)):
     """Lock/Unlock server"""

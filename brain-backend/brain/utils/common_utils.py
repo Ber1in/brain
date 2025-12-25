@@ -1,7 +1,6 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from typing import Dict, List
 import asyncio
 from collections import OrderedDict, defaultdict
 from datetime import datetime
@@ -324,7 +323,7 @@ async def get_nics(
                     sys_width = width_res.strip()
                     if sys_width.isdigit():
                         current["pcie_width"] = f"x{sys_width}"
-                except:
+                except Exception:
                     pass
 
             nic_info = []
