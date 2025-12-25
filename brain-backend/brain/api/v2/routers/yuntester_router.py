@@ -136,7 +136,7 @@ async def get_repo_branches_and_tags(user=Depends(authenticate_user)):
 @router.post("/yuntester/switch", status_code=204)
 async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
                                user=Depends(authenticate_user)):
-    LOG.info(f"{user} witching to branch={data.branch} tag={data.tag}")
+    LOG.info(f"[{user}] witching to branch={data.branch} tag={data.tag}")
 
     try:
         user_repo_dir = await get_user_repo_dir(user)
@@ -411,7 +411,7 @@ async def execute_cases(data: yuntester_schemas.ExecuteRequest, user=Depends(aut
         )
     )
 
-    LOG.info(f"Test task {task_id} submitted for user {user}")
+    LOG.info(f"[{user}] Test task {task_id} submitted")
 
     return {"id": task_id}
 
@@ -427,7 +427,7 @@ async def get_task_status(task_id: str):
 
 
 @router.post("/yuntester/task/{task_id}/cancel")
-async def cancel_task(task_id: str):
+async def cancel_task(task_id: str, user=Depends(authenticate_user)):
     try:
         task = db.find_one(TEST_HISTORY_COLLECTION, {"id": task_id})
     except Exception:
@@ -437,7 +437,7 @@ async def cancel_task(task_id: str):
         return {"message": "Task already requested to cancel", "task_id": task_id}
 
     db.update(TEST_HISTORY_COLLECTION, {"id": task_id}, {"cancel": 1})
-    LOG.info(f"Cancel requested for task {task_id}")
+    LOG.info(f"[{user}] Cancel requested for task {task_id}")
     return {"message": "Task cancellation requested", "task_id": task_id}
 
 
@@ -483,7 +483,7 @@ async def save_custom_combinations_of_test_cases(
     """
 
     data_dict = data.dict()
-    LOG.info(f"Saving a new custom test case combination: {data_dict}")
+    LOG.info(f"[{user}] Saving a new custom test case combination: {data_dict}")
 
     data_dict["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data_dict["id"] = str(uuid4())
@@ -503,7 +503,7 @@ async def delete_custom_combination(combination_id: str, user=Depends(authentica
     database. If the specified ID does not exist, a 404 error is raised.
     """
 
-    LOG.info(f"Request to delete custom test case combination: id={combination_id}")
+    LOG.info(f"[{user}] Request to delete custom test case combination: id={combination_id}")
 
     try:
         record = db.find_one(TEST_CASE_COLLECTION, {"id": combination_id})
@@ -522,7 +522,8 @@ async def delete_custom_combination(combination_id: str, user=Depends(authentica
 
 @router.post("/yuntester/custom-combinations/{combination_id}", status_code=204)
 async def copy_custom_combination(combination_id: str,
-                                  data: yuntester_schemas.combinationShareRequest):
+                                  data: yuntester_schemas.combinationShareRequest,
+                                  user=Depends(authenticate_user)):
     """Copy a custom test case combination and share it with another user."""
 
     try:
@@ -536,7 +537,7 @@ async def copy_custom_combination(combination_id: str,
         record["id"] = new_id
         record["user"] = data.share_user
         db.insert(TEST_CASE_COLLECTION, record)
-        LOG.info("Successfully shared combination new_id=%s to user=%s", new_id, data.share_user)
+        LOG.info(f"[{user}]Successfully shared combination new_id={new_id} to {data.share_user}")
     except Exception as e:
         LOG.error("Failed to insert cloned combination new_id=%s, error=%s", new_id, e)
         raise HTTPException(status_code=500, detail="Failed to save cloned combination")

@@ -30,8 +30,8 @@ TASK_DIY_CONFIG = "users"
 
 
 @router.post("/servers", response_model=server_schemas.ServerDetailResponse)
-async def create_device(data: server_schemas.ServerRequest):
-    LOG.info(f"Creating server, IP: {data.device.ip}, hostname: {data.bmc.hostname}")
+async def create_device(data: server_schemas.ServerRequest, user=Depends(authenticate_user)):
+    LOG.info(f"[{user}] Creating server, IP: {data.device.ip}, hostname: {data.bmc.hostname}")
 
     exist = db.find(SERVER_COLLECTION,
                     {"json_extract(device, '$.ip')": str(data.device.ip)})
@@ -113,8 +113,8 @@ async def create_device(data: server_schemas.ServerRequest):
 
 
 @router.delete("/servers/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_device(device_id: str):
-    LOG.info(f"Deleting Server, ID: {device_id}")
+async def delete_device(device_id: str, user=Depends(authenticate_user)):
+    LOG.info(f"[{user}] Deleting Server, ID: {device_id}")
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": device_id})
     except Exception as e:
@@ -325,7 +325,7 @@ async def occupy_server(
 
         end_timestamp = server["start"] + time
         end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
-        LOG.info(f"occupy_server : ip={ip}, user={user}, time={end_time}")
+        LOG.info(f"[{user}] occupy_server: ip={ip}, end_time={end_time}")
 
         await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
         await task_scheduler.send_server_reminder(server, ServerStatus.OCCUPIED)
@@ -360,7 +360,7 @@ async def occupy_server(
             LOG.error(f"Failed to schedule auto cleanup task {task_id}")
 
     else:
-        LOG.info(f"release_server : ip={ip}, user={user}")
+        LOG.info(f"[{user}] release_server: ip={ip}")
         await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
 
         warn_task_id = f"device_warn_{ip.replace('.', '_')}"
@@ -375,7 +375,7 @@ async def occupy_server(
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
-    LOG.info(f"update server {ip} occupy info  by {user} finished.")
+    LOG.info(f"update server {ip} occupy info by {user} finished.")
     return server
 
 
@@ -393,10 +393,10 @@ async def focus_server(server_id: str, data: server_schemas.FocusRequest,
     recipients = server.get("recipients", [])
     if data.focus:
         server["recipients"] = list(set(recipients + [user]))
-        LOG.info(f"User {user} followed server {server['device']['ip']}.")
+        LOG.info(f"[{user}] followed server {server['device']['ip']}.")
     else:
         server["recipients"] = [r for r in recipients if r != user]
-        LOG.info(f"User {user} unfollowed server {server['device']['ip']}.")
+        LOG.info(f"[{user}] unfollowed server {server['device']['ip']}.")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
@@ -407,9 +407,9 @@ async def lock_server(server_id: str, data: server_schemas.LockRequest,
     """Lock/Unlock server"""
     if user not in settings.admin_list:
         LOG.error(
-            f"User {user} is not an administrator and does not have permission to lock the server")
+            f"[{user}] is not an administrator and does not have permission to lock the server")
         raise HTTPException(403, detail=(
-            f"User {user} is not an administrator and does not have permission to lock the server"))
+            f"[{user}] is not an administrator and does not have permission to lock the server"))
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
     except Exception as e:
@@ -418,10 +418,10 @@ async def lock_server(server_id: str, data: server_schemas.LockRequest,
 
     if data.lock:
         server["lock"] = 1
-        LOG.info(f"User {user} locked server {server['device']['ip']}.")
+        LOG.info(f"[{user}] locked server {server['device']['ip']}.")
     else:
         server["lock"] = 0
-        LOG.info(f"User {user} unlocked server {server['device']['ip']}.")
+        LOG.info(f"[{user}] unlocked server {server['device']['ip']}.")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
@@ -497,6 +497,7 @@ async def set_boot_entry(
     server_id: str, 
     boot_id: str = Query(...),
     set_default: bool = Query(False),
+    user=Depends(authenticate_user)
 ):
     """
     Set boot entry for bare metal server
@@ -518,7 +519,8 @@ async def set_boot_entry(
         raise HTTPException(
             status_code=400, detail="No saved OS credentials found for this server")
 
-    LOG.info(f"Setting next boot entry {boot_id} on server {server_id} ({server['device']['ip']})")
+    LOG.info(f"[{user}] Setting next boot entry {boot_id} on server {server_id}"
+             f" ({server['device']['ip']})")
     await ssh_execute_async(server['device']['ip'],
                             f"efibootmgr -n {boot_id}", credentials_user, credentials_pwd)
 
@@ -593,11 +595,11 @@ async def get_hw_information(server_id: str):
 
 
 @router.post("/servers/{server_id}/power-cycle")
-async def power_cycle_server(server_id: str):
+async def power_cycle_server(server_id: str, user=Depends(authenticate_user)):
     """
     Power cycle bare metal server via BMC
     """
-    LOG.info(f"Received request to power cycle server {server_id}")
+    LOG.info(f"[{user}] Received request to power cycle server {server_id}")
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
     except Exception:
@@ -615,11 +617,11 @@ async def power_cycle_server(server_id: str):
 
 
 @router.post("/servers/{server_id}/power-reset")
-async def power_reset_server(server_id: str):
+async def power_reset_server(server_id: str, user=Depends(authenticate_user)):
     """
     Warm reset bare metal server via BMC
     """
-    LOG.info(f"Received request to power reset server {server_id}")
+    LOG.info(f"[{user}] Received request to power reset server {server_id}")
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
     except Exception:
@@ -638,8 +640,9 @@ async def power_reset_server(server_id: str):
 
 
 @router.post("/servers/{server_id}/update_mcr", status_code=202)
-async def update_mcr(server_id: str, data: common_schemas.MCRRequest):
-    LOG.info("Received MCR update request for server_id="
+async def update_mcr(server_id: str, data: common_schemas.MCRRequest,
+                     user=Depends(authenticate_user)):
+    LOG.info(f"[{user}] Received MCR update request for server_id="
              f"{server_id} with options={data.update_options}")
 
     # Fetch server information
