@@ -308,10 +308,6 @@ async def occupy_server(
         LOG.warning(f"Device not found, ID: {server_id}")
         raise HTTPException(status_code=404, detail="Device not found")
 
-    if server["lock"]:
-        LOG.error("The server is locked and cannot be occupied")
-        raise HTTPException(403, detail="The server is locked and cannot be occupied")
-
     server["time"] = data.time
     server["start"] = datetime.now().timestamp()
     ip: str = server["device"]["ip"]
@@ -320,6 +316,10 @@ async def occupy_server(
     time = int(data.time)
 
     if time > 0:
+        if server["lock"]:
+            LOG.error("The server is locked and cannot be occupied")
+            raise HTTPException(403, detail="The server is locked and cannot be occupied")
+
         server["user"] = user
         server["recipients"] = list(set(server.get("recipients", []) + [user]))
 
