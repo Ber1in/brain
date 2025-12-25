@@ -14,7 +14,7 @@ from brain.json_db import db
 LOG = logging.getLogger(__name__)
 OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
 NON_AUDITED_OPERATIONS = [
-    "/login"]
+    "/login", "/filtering_conditions"]
 
 
 request_id_var = ContextVar("request_id", default=None)
