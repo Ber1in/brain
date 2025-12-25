@@ -8,7 +8,7 @@
         <el-menu
           router
           :default-active="$route.path"
-          :default-openeds="['resource-management']"
+          :default-openeds="['resource-management', 'more-menu']"
           class="sidebar-menu"
           background-color="#304156"
           text-color="#bfcbd9"
