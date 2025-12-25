@@ -121,9 +121,14 @@
             
             <!-- 操作列 -->
             <el-table-column prop="operation" label="操作" min-width="280">
-              <template #default="{ row }">
-                <div class="operation-cell" v-html="renderOperationDescription(row)"></div>
-              </template>
+                <template #default="{ row }">
+                <div class="operation-cell">
+                    <span class="operation-text">{{ getOperationText(row) }}</span>
+                    <span v-if="getServerName(row)" class="server-name">
+                    {{ getServerName(row) }}
+                    </span>
+                </div>
+                </template>
             </el-table-column>
             
             <!-- 时间列 -->
@@ -188,7 +193,8 @@ import { ref, computed, onMounted } from 'vue'
 import { Search, Refresh, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { operationApi } from '@/api/common'
-import type { OperationFilterRequest, OperationResponse } from '@/types/api'
+import { deviceApi } from '@/api/device'
+import type { OperationFilterRequest, OperationResponse, ServerDetailResponse } from '@/types/api'
 
 // 定义UUID正则
 const UUID_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -214,10 +220,30 @@ const total = ref(0)
 // 用户列表（从数据中提取）
 const userList = ref<string[]>([])
 
-// 初始化加载数据
-onMounted(() => {
+const servers = ref<ServerDetailResponse[]>([])
+const serversLoading = ref(false)
+
+// 添加获取服务器列表的函数
+const loadServers = async () => {
+  try {
+    serversLoading.value = true
+    const response = await deviceApi.getAll()
+    servers.value = response
+  } catch (error) {
+    console.error('加载服务器列表失败:', error)
+    servers.value = []
+  } finally {
+    serversLoading.value = false
+  }
+}
+
+// 在初始化时加载服务器列表
+onMounted(async () => {
   setDateRangeByType('7days')
-  handleSearch()
+  await Promise.all([
+    handleSearch(),
+    loadServers()
+  ])
 })
 
 // 表格样式
@@ -269,46 +295,44 @@ const extractServerId = (path: string): string | null => {
   return null
 }
 
-// 获取操作描述（带server_id标签）
-const getOperationDescription = (audit: OperationResponse): string => {
+const getOperationText = (audit: OperationResponse): string => {
   const { path, method } = audit
-  const serverId = extractServerId(path)
   
-  // 根据规则判断操作类型
   if (path.endsWith('/servers') && method === 'POST') {
     return '纳管服务器'
   }
   
-  if (serverId) {
+  const server = findServerByPath(path)
+  if (server) {
     if (method === 'PUT') {
-      return `更新服务器 <span class="server-id-tag">${serverId}</span> 的信息`
+      return '更新服务器'
     }
     if (method === 'DELETE') {
-      return `删除服务器 <span class="server-id-tag">${serverId}</span>`
+      return '删除服务器'
     }
     if (path.endsWith('/occupy')) {
-      return `占用服务器 <span class="server-id-tag">${serverId}</span>`
+      return '占用服务器'
     }
     if (path.endsWith('/release')) {
-      return `释放服务器 <span class="server-id-tag">${serverId}</span>`
+      return '释放服务器'
     }
     if (path.endsWith('/follow')) {
-      return `关注服务器 <span class="server-id-tag">${serverId}</span>`
+      return '关注服务器'
     }
     if (path.endsWith('/unfollow')) {
-      return `取消关注服务器 <span class="server-id-tag">${serverId}</span>`
+      return '取消关注服务器'
     }
     if (path.endsWith('/set-boot')) {
-      return `更新服务器 <span class="server-id-tag">${serverId}</span> 启动项`
+      return '更新服务器启动项'
     }
     if (path.endsWith('/power-cycle')) {
-      return `冷重启服务器 <span class="server-id-tag">${serverId}</span>`
+      return '冷重启服务器'
     }
     if (path.endsWith('/power-reset')) {
-      return `热重启服务器 <span class="server-id-tag">${serverId}</span>`
+      return '热重启服务器'
     }
     if (path.endsWith('/update_mcr')) {
-      return `更新服务器 <span class="server-id-tag">${serverId}</span> 的MCR包`
+      return '更新服务器的MCR包'
     }
   }
   
@@ -317,18 +341,32 @@ const getOperationDescription = (audit: OperationResponse): string => {
   return `${method} ${shortPath}`
 }
 
-// 渲染操作描述（处理HTML标签）
-const renderOperationDescription = (audit: OperationResponse): string => {
-  const description = getOperationDescription(audit)
-  const serverId = extractServerId(audit.path)
+// 获取服务器名称
+const getServerName = (audit: OperationResponse): string | null => {
+  const server = findServerByPath(audit.path)
+  return server ? getServerDisplayName(server) : null
+}
+
+// 根据路径查找对应的服务器信息
+const findServerByPath = (path: string): ServerDetailResponse | null => {
+  const serverId = extractServerId(path)
+  if (!serverId) return null
   
-  if (!serverId) return description
-  
-  // 替换server-id标签为实际的HTML
-  return description.replace(
-    /<server-id-tag>(.*?)<\/server-id-tag>/g,
-    `<span class="server-id-tag">$1</span>`
-  )
+  return servers.value.find(server => server.id === serverId) || null
+}
+
+// 获取服务器显示名称
+const getServerDisplayName = (server: ServerDetailResponse): string => {
+  const { bmc, device } = server
+  if (bmc?.hostname && device?.ip) {
+    return `${bmc.hostname}(${device.ip})`
+  } else if (bmc?.hostname) {
+    return bmc.hostname
+  } else if (device?.ip) {
+    return device.ip
+  } else {
+    return '未知服务器'
+  }
 }
 
 // 获取状态标签类型
@@ -645,26 +683,24 @@ const displayedData = computed(() => {
 .operation-cell {
   display: flex;
   align-items: center;
+  gap: 4px;
   line-height: 1.6;
   color: #1f2937;
   font-weight: 500;
+  flex-wrap: wrap;
 }
 
-/* Server ID 标签样式 */
-.operation-cell :deep(.server-id-tag) {
-  display: inline-block;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+.operation-text {
+  color: #1f2937;
+}
+
+.server-name {
   color: #3b82f6;
-  border: 1px solid #d4e8ff;
-  border-radius: 6px;
-  padding: 2px 8px;
-  margin: 0 4px;
-  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-  font-size: 11px;
   font-weight: 600;
-  line-height: 1.4;
-  vertical-align: middle;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.1);
+  padding: 1px 4px;
+  background: #f0f9ff;
+  border-radius: 3px;
+  border: 1px solid #d4e8ff;
 }
 
 /* 时间单元格 */
