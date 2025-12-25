@@ -408,7 +408,7 @@ async def release_server(
     return server
 
 
-@router.patch("/servers/{server_id}/follow")
+@router.patch("/servers/{server_id}/follow", status_code=204)
 async def follow_server(server_id: str, user=Depends(authenticate_user)):
     """following server"""
 
@@ -424,7 +424,7 @@ async def follow_server(server_id: str, user=Depends(authenticate_user)):
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
 
-@router.patch("/servers/{server_id}/unfollow")
+@router.patch("/servers/{server_id}/unfollow", status_code=204)
 async def unfollow_server(server_id: str, user=Depends(authenticate_user)):
     """unfollowing server"""
 
@@ -442,9 +442,8 @@ async def unfollow_server(server_id: str, user=Depends(authenticate_user)):
 
 
 @router.patch("/servers/{server_id}/lock", status_code=204)
-async def lock_server(server_id: str, data: server_schemas.LockRequest,
-                      user=Depends(authenticate_user)):
-    """Lock/Unlock server"""
+async def lock_server(server_id: str, user=Depends(authenticate_user)):
+    """Unlock server"""
     if user not in settings.admin_list:
         LOG.error(
             f"[{user}] is not an administrator and does not have permission to lock the server")
@@ -456,12 +455,28 @@ async def lock_server(server_id: str, data: server_schemas.LockRequest,
         LOG.warning(f"Server {server_id} not found.")
         raise HTTPException(status_code=404, detail=f"{e}")
 
-    if data.lock:
-        server["lock"] = 1
-        LOG.info(f"[{user}] locked server {server['device']['ip']}.")
-    else:
-        server["lock"] = 0
-        LOG.info(f"[{user}] unlocked server {server['device']['ip']}.")
+    server["lock"] = 1
+    LOG.info(f"[{user}] locked server {server['device']['ip']}.")
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+
+@router.patch("/servers/{server_id}/unlock", status_code=204)
+async def unlock_server(server_id: str, user=Depends(authenticate_user)):
+    """Unlock server"""
+    if user not in settings.admin_list:
+        LOG.error(
+            f"[{user}] is not an administrator and does not have permission to unlock the server")
+        raise HTTPException(403, detail=(
+            f"[{user}] is not an administrator and does not have permission to unlock the server"))
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception as e:
+        LOG.warning(f"Server {server_id} not found.")
+        raise HTTPException(status_code=404, detail=f"{e}")
+
+    server["lock"] = 0
+    LOG.info(f"[{user}] unlocked server {server['device']['ip']}.")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
