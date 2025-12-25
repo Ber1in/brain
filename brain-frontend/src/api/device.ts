@@ -175,12 +175,16 @@ export const deviceApi = {
     return apiClient.post(`/api/servers/${serverId}/reset_fw`, data)
   },
 
-  focusServer(serverId: string, focus: boolean): Promise<void> {
-    return apiClient.patch(`/api/servers/${serverId}/focus`, { focus })
+  followServer(serverId: string): Promise<void> {
+    return apiClient.patch(`/api/servers/${serverId}/follow`)
+  },
+  
+  unfollowServer(serverId: string): Promise<void> {
+    return apiClient.patch(`/api/servers/${serverId}/unfollow`)
   },
 
   lockServer(serverId: string, lock: number): Promise<void> {
-    return apiClient.patch(`/api/servers/${serverId}/focus`, { lock })
+    return apiClient.patch(`/api/servers/${serverId}/lock`, { lock })
   },
 
   occupyServer(serverId: string, time: number): Promise<ServerDetailResponse> {

@@ -937,14 +937,13 @@ const handleFollow = async () => {
     followLoading.value = true
     
     const focus = !isFollowing.value // true 表示关注，false 表示取消关注
-    
-    await deviceApi.focusServer(deviceId.value, focus)
-    
     if (focus) {
       // 关注成功
+      await deviceApi.followServer(deviceId.value)
       ElMessage.success(`关注成功，将会接收到该服务器的占用释放提醒邮件`)
     } else {
       // 取消关注成功
+      await deviceApi.unfollowServer(deviceId.value)
       ElMessage.success('取消关注，不再接收该服务器的占用释放提醒邮件')
     }
     

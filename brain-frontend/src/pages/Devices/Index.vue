@@ -2100,14 +2100,15 @@ const isFollowing = (device: ServerDetailResponse) => {
 const handleFollow = async (device: ServerDetailResponse) => {
   try {
     followLoading.value[device.id!] = true
-    
-    await deviceApi.focusServer(device.id!, !isFollowing(device))
-    
+  
     if (!isFollowing(device)) {
       // 关注成功
+      await deviceApi.followServer(device.id!)
       ElMessage.success(`关注成功，将会接收该服务器的占用释放提醒邮件`)
     } else {
       // 取消关注成功
+      
+      await deviceApi.unfollowServer(device.id!)
       ElMessage.success('取消关注, 不再接收该服务器的占用释放提醒邮件')
     }
     

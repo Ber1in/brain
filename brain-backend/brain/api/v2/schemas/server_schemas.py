@@ -100,10 +100,6 @@ class ServerUpdateRequest(BaseModel):
     focus: bool = False
 
 
-class FocusRequest(BaseModel):
-    focus: bool
-
-
 class LockRequest(BaseModel):
     lock: int
 

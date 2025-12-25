@@ -408,10 +408,9 @@ async def release_server(
     return server
 
 
-@router.patch("/servers/{server_id}/focus")
-async def focus_server(server_id: str, data: server_schemas.FocusRequest,
-                       user=Depends(authenticate_user)):
-    """following/unfollowing server"""
+@router.patch("/servers/{server_id}/follow")
+async def follow_server(server_id: str, user=Depends(authenticate_user)):
+    """following server"""
 
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
@@ -420,12 +419,24 @@ async def focus_server(server_id: str, data: server_schemas.FocusRequest,
         raise HTTPException(status_code=404, detail=f"{e}")
 
     recipients = server.get("recipients", [])
-    if data.focus:
-        server["recipients"] = list(set(recipients + [user]))
-        LOG.info(f"[{user}] followed server {server['device']['ip']}.")
-    else:
-        server["recipients"] = [r for r in recipients if r != user]
-        LOG.info(f"[{user}] unfollowed server {server['device']['ip']}.")
+    server["recipients"] = list(set(recipients + [user]))
+    LOG.info(f"[{user}] followed server {server['device']['ip']}.")
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+
+@router.patch("/servers/{server_id}/unfollow")
+async def unfollow_server(server_id: str, user=Depends(authenticate_user)):
+    """unfollowing server"""
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception as e:
+        LOG.warning(f"Server {server_id} not found.")
+        raise HTTPException(status_code=404, detail=f"{e}")
+
+    recipients = server.get("recipients", [])
+    server["recipients"] = [r for r in recipients if r != user]
+    LOG.info(f"[{user}] unfollowed server {server['device']['ip']}.")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
