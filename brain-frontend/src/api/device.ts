@@ -187,6 +187,10 @@ export const deviceApi = {
     return apiClient.patch(`/api/servers/${serverId}/occupy`, { time })
   },
 
+  releaseServer(serverId: string): Promise<ServerDetailResponse> {
+    return apiClient.patch(`/api/servers/${serverId}/release`)
+  },
+
   getAllNicTypes(): Promise<string[]> {
     return apiClient.get('/api/servers/nic_types')
   },

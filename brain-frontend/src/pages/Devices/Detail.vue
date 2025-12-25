@@ -1560,7 +1560,7 @@ const handleRelease = async () => {
     )
 
     // 使用新的 occupy 接口，传 0 表示释放
-    await deviceApi.occupyServer(deviceId.value, 0)
+    await deviceApi.releaseServer(deviceId.value)
     
     ElMessage.success('服务器已释放')
     loadDeviceDetail() // 重新加载数据

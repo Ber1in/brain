@@ -287,14 +287,13 @@ async def occupy_server(
     user: str = Depends(authenticate_user)
 ) -> dict:
     """
-    Occupy or release a server.
+    Occupy a server.
 
-    If `data.time > 0`, mark the server as occupied by the current user for the specified time,
+    mark the server as occupied by the current user for the specified time,
     schedule warnings and auto-cleanup tasks.  
-    If `data.time <= 0`, release the server and cancel any scheduled tasks.
 
     Args:
-        server_id: The ID of the server to occupy/release.
+        server_id: The ID of the server to occupy.
         data: ServerOccupyRequest containing the occupy time in seconds.
         user: The authenticated username (injected by Depends).
 
@@ -315,67 +314,97 @@ async def occupy_server(
     ssh_pass = server["device"].get("password", "")
     time = int(data.time)
 
-    if time > 0:
-        if server["lock"]:
-            LOG.error("The server is locked and cannot be occupied")
-            raise HTTPException(403, detail="The server is locked and cannot be occupied")
+    if server["lock"]:
+        LOG.error("The server is locked and cannot be occupied")
+        raise HTTPException(403, detail="The server is locked and cannot be occupied")
 
-        server["user"] = user
-        server["recipients"] = list(set(server.get("recipients", []) + [user]))
+    server["user"] = user
+    server["recipients"] = list(set(server.get("recipients", []) + [user]))
 
-        end_timestamp = server["start"] + time
-        end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
-        LOG.info(f"[{user}] occupy_server: ip={ip}, end_time={end_time}")
+    end_timestamp = server["start"] + time
+    end_time = datetime.fromtimestamp(end_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    LOG.info(f"[{user}] occupy_server: ip={ip}, end_time={end_time}")
 
-        await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
-        await task_scheduler.send_server_reminder(server, ServerStatus.OCCUPIED)
-        await task_scheduler.send_feishu_group_message(server, ServerStatus.OCCUPIED)
+    await task_scheduler.occupy_warning(ip, ssh_user, ssh_pass, user, end_time)
+    await task_scheduler.send_server_reminder(server, ServerStatus.OCCUPIED)
+    await task_scheduler.send_feishu_group_message(server, ServerStatus.OCCUPIED)
 
-        warn_delay = max(time - 300, 0)
-        if warn_delay > 0:
-            warn_task_id = f"device_warn_{ip.replace('.', '_')}"
-            warn_success = await scheduler.schedule_task(
-                task_id=warn_task_id,
-                delay_seconds=warn_delay,
-                task_func=task_scheduler.init_server_warning,
-                device_id=server_id,
-                status=ServerStatus.EXPIRING
-            )
-            if warn_success:
-                LOG.info(f"Scheduled warning task {warn_task_id} (delay={warn_delay}s)")
-            else:
-                LOG.error(f"Failed to schedule warning task {warn_task_id}")
-
-        task_id = f"device_cleanup_{ip.replace('.', '_')}"
-        success = await scheduler.schedule_task(
-            task_id=task_id,
-            delay_seconds=time,
+    warn_delay = max(time - 300, 0)
+    if warn_delay > 0:
+        warn_task_id = f"device_warn_{ip.replace('.', '_')}"
+        warn_success = await scheduler.schedule_task(
+            task_id=warn_task_id,
+            delay_seconds=warn_delay,
             task_func=task_scheduler.init_server_warning,
             device_id=server_id,
-            status=ServerStatus.RELEASED
+            status=ServerStatus.EXPIRING
         )
-        if success:
-            LOG.info(f"Scheduled cleanup task {task_id} (delay={time}s)")
+        if warn_success:
+            LOG.info(f"Scheduled warning task {warn_task_id} (delay={warn_delay}s)")
         else:
-            LOG.error(f"Failed to schedule auto cleanup task {task_id}")
+            LOG.error(f"Failed to schedule warning task {warn_task_id}")
 
+    task_id = f"device_cleanup_{ip.replace('.', '_')}"
+    success = await scheduler.schedule_task(
+        task_id=task_id,
+        delay_seconds=time,
+        task_func=task_scheduler.init_server_warning,
+        device_id=server_id,
+        status=ServerStatus.RELEASED
+    )
+    if success:
+        LOG.info(f"Scheduled cleanup task {task_id} (delay={time}s)")
     else:
-        LOG.info(f"[{user}] release_server: ip={ip}")
-        await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
-
-        warn_task_id = f"device_warn_{ip.replace('.', '_')}"
-        await scheduler.cancel_task(warn_task_id)
-
-        task_id = f"device_cleanup_{ip.replace('.', '_')}"
-        await scheduler.cancel_task(task_id)
-
-        await task_scheduler.send_server_reminder(server, ServerStatus.RELEASED)
-        await task_scheduler.send_feishu_group_message(server, ServerStatus.RELEASED)
-        server["user"] = ""
+        LOG.error(f"Failed to schedule auto cleanup task {task_id}")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 
     LOG.info(f"update server {ip} occupy info by {user} finished.")
+    return server
+
+
+@router.patch("/servers/{server_id}/release", response_model=server_schemas.ServerDetailResponse)
+async def release_server(
+    server_id: str, 
+    user: str = Depends(authenticate_user)
+) -> dict:
+    """
+    Release the server and cancel any scheduled tasks.
+
+    Args:
+        server_id: The ID of the server to release.
+        user: The authenticated username (injected by Depends).
+
+    Returns:
+        The updated server record as a dict.
+    """
+
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.warning(f"Device not found, ID: {server_id}")
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    ip: str = server["device"]["ip"]
+    ssh_user = server["device"].get("username", "")
+    ssh_pass = server["device"].get("password", "")
+    server["time"] = 0
+    LOG.info(f"[{user}] release_server: ip={ip}")
+    await task_scheduler.init_warning(ip, ssh_user, ssh_pass)
+
+    warn_task_id = f"device_warn_{ip.replace('.', '_')}"
+    await scheduler.cancel_task(warn_task_id)
+
+    task_id = f"device_cleanup_{ip.replace('.', '_')}"
+    await scheduler.cancel_task(task_id)
+
+    await task_scheduler.send_server_reminder(server, ServerStatus.RELEASED)
+    await task_scheduler.send_feishu_group_message(server, ServerStatus.RELEASED)
+    server["user"] = ""
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+    LOG.info(f"[{user}] release server {ip} finished.")
     return server
 
 

@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from datetime import datetime
 import logging
 import uuid
 from contextvars import ContextVar
@@ -38,6 +39,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         req_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4()}"
         set_request_id(req_id)
 
+        date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = req_id
 
@@ -56,6 +58,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
                         "path": path,
                         "method": request.method,
                         "status": response.status_code,
+                        "date": date
                     }
                 )
         except Exception as e:

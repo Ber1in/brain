@@ -2353,7 +2353,7 @@ const handleBatchRelease = async () => {
   
   const promises = releasableDevices.map(device => 
     // 使用新的 occupy 接口，传 0 表示释放
-    deviceApi.occupyServer(device.id!, 0)
+    deviceApi.releaseServer(device.id!)
   )
 
   await Promise.all(promises)
@@ -3385,7 +3385,7 @@ const handleRelease = async (device: ServerDetailResponse) => {
     )
 
     // 使用新的 occupy 接口，传 0 表示释放
-    await deviceApi.occupyServer(device.id!, 0)
+    await deviceApi.releaseServer(device.id!)
     
     ElMessage.success('服务器已释放')
     loadData() // 重新加载数据

@@ -342,6 +342,7 @@ class SQLiteDocumentDB:
             "path": "",
             "method": "",
             "status": "",
+            "date": ""
         }
     }
 
