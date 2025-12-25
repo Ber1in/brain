@@ -49,3 +49,19 @@ class FilteringConditions(BaseModel):
     tag_filtering_condition: str = ""
     nics: List[str] = []
     nic_filtering_condition: str = ""
+
+
+class OperationFilterRequest(BaseModel):
+    user: str = None
+    start: str = None
+    end: str = None
+    operation: str = None
+
+
+class OperationResponse(BaseModel):
+    request_id: str = None
+    user: str = None
+    path: str = None
+    method: str = None
+    status: str = None
+    date: str = None

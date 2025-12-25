@@ -6,7 +6,7 @@ import yaml
 import random
 from typing import List
 from uuid import uuid4
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Query
 import logging
 
 
@@ -20,6 +20,7 @@ LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 TAG_COLLERCTION = "tags"
 TASK_POOL_COLLECTION = "tasks"
+OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
 TASK_DIY_CONFIG = "users"
 db = SQLiteDocumentDB()
 COMMON_USER = "tester"
@@ -153,3 +154,37 @@ async def get_filter_conditions(user=Depends(authenticate_user)):
         LOG.debug(f"User {user} has not customized server filtering conditions")
 
     return filter_conditions
+
+
+@router.get("/operational_audit", response_model=List[common_schemas.OperationResponse])
+async def get_operations(user: str = Query(None), start: str = Query(None), end: str = Query(None)):
+
+    try:
+        filter_dict = {}
+
+        if user:
+            filter_dict["user"] = user
+
+        if start:
+            if len(start) == 10:
+                start_time = f"{start} 00:00:00"
+            else:
+                start_time = start
+            filter_dict["date >="] = start_time
+
+        if end:
+            if len(end) == 10:
+                end_time = f"{end} 23:59:59"
+            else:
+                end_time = end
+            filter_dict["date <="] = end_time
+
+        operational_audit = db.find(OPERATIONAL_AUDIT_COLLECTION, filter_dict, 
+                                    sort_by="date", desc=True)
+
+        return operational_audit
+
+    except Exception as e:
+        LOG.error(f"Failed to retrieve operation audit information, error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to retrieve operation audit information, error: {e}")

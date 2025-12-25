@@ -451,3 +451,19 @@ export interface FilteringConditions {
   nics: string[];
   nic_filtering_condition: string;
 }
+
+export interface OperationFilterRequest {
+  user?: string 
+  start?: string
+  end?: string
+  operation?: string
+}
+
+export interface OperationResponse {
+  request_id?: string
+  user?: string
+  path?: string
+  method?: string
+  status?: string
+  date?: string
+}

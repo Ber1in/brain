@@ -416,7 +416,8 @@ class SQLiteDocumentDB:
         with self.lock, self._conn:
             self._conn.execute(sql, vals)
 
-    def find(self, collection: str, filter_dict=None) -> List[Dict[str, Any]]:
+    def find(self, collection: str, filter_dict=None, sort_by: str = None,
+             desc: bool = False) -> List[Dict[str, Any]]:
         self._ensure_table(collection)
         sql = f"SELECT * FROM {collection}"
         params = []
@@ -424,18 +425,24 @@ class SQLiteDocumentDB:
         if filter_dict:
             conds = []
             for k, v in filter_dict.items():
-                # json_extract 特殊处理
-                if k.startswith("json_extract("):
+                if isinstance(k, str) and " LIKE" in k:
+                    col = k.replace(" LIKE", "").strip()
+                    conds.append(f"{col} LIKE ?")
+                    params.append(self._serialize_field(v))
+                elif k.startswith("json_extract("):
                     conds.append(f"{k} = ?")
                 else:
-                    # 支持操作符，默认 =
                     if " " in k:
                         col, op = k.split(" ", 1)
                         conds.append(f"{col} {op} ?")
                     else:
                         conds.append(f"{k} = ?")
-                params.append(self._serialize_field(v))
+                    params.append(self._serialize_field(v))
             sql += " WHERE " + " AND ".join(conds)
+
+        if sort_by:
+            order = "DESC" if desc else "ASC"
+            sql += f" ORDER BY {sort_by} {order}"
 
         with self.lock:
             cur = self._conn.execute(sql, params)

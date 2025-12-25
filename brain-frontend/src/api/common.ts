@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse, AppConfig, FilteringConditions } from '@/types/api'
+import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse, AppConfig, FilteringConditions, OperationFilterRequest, OperationResponse } from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -53,3 +53,9 @@ export const filterApi = {
     return apiClient.post('/api/filtering_conditions', data)
   }
 }
+
+export const operationApi = {
+  getOperationalAudit(params?: OperationFilterRequest): Promise<OperationResponse[]> {
+    return apiClient.get('/api/operational_audit', { params });
+  },
+};

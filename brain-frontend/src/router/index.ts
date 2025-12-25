@@ -194,6 +194,11 @@ const router = createRouter({
       name: '系统设置',
       component: () => import('@/pages/SystemInfo.vue')
     },
+    {
+      path: '/audit',
+      name: '操作审计',
+      component: () => import('@/pages/OperationalAudit.vue')
+    }
   ],
 })
 

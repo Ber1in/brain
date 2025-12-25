@@ -62,7 +62,7 @@
               <el-icon><Setting /></el-icon>
               <span>系统设置</span>
             </el-menu-item>
-            <el-menu-item index="/logs">
+            <el-menu-item index="/audit">
               <el-icon><Document /></el-icon>
               <span>操作日志</span>
             </el-menu-item>
