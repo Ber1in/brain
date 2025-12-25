@@ -128,47 +128,33 @@
             
             <!-- 时间列 -->
             <el-table-column prop="date" label="时间" width="180" sortable>
-            <template #default="{ row }">
+              <template #default="{ row }">
                 <span class="date-full">{{ row.date }}</span>
-            </template>
+              </template>
             </el-table-column>
             
+            <!-- 请求ID列 -->
             <el-table-column prop="request_id" label="请求ID" width="400">
-            <template #default="{ row }">
+              <template #default="{ row }">
                 <div class="request-id-cell">
-                <span class="request-id-text" :title="row.request_id">
+                  <span class="request-id-text" :title="row.request_id">
                     {{ row.request_id || '-' }}
-                </span>
-                <el-tooltip 
+                  </span>
+                  <el-tooltip 
                     v-if="row.status"
                     :content="getStatusTooltip(row.status)"
                     placement="top"
-                >
+                  >
                     <el-tag 
-                    :type="getStatusTagType(row.status)" 
-                    size="small"
-                    class="status-tag"
-                    :class="getStatusTagClass(row.status)"
+                      :type="getStatusTagType(row.status)" 
+                      size="small"
+                      class="status-tag"
+                      :class="getStatusTagClass(row.status)"
                     >
-                    {{ row.status }}
+                      {{ row.status }}
                     </el-tag>
-                </el-tooltip>
+                  </el-tooltip>
                 </div>
-            </template>
-            </el-table-column>
-
-            <!-- 详情列 -->
-            <el-table-column label="" width="100" fixed="right" align="center">
-              <template #default="{ row }">
-                <el-button
-                  type="primary"
-                  link
-                  @click="showDetail(row)"
-                  size="small"
-                  class="detail-btn"
-                >
-                  详情
-                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -194,73 +180,6 @@
         <el-empty description="暂无操作记录" :image-size="100" />
       </div>
     </el-card>
-
-    <!-- 详情对话框 -->
-    <el-dialog
-      v-model="detailDialogVisible"
-      title="操作详情"
-      width="520px"
-      class="audit-detail-dialog"
-    >
-      <div v-if="selectedAudit" class="audit-detail-content">
-        <el-descriptions :column="1" border size="default">
-          <el-descriptions-item label="用户">
-            <div class="detail-user">
-              <el-avatar 
-                v-if="selectedAudit.user"
-                :size="32" 
-                :style="{ backgroundColor: stringToColor(selectedAudit.user) }"
-                class="detail-user-avatar"
-              >
-                {{ selectedAudit.user.charAt(0).toUpperCase() }}
-              </el-avatar>
-              <span class="detail-user-name">{{ selectedAudit.user }}</span>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item label="操作">
-            <div class="detail-operation" v-html="renderOperationDescription(selectedAudit)"></div>
-          </el-descriptions-item>
-          <el-descriptions-item label="时间">
-            <div class="detail-time">
-              <span class="detail-date">{{ formatDateOnly(selectedAudit.date) }}</span>
-              <span class="detail-time-separator">·</span>
-              <span class="detail-time-text">{{ formatTimeOnly(selectedAudit.date) }}</span>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item label="请求ID">
-            <span class="detail-request-id">{{ selectedAudit.request_id || '-' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="HTTP方法">
-            <el-tag 
-              :type="getMethodTagType(selectedAudit.method)" 
-              size="small"
-              class="detail-method-tag"
-            >
-              {{ selectedAudit.method }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="请求路径">
-            <span class="detail-path">{{ selectedAudit.path }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="状态码">
-            <el-tag 
-              :type="getStatusTagType(selectedAudit.status)" 
-              size="small"
-              class="detail-status-tag"
-              :class="getStatusTagClass(selectedAudit.status)"
-            >
-              {{ selectedAudit.status }}
-            </el-tag>
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
-      
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="detailDialogVisible = false" class="close-btn">关闭</el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -294,10 +213,6 @@ const total = ref(0)
 
 // 用户列表（从数据中提取）
 const userList = ref<string[]>([])
-
-// 详情对话框
-const detailDialogVisible = ref(false)
-const selectedAudit = ref<OperationResponse | null>(null)
 
 // 初始化加载数据
 onMounted(() => {
@@ -416,19 +331,6 @@ const renderOperationDescription = (audit: OperationResponse): string => {
   )
 }
 
-// 获取方法标签类型（仅在详情中使用）
-const getMethodTagType = (method: string): string => {
-  const methodUpper = method?.toUpperCase()
-  switch (methodUpper) {
-    case 'GET': return 'success'
-    case 'POST': return 'primary'
-    case 'PUT': return 'warning'
-    case 'DELETE': return 'danger'
-    case 'PATCH': return 'info'
-    default: return 'info'
-  }
-}
-
 // 获取状态标签类型
 const getStatusTagType = (status: string): string => {
   if (!status) return 'info'
@@ -526,56 +428,6 @@ const formatDateTimeString = (date: Date): string => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-// 格式化日期显示（YYYY-MM-DD）
-const formatDateOnly = (dateString: string): string => {
-  if (!dateString) return '-'
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).replace(/\//g, '-')
-  } catch (error) {
-    return dateString.split(' ')[0] || dateString
-  }
-}
-
-// 格式化时间显示（HH:mm:ss）
-const formatTimeOnly = (dateString: string): string => {
-  if (!dateString) return '-'
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    })
-  } catch (error) {
-    return dateString.split(' ')[1] || '-'
-  }
-}
-
-// 格式化完整日期时间
-const formatDateTime = (dateString: string): string => {
-  if (!dateString) return '-'
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    }).replace(/\//g, '/')
-  } catch (error) {
-    return dateString
-  }
-}
-
 // 处理自定义日期选择
 const handleCustomDateChange = (dates: [string, string]) => {
   if (dates && dates.length === 2) {
@@ -654,12 +506,6 @@ const handleSizeChange = (size: number) => {
 // 页码变化
 const handleCurrentChange = (page: number) => {
   currentPage.value = page
-}
-
-// 显示详情
-const showDetail = (audit: OperationResponse) => {
-  selectedAudit.value = audit
-  detailDialogVisible.value = true
 }
 
 // 计算当前页显示的数据
@@ -829,20 +675,11 @@ const displayedData = computed(() => {
   font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
 }
 
-.date-text {
+.date-full {
   font-size: 13px;
   color: #1f2937;
   font-weight: 500;
-}
-
-.time-divider {
-  color: #9ca3af;
-  font-weight: 300;
-}
-
-.time-text {
-  font-size: 12px;
-  color: #6b7280;
+  white-space: nowrap;
 }
 
 /* 请求ID单元格 */
@@ -868,6 +705,10 @@ const displayedData = computed(() => {
   border: 1px solid #e5e7eb;
   word-break: break-all;
   line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }
 
 .status-tag {
@@ -895,20 +736,6 @@ const displayedData = computed(() => {
   color: #991b1b;
 }
 
-/* 详情按钮 */
-.detail-btn {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.detail-btn:hover {
-  background-color: #f0f9ff;
-  transform: translateY(-1px);
-}
-
 /* 分页 */
 .pagination-section {
   padding: 20px 24px;
@@ -922,131 +749,6 @@ const displayedData = computed(() => {
 /* 空状态 */
 .empty-state {
   padding: 60px 20px;
-}
-
-/* 详情对话框 */
-.audit-detail-dialog :deep(.el-dialog__header) {
-  border-bottom: 1px solid #e5e7eb;
-  padding: 20px 24px;
-  margin-right: 0;
-}
-
-.audit-detail-dialog :deep(.el-dialog__body) {
-  padding: 24px;
-}
-
-.audit-detail-content {
-  padding: 8px 0;
-}
-
-.detail-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.detail-user-avatar {
-  flex-shrink: 0;
-  font-weight: 500;
-  color: white;
-}
-
-.detail-user-name {
-  font-weight: 500;
-  color: #1f2937;
-  font-size: 14px;
-}
-
-.detail-operation {
-  line-height: 1.6;
-  font-weight: 500;
-  color: #1f2937;
-  padding: 8px 0;
-}
-
-.detail-operation :deep(.server-id-tag) {
-  display: inline-block;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
-  color: #3b82f6;
-  border: 1px solid #d4e8ff;
-  border-radius: 6px;
-  padding: 2px 8px;
-  margin: 0 4px;
-  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
-  vertical-align: middle;
-}
-
-.detail-time {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-}
-
-.detail-date {
-  font-size: 14px;
-  color: #1f2937;
-  font-weight: 500;
-}
-
-.detail-time-separator {
-  color: #9ca3af;
-  font-weight: 300;
-}
-
-.detail-time-text {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.detail-request-id {
-  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  color: #4b5563;
-  background: #f9fafb;
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid #e5e7eb;
-  display: inline-block;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.detail-path {
-  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  color: #3b82f6;
-  word-break: break-all;
-}
-
-.detail-method-tag {
-  font-size: 12px;
-  font-weight: 600;
-  border: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.detail-status-tag {
-  font-size: 12px;
-  font-weight: 600;
-  border: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  min-width: 50px;
-  text-align: center;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 16px 24px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.close-btn {
-  min-width: 80px;
 }
 
 /* 响应式设计 */
@@ -1091,6 +793,10 @@ const displayedData = computed(() => {
   
   .status-tag {
     align-self: flex-start;
+  }
+  
+  .request-id-text {
+    max-width: 200px;
   }
 }
 </style>
