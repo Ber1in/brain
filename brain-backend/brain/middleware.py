@@ -14,7 +14,7 @@ from brain.json_db import db
 LOG = logging.getLogger(__name__)
 OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
 NON_AUDITED_OPERATIONS = [
-    "/login", "/filtering_conditions"]
+    "/login", "/api/filtering_conditions", "/api/yuntester", "/api/tag"]
 
 
 request_id_var = ContextVar("request_id", default=None)
@@ -49,7 +49,8 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
                 username = request.headers.get("X-User", "")
 
             path = request.url.path
-            if request.method != "GET" and path not in NON_AUDITED_OPERATIONS:
+            should_skip = any(path.startswith(prefix) for prefix in NON_AUDITED_OPERATIONS)
+            if not should_skip and request.method != "GET":
                 db.insert(
                     OPERATIONAL_AUDIT_COLLECTION,
                     {
