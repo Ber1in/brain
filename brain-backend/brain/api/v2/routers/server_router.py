@@ -308,6 +308,10 @@ async def occupy_server(
         LOG.warning(f"Device not found, ID: {server_id}")
         raise HTTPException(status_code=404, detail="Device not found")
 
+    if server["lock"]:
+        LOG.error("The server is locked and cannot be occupied")
+        raise HTTPException(403, detail="The server is locked and cannot be occupied")
+
     server["time"] = data.time
     server["start"] = datetime.now().timestamp()
     ip: str = server["device"]["ip"]
@@ -403,7 +407,7 @@ async def lock_server(server_id: str, data: server_schemas.LockRequest,
     if user not in settings.admin_list:
         LOG.error(
             f"User {user} is not an administrator and does not have permission to lock the server")
-        return HTTPException(403, detail=(
+        raise HTTPException(403, detail=(
             f"User {user} is not an administrator and does not have permission to lock the server"))
     try:
         server = db.find_one(SERVER_COLLECTION, {"id": server_id})
