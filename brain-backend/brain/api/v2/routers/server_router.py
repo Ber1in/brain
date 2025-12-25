@@ -17,6 +17,7 @@ from brain.json_db import SQLiteDocumentDB
 from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils, task_scheduler
 from brain.utils.task_scheduler import ServerStatus, task_scheduler as scheduler
+from brain.config import settings
 
 
 LOG = logging.getLogger(__name__)
@@ -391,6 +392,31 @@ async def focus_server(server_id: str, data: server_schemas.FocusRequest,
     else:
         server["recipients"] = [r for r in recipients if r != user]
         LOG.info(f"User {user} unfollowed server {server['device']['ip']}.")
+
+    db.update(SERVER_COLLECTION, {"id": server_id}, server)
+
+
+@router.patch("/servers/{server_id}/lock")
+async def lock_server(server_id: str, data: server_schemas.LockRequest,
+                      user=Depends(authenticate_user)):
+    """Lock/Unlock server"""
+    if user not in settings.admin_list:
+        LOG.error(
+            f"User {user} is not an administrator and does not have permission to lock the server")
+        return HTTPException(403, detail=(
+            f"User {user} is not an administrator and does not have permission to lock the server"))
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception as e:
+        LOG.warning(f"Server {server_id} not found.")
+        raise HTTPException(status_code=404, detail=f"{e}")
+
+    if data.lock:
+        server["lock"] = 1
+        LOG.info(f"User {user} locked server {server['device']['ip']}.")
+    else:
+        server["lock"] = 0
+        LOG.info(f"User {user} unlocked server {server['device']['ip']}.")
 
     db.update(SERVER_COLLECTION, {"id": server_id}, server)
 

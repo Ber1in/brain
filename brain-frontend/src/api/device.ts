@@ -179,6 +179,10 @@ export const deviceApi = {
     return apiClient.patch(`/api/servers/${serverId}/focus`, { focus })
   },
 
+  lockServer(serverId: string, lock: number): Promise<void> {
+    return apiClient.patch(`/api/servers/${serverId}/focus`, { lock })
+  },
+
   occupyServer(serverId: string, time: number): Promise<ServerDetailResponse> {
     return apiClient.patch(`/api/servers/${serverId}/occupy`, { time })
   },

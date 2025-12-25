@@ -86,6 +86,7 @@ class ServerDetailResponse(ServerResponse):
     id: str = None
     recipients: List[str] = []
     task_id: str = None
+    lock: int = None
 
 
 class ServerUpdateRequest(BaseModel):
@@ -101,6 +102,10 @@ class ServerUpdateRequest(BaseModel):
 
 class FocusRequest(BaseModel):
     focus: bool
+
+
+class LockRequest(BaseModel):
+    lock: int
 
 
 class ServerOccupyRequest(BaseModel):

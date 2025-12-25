@@ -3,7 +3,7 @@
 
 import yaml
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 CONFIG_FILE = "/etc/yuntester/yuntester.yaml"
 
@@ -31,6 +31,8 @@ class AppConfig(BaseModel):
     ldap_server: str = "ldaps://it-srv-idc001.yunsilicon.com:636"
     admin_password: str = "yuntester@admin2021"
     release_notices: Optional[List[ReleaseNotice]] = None
+    admin_list: List[str] = Field(default_factory=lambda: [
+        "mengxh", "gongyh", "nana", "chenx", "jacky", "zhangx", "weihg"])
 
 
 def load_config() -> AppConfig:
@@ -91,6 +93,10 @@ class _SettingsProxy:
     @property
     def admin_password(self) -> str:
         return _current_settings.admin_password
+
+    @property
+    def admin_list(self) -> str:
+        return _current_settings.admin_list
 
     @property
     def release_notices(self) -> Optional[List[ReleaseNotice]]:

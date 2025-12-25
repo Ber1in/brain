@@ -285,7 +285,8 @@ class SQLiteDocumentDB:
             "updated_at": "",
             "id": "99b62073-21dd-440a-9d2a-5e8f5b538a81",
             "recipients": [],
-            "task_id": ""
+            "task_id": "",
+            "lock": 0
         },
         "tags": {
             "id": "",
