@@ -294,7 +294,10 @@ const extractResourceId = (path: string, type: ResourceType): string | null => {
 // ========== 新增：判断路径对应的资源类型 ==========
 const getResourceType = (path: string): ResourceType | null => {
   if (path.includes('/servers/')) {
-    return path.includes('/mv-servers/') ? ResourceType.MV200 : ResourceType.SERVER
+    return ResourceType.SERVER
+  }
+  if (path.includes('/mv-servers/')) {
+    return ResourceType.MV200
   }
   if (path.includes('/settings')) {
     return ResourceType.SYSTEM_SETTINGS
