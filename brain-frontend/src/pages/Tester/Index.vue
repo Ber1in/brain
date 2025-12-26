@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <h2>质量保证平台</h2>
+          <span>质量保证平台</span>
         </div>
       </template>
 
@@ -4267,9 +4267,6 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.qa-platform {
-  padding: 20px;
-}
 
 .card-header {
   display: flex;
