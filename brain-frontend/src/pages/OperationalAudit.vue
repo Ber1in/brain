@@ -171,7 +171,7 @@
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[10, 15, 30, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
           :total="total"
           @size-change="handleSizeChange"
@@ -215,7 +215,7 @@ const customDateRange = ref<[string, string]>(['', ''])
 const auditData = ref<OperationResponse[]>([])
 const loading = ref(false)
 const currentPage = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(15)
 const total = ref(0)
 
 // 用户列表（从数据中提取）
