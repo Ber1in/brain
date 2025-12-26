@@ -194,6 +194,7 @@ import { Search, Refresh, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { operationApi } from '@/api/common'
 import { deviceApi } from '@/api/device'
+import { mv200Api } from '@/api/mv200'
 import type { OperationFilterRequest, OperationResponse, ServerDetailResponse } from '@/types/api'
 
 // 定义UUID正则
@@ -223,6 +224,16 @@ const userList = ref<string[]>([])
 const servers = ref<ServerDetailResponse[]>([])
 const serversLoading = ref(false)
 
+const mv200List = ref<MVServer[]>([])
+
+const loadMv200List = async () => {
+  try {
+    mv200List.value = await mv200Api.getAll()
+  } catch (error) {
+    console.error('获取MV200列表失败:', error)
+  }
+}
+
 // 添加获取服务器列表的函数
 const loadServers = async () => {
   try {
@@ -242,7 +253,8 @@ onMounted(async () => {
   setDateRangeByType('7days')
   await Promise.all([
     handleSearch(),
-    loadServers()
+    loadServers(),
+    loadMv200List()
   ])
 })
 
@@ -288,9 +300,16 @@ const stringToColor = (str: string): string => {
 
 // 提取server_id
 const extractServerId = (path: string): string | null => {
-  const match = path.match(/\/servers\/([^\/]+)/)
-  if (match && UUID_REGEX.test(match[1])) {
-    return match[1]
+  const patterns = [
+    /\/servers\/([^\/]+)/,     // 匹配 /servers/{id}
+    /\/mv-servers\/([^\/]+)/   // 匹配 /mv-servers/{id}
+  ]
+  
+  for (const pattern of patterns) {
+    const match = path.match(pattern)
+    if (match && match[1]) {
+      return match[1]
+    }
   }
   return null
 }
@@ -302,8 +321,15 @@ const getOperationText = (audit: OperationResponse): string => {
     return '纳管服务器'
   }
   
+  if (path.endsWith('/mv-servers') && method === 'POST') {
+    return '纳管MV200'
+  }
+  
   const server = findServerByPath(path)
+  const mv200 = findMv200ByPath(path) // 新增：查找MV200
+  
   if (server) {
+    // 普通服务器的操作逻辑
     if (method === 'PUT') {
       return '更新服务器'
     }
@@ -336,6 +362,20 @@ const getOperationText = (audit: OperationResponse): string => {
     }
   }
   
+  // 3. 处理 MV200 的特定操作
+  if (mv200) {
+    if (method === 'PUT') {
+      return '更新MV200信息'
+    }
+    if (method === 'DELETE') {
+      return '删除MV200'
+    }
+    if (path.endsWith('/update_mcr')) {
+      return '更新MV200的MCR包' // 区分普通服务器和MV200
+    }
+    // 可以继续添加其他MV200特有的操作
+  }
+  
   // 默认返回路径（简化显示）
   const shortPath = path.length > 30 ? path.substring(0, 30) + '...' : path
   return `${method} ${shortPath}`
@@ -344,7 +384,12 @@ const getOperationText = (audit: OperationResponse): string => {
 // 获取服务器名称
 const getServerName = (audit: OperationResponse): string | null => {
   const server = findServerByPath(audit.path)
-  return server ? getServerDisplayName(server) : null
+  if (server) return getServerDisplayName(server)
+  
+  const mv200 = findMv200ByPath(audit.path)
+  if (mv200) return getMv200DisplayName(mv200)
+  
+  return null
 }
 
 // 根据路径查找对应的服务器信息
@@ -354,6 +399,15 @@ const findServerByPath = (path: string): ServerDetailResponse | null => {
   
   return servers.value.find(server => server.id === serverId) || null
 }
+
+// 根据路径查找对应的MV200信息
+const findMv200ByPath = (path: string): MVServer | null => {
+  const serverId = extractServerId(path)
+  if (!serverId) return null
+  
+  return mv200List.value.find(mv200 => mv200.id === serverId) || null
+}
+
 
 // 获取服务器显示名称
 const getServerDisplayName = (server: ServerDetailResponse): string => {
@@ -366,6 +420,20 @@ const getServerDisplayName = (server: ServerDetailResponse): string => {
     return device.ip
   } else {
     return '未知服务器'
+  }
+}
+
+// 获取MV200显示名称（根据MVServer接口）
+const getMv200DisplayName = (mv200: MVServer): string => {
+  const { name, ip_address } = mv200
+  if (name && ip_address) {
+    return `MV200: ${name}(${ip_address})`
+  } else if (name) {
+    return `MV200: ${name}`
+  } else if (ip_address) {
+    return `MV200: ${ip_address}`
+  } else {
+    return '未知MV200'
   }
 }
 

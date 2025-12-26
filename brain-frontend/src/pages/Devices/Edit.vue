@@ -5,15 +5,6 @@
         <div class="card-header">
           <h2>编辑服务器 - {{ deviceData.bmc?.hostname }}</h2>
           <div class="header-actions">
-            <el-button 
-              type="warning" 
-              @click="handleAutoUpdate" 
-              :loading="autoUpdateLoading"
-              :disabled="autoUpdateLoading"
-            >
-              <el-icon><Refresh /></el-icon>
-              {{ autoUpdateLoading ? '更新中...' : '更新信息' }}
-            </el-button>
             <el-button type="primary" @click="handleSubmit" :loading="loading">
               <el-icon><Check /></el-icon>
               保存
