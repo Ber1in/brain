@@ -198,6 +198,11 @@ const router = createRouter({
       path: '/audit',
       name: '操作审计',
       component: () => import('@/pages/OperationalAudit.vue')
+    },
+    {
+      path: '/help',
+      name: '帮助文档',
+      component: () => import('@/pages/Help.vue')
     }
   ],
 })
