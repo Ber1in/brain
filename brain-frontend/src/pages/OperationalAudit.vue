@@ -202,6 +202,16 @@ import type { OperationFilterRequest, OperationResponse, ServerDetailResponse } 
 // 定义UUID正则
 const UUID_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// 资源类型枚举
+enum ResourceType {
+  SERVER = 'server',          // 普通服务器
+  MV200 = 'mv200',            // MV200服务器
+  SYSTEM_SETTINGS = 'settings', // 系统设置
+  XSC_NETWORK = 'network',     // XSC网口
+  CLOUD_DISK = 'cloud-disk',  // 云系统盘
+  CLOUD_IMAGE = 'cloud-image' // 云镜像
+}
+
 // 筛选表单
 const filterForm = ref<OperationFilterRequest>({
   user: '',
@@ -260,6 +270,240 @@ onMounted(async () => {
   ])
 })
 
+// ========== 新增：资源ID提取函数 ==========
+const extractResourceId = (path: string, type: ResourceType): string | null => {
+  const patterns: Record<ResourceType, RegExp[]> = {
+    [ResourceType.SERVER]: [/\/servers\/([^\/]+)/],
+    [ResourceType.MV200]: [/\/mv-servers\/([^\/]+)/],
+    [ResourceType.XSC_NETWORK]: [/\/networks\/([^\/]+)/],
+    [ResourceType.CLOUD_DISK]: [/\/system-disks\/([^\/]+)/],
+    [ResourceType.CLOUD_IMAGE]: [/\/images\/([^\/]+)/],
+    [ResourceType.SYSTEM_SETTINGS]: []
+  }
+  
+  const typePatterns = patterns[type] || []
+  for (const pattern of typePatterns) {
+    const match = path.match(pattern)
+    if (match && match[1]) {
+      return match[1]
+    }
+  }
+  return null
+}
+
+// ========== 新增：判断路径对应的资源类型 ==========
+const getResourceType = (path: string): ResourceType | null => {
+  if (path.includes('/servers/')) {
+    return path.includes('/mv-servers/') ? ResourceType.MV200 : ResourceType.SERVER
+  }
+  if (path.includes('/settings')) {
+    return ResourceType.SYSTEM_SETTINGS
+  }
+  if (path.includes('/networks/')) {
+    return ResourceType.XSC_NETWORK
+  }
+  if (path.includes('/system-disks/')) {
+    return ResourceType.CLOUD_DISK
+  }
+  if (path.includes('/images/')) {
+    return ResourceType.CLOUD_IMAGE
+  }
+  return null
+}
+
+// ========== 更新：getOperationText 函数 ==========
+const getOperationText = (audit: OperationResponse): string => {
+  const { path, method } = audit
+  
+  // 系统设置
+  if (path.endsWith('/settings') && method === 'PUT') {
+    return '更新系统设置'
+  }
+  
+  // XSC网口相关
+  if (path.endsWith('/networks') && method === 'POST') {
+    return '创建XSC网口'
+  }
+  if (path.includes('/networks/')) {
+    const resourceId = extractResourceId(path, ResourceType.XSC_NETWORK)
+    if (resourceId) {
+      if (method === 'PUT') return '更新XSC网口信息'
+      if (method === 'DELETE') return '删除XSC网口'
+    }
+  }
+  
+  // 云系统盘相关
+  if (path.endsWith('/system-disks') && method === 'POST') {
+    return '创建云系统盘'
+  }
+  if (path.includes('/system-disks/')) {
+    const resourceId = extractResourceId(path, ResourceType.CLOUD_DISK)
+    if (resourceId) {
+      if (method === 'PUT') return '更新云系统盘信息'
+      if (method === 'DELETE') return '删除云系统盘'
+      if (path.endsWith('/flatten')) return '云系统盘做Flatten'
+      if (path.endsWith('/upload')) return '将云系统盘保存为新云镜像'
+      if (path.endsWith('/rebuild')) return '重置云系统盘'
+    }
+  }
+  
+  // 云镜像相关
+  if (path.endsWith('/images') && method === 'POST') {
+    return '纳管云镜像'
+  }
+  if (path.includes('/images/')) {
+    const resourceId = extractResourceId(path, ResourceType.CLOUD_IMAGE)
+    if (resourceId) {
+      if (method === 'PUT') return '更新云镜像信息'
+      if (method === 'DELETE') return '删除云镜像'
+    }
+  }
+  
+  // 服务器相关（原有逻辑）
+  if (path.endsWith('/servers') && method === 'POST') {
+    return '纳管服务器'
+  }
+  
+  if (path.endsWith('/mv-servers') && method === 'POST') {
+    return '纳管MV200'
+  }
+  
+  const server = findServerByPath(path)
+  const mv200 = findMv200ByPath(path)
+  
+  if (server) {
+    if (method === 'PUT') return '更新服务器'
+    if (method === 'DELETE') return '删除服务器'
+    if (path.endsWith('/occupy')) return '占用服务器'
+    if (path.endsWith('/release')) return '释放服务器'
+    if (path.endsWith('/follow')) return '关注服务器'
+    if (path.endsWith('/unfollow')) return '取消关注服务器'
+    if (path.endsWith('/set-boot')) return '更新服务器启动项'
+    if (path.endsWith('/power-cycle')) return '冷重启服务器'
+    if (path.endsWith('/power-reset')) return '热重启服务器'
+    if (path.endsWith('/update_mcr')) return '更新服务器的MCR包'
+  }
+  
+  if (mv200) {
+    if (method === 'PUT') return '更新MV200信息'
+    if (method === 'DELETE') return '删除MV200'
+    if (path.endsWith('/update_mcr')) return '更新MV200的MCR包'
+  }
+  
+  // 默认返回路径（简化显示）
+  const shortPath = path.length > 30 ? path.substring(0, 30) + '...' : path
+  return `${method} ${shortPath}`
+}
+
+// ========== 更新：getServerName 函数 ==========
+const getServerName = (audit: OperationResponse): string | null => {
+  const { path } = audit
+  const resourceType = getResourceType(path)
+  
+  switch (resourceType) {
+    case ResourceType.SERVER:
+      const server = findServerByPath(path)
+      return server ? getServerDisplayName(server) : null
+      
+    case ResourceType.MV200:
+      const mv200 = findMv200ByPath(path)
+      return mv200 ? getMv200DisplayName(mv200) : null
+      
+    case ResourceType.XSC_NETWORK:
+      const networkId = extractResourceId(path, ResourceType.XSC_NETWORK)
+      return networkId ? networkId.substring(0, 8) + '...' : null
+      
+    case ResourceType.CLOUD_DISK:
+      const diskId = extractResourceId(path, ResourceType.CLOUD_DISK)
+      return diskId ? diskId.substring(0, 8) + '...' : null
+      
+    case ResourceType.CLOUD_IMAGE:
+      const imageId = extractResourceId(path, ResourceType.CLOUD_IMAGE)
+      return imageId ? imageId.substring(0, 8) + '...' : null
+      
+    case ResourceType.SYSTEM_SETTINGS:
+      return '系统设置'
+      
+    default:
+      return null
+  }
+}
+
+// ========== 更新：getServerNameClass 函数 ==========
+const getServerNameClass = (audit: OperationResponse): string => {
+  const { path } = audit
+  const resourceType = getResourceType(path)
+  
+  switch (resourceType) {
+    case ResourceType.SERVER:
+      return 'resource-name--server'
+      
+    case ResourceType.MV200:
+      return 'resource-name--mv200'
+      
+    case ResourceType.XSC_NETWORK:
+      return 'resource-name--xsc-network'
+      
+    case ResourceType.CLOUD_DISK:
+      return 'resource-name--cloud-disk'
+      
+    case ResourceType.CLOUD_IMAGE:
+      return 'resource-name--cloud-image'
+      
+    case ResourceType.SYSTEM_SETTINGS:
+      return 'resource-name--system-settings'
+      
+    default:
+      return ''
+  }
+}
+
+// ========== 原有辅助函数保持不变 ==========
+
+// 根据路径查找对应的服务器信息
+const findServerByPath = (path: string): ServerDetailResponse | null => {
+  const serverId = extractResourceId(path, ResourceType.SERVER)
+  if (!serverId) return null
+  
+  return servers.value.find(server => server.id === serverId) || null
+}
+
+// 根据路径查找对应的MV200信息
+const findMv200ByPath = (path: string): MVServer | null => {
+  const mv200Id = extractResourceId(path, ResourceType.MV200)
+  if (!mv200Id) return null
+  
+  return mv200List.value.find(mv200 => mv200.id === mv200Id) || null
+}
+
+// 获取服务器显示名称
+const getServerDisplayName = (server: ServerDetailResponse): string => {
+  const { bmc, device } = server
+  if (bmc?.hostname && device?.ip) {
+    return `${bmc.hostname}(${device.ip})`
+  } else if (bmc?.hostname) {
+    return bmc.hostname
+  } else if (device?.ip) {
+    return device.ip
+  } else {
+    return '未知服务器'
+  }
+}
+
+// 获取MV200显示名称
+const getMv200DisplayName = (mv200: MVServer): string => {
+  const { name, ip_address } = mv200
+  if (name && ip_address) {
+    return `${name}(${ip_address})`
+  } else if (name) {
+    return name
+  } else if (ip_address) {
+    return ip_address
+  } else {
+    return '未知MV200'
+  }
+}
+
 // 表格样式
 const headerCellStyle = () => {
   return {
@@ -300,159 +544,9 @@ const stringToColor = (str: string): string => {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// 提取server_id
-const extractServerId = (path: string): string | null => {
-  const patterns = [
-    /\/servers\/([^\/]+)/,     // 匹配 /servers/{id}
-    /\/mv-servers\/([^\/]+)/   // 匹配 /mv-servers/{id}
-  ]
-  
-  for (const pattern of patterns) {
-    const match = path.match(pattern)
-    if (match && match[1]) {
-      return match[1]
-    }
-  }
-  return null
-}
-
-const getServerNameClass = (audit: OperationResponse): string => {
-  const server = findServerByPath(audit.path)
-  if (server) return 'server-name--regular'
-  
-  const mv200 = findMv200ByPath(audit.path)
-  if (mv200) return 'server-name--mv200'
-  
-  return ''
-}
-
-const getOperationText = (audit: OperationResponse): string => {
-  const { path, method } = audit
-  
-  if (path.endsWith('/servers') && method === 'POST') {
-    return '纳管服务器'
-  }
-  
-  if (path.endsWith('/mv-servers') && method === 'POST') {
-    return '纳管MV200'
-  }
-  
-  const server = findServerByPath(path)
-  const mv200 = findMv200ByPath(path) // 新增：查找MV200
-  
-  if (server) {
-    // 普通服务器的操作逻辑
-    if (method === 'PUT') {
-      return '更新服务器'
-    }
-    if (method === 'DELETE') {
-      return '删除服务器'
-    }
-    if (path.endsWith('/occupy')) {
-      return '占用服务器'
-    }
-    if (path.endsWith('/release')) {
-      return '释放服务器'
-    }
-    if (path.endsWith('/follow')) {
-      return '关注服务器'
-    }
-    if (path.endsWith('/unfollow')) {
-      return '取消关注服务器'
-    }
-    if (path.endsWith('/set-boot')) {
-      return '更新服务器启动项'
-    }
-    if (path.endsWith('/power-cycle')) {
-      return '冷重启服务器'
-    }
-    if (path.endsWith('/power-reset')) {
-      return '热重启服务器'
-    }
-    if (path.endsWith('/update_mcr')) {
-      return '更新服务器的MCR包'
-    }
-  }
-  
-  // 3. 处理 MV200 的特定操作
-  if (mv200) {
-    if (method === 'PUT') {
-      return '更新MV200信息'
-    }
-    if (method === 'DELETE') {
-      return '删除MV200'
-    }
-    if (path.endsWith('/update_mcr')) {
-      return '更新MV200的MCR包' // 区分普通服务器和MV200
-    }
-    // 可以继续添加其他MV200特有的操作
-  }
-  
-  // 默认返回路径（简化显示）
-  const shortPath = path.length > 30 ? path.substring(0, 30) + '...' : path
-  return `${method} ${shortPath}`
-}
-
-// 获取服务器名称
-const getServerName = (audit: OperationResponse): string | null => {
-  const server = findServerByPath(audit.path)
-  if (server) return getServerDisplayName(server)
-  
-  const mv200 = findMv200ByPath(audit.path)
-  if (mv200) return getMv200DisplayName(mv200)
-  
-  return null
-}
-
-// 根据路径查找对应的服务器信息
-const findServerByPath = (path: string): ServerDetailResponse | null => {
-  const serverId = extractServerId(path)
-  if (!serverId) return null
-  
-  return servers.value.find(server => server.id === serverId) || null
-}
-
-// 根据路径查找对应的MV200信息
-const findMv200ByPath = (path: string): MVServer | null => {
-  const serverId = extractServerId(path)
-  if (!serverId) return null
-  
-  return mv200List.value.find(mv200 => mv200.id === serverId) || null
-}
-
-
-// 获取服务器显示名称
-const getServerDisplayName = (server: ServerDetailResponse): string => {
-  const { bmc, device } = server
-  if (bmc?.hostname && device?.ip) {
-    return `${bmc.hostname}(${device.ip})`
-  } else if (bmc?.hostname) {
-    return bmc.hostname
-  } else if (device?.ip) {
-    return device.ip
-  } else {
-    return '未知服务器'
-  }
-}
-
-// 获取MV200显示名称（根据MVServer接口）
-const getMv200DisplayName = (mv200: MVServer): string => {
-  const { name, ip_address } = mv200
-  if (name && ip_address) {
-    return `${name}(${ip_address})`
-  } else if (name) {
-    return name
-  } else if (ip_address) {
-    return ip_address
-  } else {
-    return '未知MV200'
-  }
-}
-
 // 获取状态标签类型
 const getStatusTagType = (status: string): string => {
   if (!status) return 'info'
-  
   const statusNum = parseInt(status)
   if (statusNum >= 200 && statusNum < 300) return 'success'
   if (statusNum >= 300 && statusNum < 400) return 'warning'
@@ -464,7 +558,6 @@ const getStatusTagType = (status: string): string => {
 // 获取状态标签样式类
 const getStatusTagClass = (status: string): string => {
   if (!status) return ''
-  
   const statusNum = parseInt(status)
   if (statusNum >= 200 && statusNum < 300) return 'status-success'
   if (statusNum >= 300 && statusNum < 400) return 'status-warning'
@@ -774,26 +867,63 @@ const displayedData = computed(() => {
   color: #1f2937;
 }
 
+/* 资源名称基础样式 */
 .server-name {
-  padding: 1px 4px;
-  border-radius: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
   font-weight: 600;
-  margin-left: 4px;
+  font-size: 12px;
+  margin-left: 8px;
   border: 1px solid;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* 普通服务器样式 */
-.server-name--regular {
-  color: #3b82f6;
-  background: #f0f9ff;
-  border-color: #d4e8ff;
+/* 普通服务器 - 蓝色主题 */
+.resource-name--server {
+  color: #2563eb;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #93c5fd;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.1);
 }
 
-/* MV200服务器样式 */
-.server-name--mv200 {
-  color: #10b981;
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+/* MV200服务器 - 绿色主题 */
+.resource-name--mv200 {
+  color: #059669;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: #6ee7b7;
+  box-shadow: 0 1px 2px rgba(5, 150, 105, 0.1);
+}
+
+/* XSC网口 - 紫色主题 */
+.resource-name--xsc-network {
+  color: #7c3aed;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border-color: #c4b5fd;
+  box-shadow: 0 1px 2px rgba(124, 58, 237, 0.1);
+}
+
+/* 云系统盘 - 橙色主题 */
+.resource-name--cloud-disk {
+  color: #ea580c;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border-color: #fdba74;
+  box-shadow: 0 1px 2px rgba(234, 88, 12, 0.1);
+}
+
+/* 云镜像 - 粉红色主题 */
+.resource-name--cloud-image {
+  color: #be185d;
+  background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+  border-color: #f9a8d4;
+  box-shadow: 0 1px 2px rgba(190, 24, 93, 0.1);
+}
+
+/* 系统设置 - 灰色主题 */
+.resource-name--system-settings {
+  color: #4b5563;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-color: #d1d5db;
+  box-shadow: 0 1px 2px rgba(75, 85, 99, 0.1);
 }
 
 /* 时间单元格 */
