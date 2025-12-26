@@ -124,8 +124,10 @@
                 <template #default="{ row }">
                 <div class="operation-cell">
                     <span class="operation-text">{{ getOperationText(row) }}</span>
-                    <span v-if="getServerName(row)" class="server-name">
-                    {{ getServerName(row) }}
+                    <span v-if="getServerName(row)" 
+                            :class="getServerNameClass(row)"
+                            class="server-name">
+                        {{ getServerName(row) }}
                     </span>
                 </div>
                 </template>
@@ -312,6 +314,16 @@ const extractServerId = (path: string): string | null => {
     }
   }
   return null
+}
+
+const getServerNameClass = (audit: OperationResponse): string => {
+  const server = findServerByPath(audit.path)
+  if (server) return 'server-name--regular'
+  
+  const mv200 = findMv200ByPath(audit.path)
+  if (mv200) return 'server-name--mv200'
+  
+  return ''
 }
 
 const getOperationText = (audit: OperationResponse): string => {
@@ -763,12 +775,25 @@ const displayedData = computed(() => {
 }
 
 .server-name {
-  color: #3b82f6;
-  font-weight: 600;
   padding: 1px 4px;
-  background: #f0f9ff;
   border-radius: 3px;
-  border: 1px solid #d4e8ff;
+  font-weight: 600;
+  margin-left: 4px;
+  border: 1px solid;
+}
+
+/* 普通服务器样式 */
+.server-name--regular {
+  color: #3b82f6;
+  background: #f0f9ff;
+  border-color: #d4e8ff;
+}
+
+/* MV200服务器样式 */
+.server-name--mv200 {
+  color: #10b981;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
 }
 
 /* 时间单元格 */
