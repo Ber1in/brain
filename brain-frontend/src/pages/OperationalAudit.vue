@@ -24,6 +24,7 @@
               clearable
               style="width: 180px"
               class="user-select"
+              @change="handleUserChange"
             >
               <el-option
                 v-for="user in userList"
@@ -64,26 +65,6 @@
               @change="handleCustomDateChange"
               class="custom-date-picker"
             />
-          </el-form-item>
-
-          <!-- 操作按钮 -->
-          <el-form-item class="action-buttons">
-            <el-button 
-              type="primary" 
-              @click="handleSearch" 
-              :loading="loading"
-              class="search-btn"
-            >
-              <el-icon><Search /></el-icon>
-              查询
-            </el-button>
-            <el-button 
-              @click="handleReset"
-              class="reset-btn"
-            >
-              <el-icon><Refresh /></el-icon>
-              重置
-            </el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -191,8 +172,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { Search, Refresh, Document } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { operationApi } from '@/api/common'
 import { deviceApi } from '@/api/device'
@@ -220,7 +201,7 @@ const filterForm = ref<OperationFilterRequest>({
 })
 
 // 时间范围选择
-const selectedTimeRange = ref('7days')
+const selectedTimeRange = ref('3days')
 const customDateRange = ref<[string, string]>(['', ''])
 
 // 表格数据
@@ -262,13 +243,20 @@ const loadServers = async () => {
 
 // 在初始化时加载服务器列表
 onMounted(async () => {
-  setDateRangeByType('7days')
+  setDateRangeByType('3days')
   await Promise.all([
     handleSearch(),
     loadServers(),
     loadMv200List()
   ])
 })
+
+// 监听自定义日期范围变化
+watch(customDateRange, (newVal) => {
+  if (newVal && newVal[0] && newVal[1]) {
+    handleCustomDateChange(newVal)
+  }
+}, { deep: true })
 
 // ========== 新增：资源ID提取函数 ==========
 const extractResourceId = (path: string, type: ResourceType): string | null => {
@@ -579,14 +567,22 @@ const getStatusTooltip = (status: string): string => {
   return '状态码'
 }
 
-// 处理时间范围选择
+// 处理用户选择变化
+const handleUserChange = () => {
+  handleSearch()
+}
+
+// 处理时间范围选择变化
 const handleTimeRangeChange = (value: string) => {
   if (value !== 'custom') {
     setDateRangeByType(value)
+    // 自动触发搜索
+    handleSearch()
   } else {
     // 选择自定义时，清空日期
     filterForm.value.start = ''
     filterForm.value.end = ''
+    customDateRange.value = ['', '']
   }
 }
 
@@ -642,12 +638,14 @@ const formatDateTimeString = (date: Date): string => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-// 处理自定义日期选择
+// 处理自定义日期选择变化
 const handleCustomDateChange = (dates: [string, string]) => {
-  if (dates && dates.length === 2) {
+  if (dates && dates.length === 2 && dates[0] && dates[1]) {
     const [start, end] = dates
     filterForm.value.start = start ? `${start} 00:00:00` : ''
     filterForm.value.end = end ? `${end} 23:59:59` : ''
+    // 自动触发搜索
+    handleSearch()
   }
 }
 
@@ -697,18 +695,6 @@ const handleSearch = async () => {
   } finally {
     loading.value = false
   }
-}
-
-// 重置筛选条件
-const handleReset = () => {
-  filterForm.value = {
-    user: '',
-    start: '',
-    end: ''
-  }
-  selectedTimeRange.value = '7days'
-  customDateRange.value = ['', '']
-  setDateRangeByType('7days')
 }
 
 // 分页大小变化
@@ -1029,17 +1015,6 @@ const displayedData = computed(() => {
   .filter-form :deep(.el-select),
   .filter-form :deep(.el-date-picker) {
     width: 100% !important;
-  }
-  
-  .action-buttons {
-    display: flex;
-    gap: 12px;
-    width: 100%;
-  }
-  
-  .search-btn,
-  .reset-btn {
-    flex: 1;
   }
   
   .audit-table-container {
