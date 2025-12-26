@@ -427,11 +427,11 @@ const getServerDisplayName = (server: ServerDetailResponse): string => {
 const getMv200DisplayName = (mv200: MVServer): string => {
   const { name, ip_address } = mv200
   if (name && ip_address) {
-    return `MV200: ${name}(${ip_address})`
+    return `${name}(${ip_address})`
   } else if (name) {
-    return `MV200: ${name}`
+    return name
   } else if (ip_address) {
-    return `MV200: ${ip_address}`
+    return ip_address
   } else {
     return '未知MV200'
   }
