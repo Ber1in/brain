@@ -459,7 +459,7 @@
                 <div class="timeline-item">
                   <div class="timeline-date">
                     <span class="date">2025-12-26</span>
-                    <el-tag type="success" size="small">v1.2.0</el-tag>
+                    <el-tag type="success" size="small">v2.0.4</el-tag>
                   </div>
                   <div class="timeline-content">
                     <div class="update-card">
@@ -469,7 +469,7 @@
                       <ul>
                         <li>支持安装、启动lldpd，查询交换机信息</li>
                         <li>支持执行用例时自动添加网口上行信息</li>
-                        <li>支持测试任务结果的解析展示</li>
+                        <li>支持解析测试任务的执行结果并展示</li>
                         <li>支持查询服务器上网卡设备的pcie宽度及网口的ipv4/ipv6地址</li>
                         <li>支持服务器、mv200、云系统盘、xsc网口等资源的操作审计，参见[更多]-[操作日志]页面</li>
                       </ul>
@@ -492,7 +492,7 @@
                 <div class="timeline-item">
                   <div class="timeline-date">
                     <span class="date">2025-12-19</span>
-                    <el-tag type="primary" size="small">v1.1.0</el-tag>
+                    <el-tag type="primary" size="small">v2.0.3</el-tag>
                   </div>
                   <div class="timeline-content">
                     <div class="update-card">
@@ -521,6 +521,114 @@
                     </div>
                   </div>
                 </div>
+
+                <div class="timeline-item">
+                  <div class="timeline-date">
+                    <span class="date">2025-12-12</span>
+                    <el-tag type="primary" size="small">v2.0.2</el-tag>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="update-card">
+                      <div class="update-type">
+                        <el-tag type="success" size="small">新增功能</el-tag>
+                      </div>
+                      <ul>
+                        <li>支持根据 tag、网卡类型、关注来筛选服务器，并记录筛选条件，下次默认应用</li>
+                        <li>支持检索服务器 GRUB 信息并在服务器详情页面展示</li>
+                        <li>支持纳管没有安装驱动的服务器（但需要有 `yuncli` 才能正确获取完整网卡信息）</li>
+                        <li>支持扫描服务器上 Mellanox 网卡</li>
+                        <li>支持提醒邮件分组发送：系统设置页面允许为标签添加自定义 webhook 飞书机器人，服务器添加该标签时，释放提示消息会发送至对应飞书群</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="warning" size="small">功能优化</el-tag>
+                      </div>
+                      <ul>
+                        <li>切换到[质量保证平台]页面时自动拉取当前分支最新代码</li>
+                        <li>服务器详情页面自动获取最新板卡信息与启动项信息，不再需要手动点击更新</li>
+                        <li>纳管服务器时自动配置 yum/apt源(已支持centos7/8/ubuntu)，安装依赖包</li>
+                        <li>允许提前取消后台测试任务, 生成已执行测试用例的测试报告</li>
+                        <li>优化云脉网卡扫描：需要结合lspci以及yuncli获取到的fru来识别所有网卡及板卡类型 </li>
+                      </ul>
+                       <div class="update-type">
+                        <el-tag type="info" size="small">问题修复</el-tag>
+                      </div>
+                      <ul>
+                        <li>修复平台重启时会中断后台测试任务，重启后任务状态始终为运行中，无法取消的问题</li>
+                        <li>修复部分服务器获取启动项失败（部分老系统 `lsblk` 命令没有 PTTYPE）的问题</li>
+                        <li>修复编辑服务器信息会导致占用信息丢失的问题</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="timeline-item">
+                  <div class="timeline-date">
+                    <span class="date">2025-12-05</span>
+                    <el-tag type="primary" size="small">v2.0.1</el-tag>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="update-card">
+                      <div class="update-type">
+                        <el-tag type="success" size="small">新增功能</el-tag>
+                      </div>
+                      <ul>
+                        <li>支持执行测试用例</li>
+                        <li>支持查看用例执行历史，展示执行日志、yaml env，集成allure测试结果页面</li>
+                        <li>支持用户自定义用例集合，允许共享集合</li>
+                        <li>支持执行测试用例时选用mv200，并生成对应的yaml env文件</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="warning" size="small">功能优化</el-tag>
+                      </div>
+                      <ul>
+                        <li>完善服务器管理页面的mcr包更新功能，支持自动安装任务所需的工具，监测更新状态</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="timeline-item">
+                  <div class="timeline-date">
+                    <span class="date">2025-11-28</span>
+                    <el-tag type="primary" size="small">v2.0.0</el-tag>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="update-card">
+                      <div class="update-type">
+                        <el-tag type="success" size="small">新增功能</el-tag>
+                      </div>
+                      <ul>
+                        <li>支持关注服务器：服务器占用释放时使用飞书及邮箱提醒关注人</li>
+                        <li>支持检索服务器impi的地址</li>
+                        <li>支持更新服务器MCR包，并展示更新结果</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="warning" size="small">功能优化</el-tag>
+                      </div>
+                      <ul>
+                        <li>更换质量保证平台后台对接的测试框架为yuntester</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="timeline-item">
+                  <div class="timeline-date">
+                    <span class="date">2025-XX-XX</span>
+                    <el-tag type="primary" size="small">v1.0.0</el-tag>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="update-card">
+                      <div class="update-type">
+                        <el-tag type="success" size="small">新增功能</el-tag>
+                      </div>
+                      <ul>
+                        <li>云服务器管理平台改造及新增【质量保证平台】页面</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           </section>
@@ -531,7 +639,7 @@
               <div class="section-icon">
                 <el-icon size="24"><Service /></el-icon>
               </div>
-              <h2>技术支持</h2>
+              <h2>支持人员</h2>
             </div>
             <div class="section-content">
               <div class="support-grid">
