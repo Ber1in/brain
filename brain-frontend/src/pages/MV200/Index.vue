@@ -593,6 +593,7 @@ const getStageText = (stage: string) => {
     'getting_mcr': '下载MCR包',
     'uninstalling_mcr': '卸载旧MCR',
     'installing_mcr': '安装新MCR',
+    'reinstalling_mcr': '重试安装',
     'waiting': '等待中'
   }
   return stageMap[stage] || stage
@@ -690,7 +691,7 @@ const queryTaskStatus = async (server: MVServer) => {
         // 对于getting_mcr阶段，前5秒使用1秒间隔，之后使用5秒间隔
         const gettingMcrDuration = currentTime - taskStartTime
         queryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
-      } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr') {
+      } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr' || taskStatus.stage === 'reinstalling_mcr') {
         // 对于卸载和安装阶段，使用15秒间隔
         queryInterval = 15000
       }
@@ -724,7 +725,7 @@ const queryTaskStatus = async (server: MVServer) => {
         const currentTime = new Date().getTime()
         const gettingMcrDuration = currentTime - taskStartTime
         retryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
-      } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr') {
+      } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr' || currentStatus.stage === 'reinstalling_mcr') {
         retryInterval = 15000
       }
     }

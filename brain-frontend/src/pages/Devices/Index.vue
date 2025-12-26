@@ -1409,6 +1409,7 @@ const getStageText = (stage: string) => {
     'getting_mcr': '下载MCR包',
     'uninstalling_mcr': '卸载旧MCR',
     'installing_mcr': '安装新MCR',
+    'reinstalling_mcr': '重试安装',
     'upgrading_fw': '升级固件',    // 新增阶段
     'erasing_bdf': '擦拭设备',      // 新增阶段
     'reboot': '重启',              // 新增阶段
@@ -1733,7 +1734,7 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
         // 对于getting_mcr阶段，前5秒使用1秒间隔，之后使用5秒间隔
         const gettingMcrDuration = currentTime - taskStartTime
         queryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
-      } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr') {
+      } else if (taskStatus.stage === 'uninstalling_mcr' || taskStatus.stage === 'installing_mcr' || taskStatus.stage === 'reinstalling_mcr') {
         // 对于卸载和安装阶段，使用10秒间隔
         queryInterval = 10000
       } else if (taskStatus.stage === 'reboot') {
@@ -1771,7 +1772,7 @@ const queryTaskStatus = async (device: ServerDetailResponse) => {
         const currentTime = new Date().getTime()
         const gettingMcrDuration = currentTime - taskStartTime
         retryInterval = gettingMcrDuration < 5000 ? 1000 : 5000
-      } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr') {
+      } else if (currentStatus.stage === 'uninstalling_mcr' || currentStatus.stage === 'installing_mcr' || currentStatus.stage === 'reinstalling_mcr') {
         retryInterval = 10000
       } else if (currentStatus.stage === 'reboot') {
         retryInterval = 20000

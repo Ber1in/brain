@@ -1098,7 +1098,7 @@ async def run_mcr_update_task(task_id: str, host: str, user: str, pwd: str, ipmi
 
                 # ---------- reinstall ----------
                 try:
-                    update_task(task_id, stage="installing_mcr",
+                    update_task(task_id, stage="reinstalling_mcr",
                                 detail="Retrying MCR install after uninstall")
                     LOG.info(f"{host} Retrying MCR install after uninstall")
                     await ssh_execute_async(host, install_cmd, user, pwd)
