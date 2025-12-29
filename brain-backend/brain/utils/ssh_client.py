@@ -4,10 +4,11 @@
 import asyncio
 import concurrent.futures
 import contextvars
+import os
 import paramiko
 import logging
 from paramiko import ssh_exception
-from stat import S_ISDIR
+from stat import S_ISDIR, S_ISLNK
 import asyncssh
 
 from fastapi import HTTPException
@@ -120,10 +121,33 @@ class AsyncRemoteFS:
         async for entry in self._sftp.scandir(remote_path):
             if entry.filename in IGNORE_DIRS:
                 continue
-            items.append({
-                "name": entry.filename,
-                "type": "directory" if S_ISDIR(entry.attrs.permissions) else "file"
-            })
+
+            # Check if it's a symlink
+            if S_ISLNK(entry.attrs.permissions):
+                # Follow the symlink to check if it points to a directory
+                target_path = await self._sftp.realpath(remote_path + '/' + entry.filename)
+                try:
+                    target_stat = await self._sftp.stat(target_path)
+                    if S_ISDIR(target_stat.permissions):
+                        items.append({
+                            "name": entry.filename,
+                            "type": "directory"
+                        })
+                    else:
+                        items.append({
+                            "name": entry.filename,
+                            "type": "file"
+                        })
+                except Exception:
+                    items.append({
+                        "name": entry.filename,
+                        "type": "file"
+                    })
+            else:
+                items.append({
+                    "name": entry.filename,
+                    "type": "directory" if S_ISDIR(entry.attrs.permissions) else "file"
+                })
         return items
 
     async def download(self, remote_path, local_path):
