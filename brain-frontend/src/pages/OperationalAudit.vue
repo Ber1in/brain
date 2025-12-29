@@ -22,6 +22,7 @@
               v-model="filterForm.user"
               placeholder="选择用户"
               clearable
+              filterable
               style="width: 180px"
               class="user-select"
               @change="handleUserChange"
