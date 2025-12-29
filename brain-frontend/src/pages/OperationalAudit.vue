@@ -85,7 +85,7 @@
             :cell-style="cellStyle"
           >
             <!-- 用户列 -->
-            <el-table-column prop="user" label="用户" width="130" sortable>
+            <el-table-column prop="user" label="用户" width="200" sortable>
               <template #default="{ row }">
                 <div class="user-cell">
                   <el-avatar 
