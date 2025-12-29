@@ -26,9 +26,26 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item 
+                    command="batchOccupy" 
+                    class="batch-occupy-item"
+                    :disabled="!canBatchOccupy"
+                  >
+                    <el-icon><Timer /></el-icon>
+                    <span>批量占用</span>
+                    <el-tooltip 
+                      v-if="!canBatchOccupy && selectedDevices.length > 0"
+                      effect="dark" 
+                      :content="getBatchOccupyTooltip()"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </el-dropdown-item>
+                  <el-dropdown-item 
                     command="batchRelease" 
                     class="batch-release-item"
                     :disabled="!canBatchRelease"
+                    divided
                   >
                     <el-icon><Unlock /></el-icon>
                     <span>释放占用</span>
@@ -588,7 +605,37 @@
       class="occupy-dialog"
       :close-on-click-modal="false"
     >
-      <div class="dialog-header">
+      <!-- 第8步新增：在对话框标题后，dialog-header之前添加批量信息 -->
+      <div v-if="isBatchOccupyMode" class="batch-occupy-info">
+        <el-alert
+          :title="`将对 ${selectedDevices.length} 台服务器设置相同的占用时间`"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+        
+        <div class="device-preview">
+          <div class="preview-title">
+            服务器列表 ({{ selectedDevices.length }} 台):
+          </div>
+          <div class="device-list">
+            <div 
+              v-for="device in selectedDevices.slice(0, 3)" 
+              :key="device.id"
+              class="device-preview-item"
+            >
+              <span class="hostname">{{ device.bmc.hostname }}</span>
+              <span class="ip">{{ device.device.ip }}</span>
+            </div>
+            <div v-if="selectedDevices.length > 3" class="more-devices">
+              等 {{ selectedDevices.length }} 台服务器...
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 原有的dialog-header -->
+      <div v-if="!isBatchOccupyMode" class="dialog-header">
         <div class="device-info">
           <el-icon class="server-icon"><Monitor /></el-icon>
           <div class="info-content">
@@ -603,8 +650,26 @@
           <span class="username">{{ currentUser }}</span>
         </div>
       </div>
+      
+      <!-- 修改dialog-header，在批量模式时不显示单设备信息 -->
+      <div v-else class="dialog-header">
+        <div class="device-info">
+          <el-icon class="server-icon"><Monitor /></el-icon>
+          <div class="info-content">
+            <div class="hostname">批量操作模式</div>
+            <div class="ip-address">已选择 {{ selectedDevices.length }} 台服务器</div>
+          </div>
+        </div>
+        <div class="user-info">
+          <el-avatar :size="32" style="background-color: #409eff;">
+            {{ currentUser?.charAt(0).toUpperCase() }}
+          </el-avatar>
+          <span class="username">{{ currentUser }}</span>
+        </div>
+      </div>
 
-      <div v-if="isModifyMode && currentDevice?.time" class="original-time">
+      <!-- 原有内容 -->
+      <div v-if="isModifyMode && currentDevice?.time &&!isBatchOccupyMode" class="original-time">
         <el-icon><Clock /></el-icon>
         <span>原截止时间：</span>
         <strong>{{ getEndTimeDisplay(currentDevice) }}</strong>
@@ -1233,6 +1298,7 @@ const filteringConditions = ref<FilteringConditions>({
 })
 
 const loadingConditions = ref(false)
+const isBatchOccupyMode = ref(false)
 
 // 加载用户保存的过滤条件
 const loadFilteringConditions = async () => {
@@ -2284,6 +2350,11 @@ const clearSelection = () => {
 
 // 处理批量操作命令
 const handleBatchCommand = (command: string) => {
+  if (command === 'batchOccupy') {
+    handleBatchOccupy()
+    return
+  }
+  
   if (command === 'batchRelease' && !canBatchRelease.value) {
     // 如果不满足批量释放条件，显示提示但不执行操作
     const invalidCount = selectedDevices.value.filter(device => 
@@ -2292,7 +2363,7 @@ const handleBatchCommand = (command: string) => {
     ElMessage.warning(`无法执行批量释放：勾选了 ${invalidCount} 台非当前用户所占用的服务器`)
     return
   }
-  
+
   if (command === 'batchPowerCycle' || command === 'batchPowerReset') {
     // 电源操作使用单独的对话框
     const operation = command === 'batchPowerCycle' ? 'cycle' : 'reset'
@@ -2315,14 +2386,16 @@ const handleBatchConfirm = async () => {
     switch (batchOperation.value) {
       case 'batchRelease':
         await handleBatchRelease()
+        batchDialogVisible.value = false
+        clearSelection()
         break
       case 'batchDelete':
         await handleBatchDelete()
+        batchDialogVisible.value = false
+        clearSelection()
         break
+      // 注意：batchOccupy 已经直接跳转到时间选择对话框，不在这里处理
     }
-
-    batchDialogVisible.value = false
-    clearSelection()
     
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '批量操作失败')
@@ -2330,6 +2403,40 @@ const handleBatchConfirm = async () => {
     batchLoading.value = false
   }
 }
+
+// 批量占用方法
+const handleBatchOccupy = async () => {
+  if (selectedDevices.value.length === 0) return
+  
+  // 检查是否可以批量占用
+  if (!canBatchOccupy.value) {
+    // 如果不满足批量占用条件，显示提示
+    const invalidDevices = selectedDevices.value.filter(device => 
+      // 检查是否被其他用户占用
+      isDeviceOccupied(device) && !isCurrentUserOccupier(device)
+    )
+    
+    if (invalidDevices.length > 0) {
+      const occupiers = [...new Set(invalidDevices.map(device => device.user))]
+      ElMessage.warning(`无法执行批量占用：勾选了 ${invalidDevices.length} 台被其他用户占用的服务器（占用人：${occupiers.join(', ')})`)
+    }
+    return
+  }
+  
+  // 设置批量占用模式为 true
+  isBatchOccupyMode.value = true
+  
+  // 设置当前设备为第一个选中的设备（仅用于显示）
+  currentDevice.value = selectedDevices.value[0]
+  
+  // 设置默认结束时间
+  let defaultEndTime = new Date()
+  defaultEndTime.setTime(defaultEndTime.getTime() + 60 * 60 * 1000) // 默认1小时后
+  
+  occupyForm.endTime = defaultEndTime
+  occupyDialogVisible.value = true
+}
+
 
 const handleBatchDelete = async () => {
   const promises = selectedDevices.value.map(device => 
@@ -2438,6 +2545,35 @@ const canBatchRelease = computed(() => {
     isDeviceOccupied(device) && isCurrentUserOccupier(device)
   )
 })
+
+// 计算是否可以批量占用
+const canBatchOccupy = computed(() => {
+  if (selectedDevices.value.length === 0) return false
+  
+  // 检查所有选中的设备是否都是未占用的或者是当前用户占用的（可以修改）
+  return selectedDevices.value.every(device => 
+    // 未占用 或 当前用户占用（可以修改占用时间）
+    !isDeviceOccupied(device) || isCurrentUserOccupier(device)
+  )
+})
+
+// 获取批量占用操作的提示信息
+const getBatchOccupyTooltip = () => {
+  if (selectedDevices.value.length === 0) return ''
+  
+  const invalidDevices = selectedDevices.value.filter(device => 
+    // 检查是否被其他用户占用
+    isDeviceOccupied(device) && !isCurrentUserOccupier(device)
+  )
+  
+  if (invalidDevices.length > 0) {
+    // 获取占用人信息（去重）
+    const occupiers = [...new Set(invalidDevices.map(device => device.user))]
+    return `勾选了 ${invalidDevices.length} 台被其他用户占用的服务器（占用人：${occupiers.join(', ')})`
+  }
+  
+  return ''
+}
 
 // 获取批量释放操作的提示信息
 const getBatchReleaseTooltip = () => {
@@ -2823,6 +2959,9 @@ const isModifyMode = computed(() => {
 
 // 获取对话框标题
 const occupyDialogTitle = computed(() => {
+  if (isBatchOccupyMode.value) {
+    return `批量占用（${selectedDevices.value.length} 台服务器）`
+  }
   return isModifyMode.value ? '修改占用' : '占用服务器'
 })
 
@@ -3332,7 +3471,7 @@ const handleOccupyDialog = (device: ServerDetailResponse) => {
 
 // 占用/修改时间服务器
 const handleOccupy = async () => {
-  if (!currentDevice.value || !occupyForm.endTime) return
+  if (!occupyForm.endTime) return
   
   try {
     occupyLoading.value = true
@@ -3347,18 +3486,53 @@ const handleOccupy = async () => {
       return
     }
     
-    // 使用新的 occupy 接口
-    await deviceApi.occupyServer(currentDevice.value.id!, durationSeconds)
-    
-    ElMessage.success(`已成功${isModifyMode.value ? '修改占用' : '占用'}服务器 ${currentDevice.value.bmc.hostname}`)
-    occupyDialogVisible.value = false
-    loadData() // 重新加载数据
+    if (isBatchOccupyMode.value) {
+      // 批量占用
+      const promises = selectedDevices.value.map(device => {
+        console.log('批量占用设备:', device.bmc.hostname, device.id, durationSeconds)
+        return deviceApi.occupyServer(device.id!, durationSeconds)
+      })
+      
+      await Promise.all(promises)
+      
+      ElMessage.success(`已成功占用 ${selectedDevices.value.length} 台服务器`)
+      
+      // 重置状态
+      occupyDialogVisible.value = false
+      isBatchOccupyMode.value = false
+      
+      // 清空选择（必须在对话框关闭前执行）
+      clearSelection()
+      
+      // 重新加载数据
+      await loadData()
+    } else {
+      // 单个占用（原有逻辑）
+      if (!currentDevice.value) return
+      
+      await deviceApi.occupyServer(currentDevice.value.id!, durationSeconds)
+      ElMessage.success(`已成功${isModifyMode.value ? '修改占用' : '占用'}服务器 ${currentDevice.value.bmc.hostname}`)
+      occupyDialogVisible.value = false
+      
+      // 重新加载数据
+      await loadData()
+    }
   } catch (error: any) {
-    ElMessage.error(`${isModifyMode.value ? '修改占用' : '占用'}服务器失败: ${error.response?.data?.detail || '请求失败'}`)
+    const action = isBatchOccupyMode.value ? '批量占用' : isModifyMode.value ? '修改占用' : '占用'
+    ElMessage.error(`${action}失败: ${error.response?.data?.detail || '请求失败'}`)
   } finally {
     occupyLoading.value = false
   }
 }
+
+watch(occupyDialogVisible, (visible) => {
+  if (!visible) {
+    // 对话框关闭时，重置批量占用模式
+    isBatchOccupyMode.value = false
+    currentDevice.value = null
+    occupyForm.endTime = null
+  }
+})
 
 // 释放占用
 const handleRelease = async (device: ServerDetailResponse) => {
@@ -3955,6 +4129,20 @@ onMounted(() => {
   color: #c0c4cc !important;
 }
 
+/* 批量占用按钮样式 */
+:deep(.batch-occupy-item.is-disabled) {
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-occupy-item.is-disabled .el-icon) {
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-occupy-item.is-disabled:hover) {
+  background-color: transparent !important;
+  color: #c0c4cc !important;
+}
+
 /* 批量释放按钮正常状态颜色 - 与单个释放按钮保持一致 */
 :deep(.batch-release-item:not(.is-disabled)) {
   color: #67c23a !important;
@@ -3965,10 +4153,24 @@ onMounted(() => {
   background-color: #f0f9eb !important;
 }
 
+/* 批量占用按钮正常状态颜色 - 与单个占用按钮保持一致 */
+:deep(.batch-occupy-item:not(.is-disabled)) {
+  color: #409eff !important;
+}
+
+:deep(.batch-occupy-item:not(.is-disabled):hover) {
+  color: #337ecc !important;
+  background-color: #f0f7ff !important;
+}
+
 :deep(.batch-power-item) {
   color: #e6a23c !important;
 }
 
+:deep(.batch-power-item:hover) {
+  color: #cf9236 !important;
+  background-color: #fdf6ec !important;
+}
 
 /* 批量对话框样式 */
 .batch-dialog-content {
@@ -3987,6 +4189,90 @@ onMounted(() => {
   border-radius: 4px;
   color: #e6a23c;
   font-size: 14px;
+}
+
+/* 批量占用对话框特定样式 */
+.batch-occupy-info {
+  margin-top: 16px;
+}
+
+.device-list {
+  margin-top: 12px;
+}
+
+.selected-devices-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.selected-devices-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.selected-devices-list::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 2px;
+}
+
+.selected-devices-list::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 2px;
+}
+
+.selected-devices-list::-webkit-scrollbar-thumb:hover {
+  background: #a0a4ac;
+}
+
+.selected-device-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.selected-device-item:hover {
+  background-color: #f8fafc;
+}
+
+.selected-device-item:last-child {
+  border-bottom: none;
+}
+
+.selected-device-item .device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.selected-device-item .device-info .hostname {
+  font-weight: 500;
+  font-size: 13px;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selected-device-item .device-info .ip {
+  font-size: 12px;
+  color: #909399;
+  font-family: 'Monaco', 'Consolas', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selected-device-item .device-status {
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
 /* 电源操作按钮样式 */
@@ -4168,6 +4454,73 @@ onMounted(() => {
   :deep(.el-dialog__footer) {
     padding: 0 20px 20px;
   }
+}
+
+/* 批量占用预览样式 */
+.batch-occupy-info {
+  margin-bottom: 16px;
+}
+
+.device-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.preview-title {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.device-preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.device-preview-item:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.device-preview-item .hostname {
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.device-preview-item .ip {
+  color: #6b7280;
+  font-family: 'Monaco', 'Consolas', monospace;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.more-devices {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+  padding: 6px 0;
+  font-style: italic;
 }
 
 /* 启动项对话框样式 */
@@ -4524,6 +4877,29 @@ onMounted(() => {
   }
   
   .boot-entry-tags {
+    align-self: flex-start;
+  }
+  
+  /* 批量占用预览响应式 */
+  .device-preview-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .device-preview-item .ip {
+    margin-left: 0;
+  }
+  
+  /* 批量对话框响应式 */
+  .selected-device-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .selected-device-item .device-status {
+    margin-left: 0;
     align-self: flex-start;
   }
 }

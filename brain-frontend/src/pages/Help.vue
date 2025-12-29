@@ -830,7 +830,6 @@ const handleSearch = () => {
 
 // 打印文档
 const printDocument = () => {
-  ElMessage.info('正在准备打印...')
   setTimeout(() => {
     window.print()
   }, 500)
