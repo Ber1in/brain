@@ -1516,9 +1516,7 @@ const hasInternalDuplicate = (device: ServerDetailResponse): boolean => {
     // 检查MAC地址重复
     const nicInfo = (nic as any).nic_info || []
     for (const info of nicInfo) {
-      if (info.mac && isZeroMac(info.mac)) {
-        continue
-      }
+      // 直接检查MAC是否重复
       if (info.mac && seenMACs.has(info.mac)) {
         return true
       }
@@ -1529,14 +1527,6 @@ const hasInternalDuplicate = (device: ServerDetailResponse): boolean => {
   }
   
   return false
-}
-
-function isZeroMac(mac: string): boolean {
-  if (!mac) return false
-  // 去除分隔符，转换为小写
-  const cleanMac = mac.replace(/[:\-\s]/g, '').toLowerCase()
-  // 检查是否全部为0
-  return /^0+$/.test(cleanMac)
 }
 
 // 检查跨服务器重复
@@ -1551,8 +1541,7 @@ const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
       
       const nicInfo = (nic as any).nic_info || []
       nicInfo.forEach((info: any) => {
-        // 跳过纯0的MAC地址
-        if (info.mac && !isZeroMac(info.mac)) {
+        if (info.mac) {
           infos.push({ type: 'mac', value: info.mac, deviceId: d.id })
         }
       })
@@ -1571,8 +1560,7 @@ const hasExternalDuplicate = (device: ServerDetailResponse): boolean => {
     
     const nicInfo = (nic as any).nic_info || []
     return nicInfo.some((info: any) => {
-      // 跳过纯0的MAC地址
-      if (info.mac && !isZeroMac(info.mac)) {
+      if (info.mac) {
         const sameMacCount = allNicInfos.filter(nicInfo => 
           nicInfo.type === 'mac' && nicInfo.value === info.mac && nicInfo.deviceId !== device.id
         ).length

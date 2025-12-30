@@ -345,6 +345,10 @@ async def get_nics(
                     perm = (await ssh_execute_async(ip, cmd_perm, user, password, False)).strip()
 
                     is_mac = bool(perm) and bool(MAC_RE.match(perm.strip()))
+
+                    if is_mac and perm.lower() in ("00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"):
+                        is_mac = False
+
                     mac = perm if is_mac else None
 
                     if not mac:
