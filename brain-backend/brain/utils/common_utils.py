@@ -370,18 +370,19 @@ async def get_nics(
     merged_pf = OrderedDict()
 
     for dev in devices:
-        bdf = dev["bdf"]
-        pf_key = bdf.split('.')[0]
+        cmd = (f"test -L /sys/bus/pci/devices/{dev['bdf']}/physfn "
+               f"&& readlink -f /sys/bus/pci/devices/{dev['bdf']}/physfn | xargs basename")
+        res = await ssh_execute_async(ip, cmd, user, password, False)
 
-        if pf_key not in merged_pf:
-            merged_pf[pf_key] = {
-                "type": dev.get("type", ""),
-                "sn": dev.get("sn", ""),
-                "pcie_width": dev.get("pcie_width", ""),
-                "nic_info": []
-            }
+        key = res.strip() or dev["bdf"]
 
-        merged_pf[pf_key]["nic_info"].extend(dev.get("nic_info", []))
+        pf = merged_pf.setdefault(key, {"type": "", "sn": "", "pcie_width": "", "nic_info": []})
+
+        if key == dev["bdf"]:
+            pf.update({"type": dev.get("type", ""), "sn": dev.get("sn", ""),
+                       "pcie_width": dev.get("pcie_width", "")})
+
+        pf["nic_info"].extend(dev.get("nic_info", []))
 
     pf_list = list(merged_pf.values())
 

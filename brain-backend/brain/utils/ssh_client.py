@@ -4,7 +4,6 @@
 import asyncio
 import concurrent.futures
 import contextvars
-import os
 import paramiko
 import logging
 from paramiko import ssh_exception
