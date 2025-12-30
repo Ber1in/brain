@@ -57,6 +57,7 @@ PRODUCT_PART_NUMBER_DICT = {
     "90-0029-01": "MC400S-Verdi",
     "90-0030-01": "MC400-Verdi"
 }
+MAC_RE = re.compile(r"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$")
 
 
 def parse_ip_br_output(output: str) -> Dict[str, Dict[str, List[str]]]:
@@ -340,9 +341,17 @@ async def get_nics(
 
             if ifaces:
                 for iface in ifaces:
-                    mac = (await ssh_execute_async(
-                        ip, f"ethtool -P {iface}", user, password)).strip().split()[-1]
-                    nic_info.append({"bdf": pci, "iface": iface, "mac": mac})
+                    cmd_perm = f"ethtool -P {iface} | awk '{{print $3}}'"
+                    perm = (await ssh_execute_async(ip, cmd_perm, user, password, False)).strip()
+
+                    is_mac = bool(perm) and bool(MAC_RE.match(perm.strip()))
+                    mac = perm if is_mac else None
+
+                    if not mac:
+                        cmd_cur = f"cat /sys/class/net/{iface}/address"
+                        mac = (await ssh_execute_async(ip, cmd_cur, user, password, False)).strip()
+
+                    nic_info.append({"bdf": pci, "iface": iface, "mac": mac, })
             else:
                 nic_info.append({"bdf": pci, "iface": "", "mac": ""})
 
