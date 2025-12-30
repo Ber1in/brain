@@ -95,7 +95,7 @@
           prop="bmc.hostname" 
           label="服务器名称"
           sortable="custom"
-          width="120"
+          width="130"
         >
           <template #default="{ row }">
             <el-link 
