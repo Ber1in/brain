@@ -1,5 +1,14 @@
 import apiClient from './client'
-import type { TagsRequest, TagsResponse, RemoteFsResponse, TaskStatusResponse, AppConfig, FilteringConditions, OperationFilterRequest, OperationResponse } from '@/types/api'
+import type {
+  TagsRequest,
+  TagsResponse,
+  RemoteFsResponse,
+  TaskStatusResponse,
+  AppConfig,
+  FilteringConditions,
+  OperationFilterRequest,
+  OperationResponse,
+  InstallDetailResponse } from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -59,3 +68,9 @@ export const operationApi = {
     return apiClient.get('/api/operational_audit', { params });
   },
 };
+
+export const mcrApi = {
+  getInstallDetail(path: string): Promise<InstallDetailResponse[]> {
+    return apiClient.get('/api/mcr_install_detail', { params: { path } })
+  }
+}

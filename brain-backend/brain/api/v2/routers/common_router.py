@@ -13,6 +13,7 @@ import logging
 from brain.auth import authenticate_user
 from brain.api.v2.schemas import common_schemas
 from brain.json_db import SQLiteDocumentDB
+from brain.utils import common_utils
 from brain.utils.ssh_client import AsyncRemoteFS
 from brain.config import AppConfig, CONFIG_FILE, reload_settings, settings
 
@@ -188,3 +189,14 @@ async def get_operations(user: str = Query(None), start: str = Query(None), end:
         LOG.error(f"Failed to retrieve operation audit information, error: {e}")
         raise HTTPException(status_code=500,
                             detail=f"Failed to retrieve operation audit information, error: {e}")
+
+
+@router.get("/mcr_install_detail", response_model=List[common_schemas.InstallDetailResponse])
+async def get_mcr_install_detail(path: str = Query(...)):
+    try:
+        install_detail = await common_utils.fetch_mcr_install_detail(path)
+    except Exception:
+        LOG.warning("")
+        install_detail = []
+
+    return install_detail

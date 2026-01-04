@@ -24,7 +24,8 @@ export const mv200Api = {
 
   upgradeMcr(serverId: string, mcrFilePath: string): Promise<void> {
     const data: MCRRequest = {
-      path: mcrFilePath
+      path: mcrFilePath,
+      update_options: '--force --ovs-dpdk --spdk --yun-upgrade-option "--dpu-blk-oprom --best-try" --dpuagent'
     }
     return apiClient.post(`/mv-servers/${serverId}/update_mcr`, data)
   },

@@ -1014,7 +1014,7 @@
       </template>
     </el-dialog>
 
-    <!-- 新增：更新MCR包对话框 -->
+    <!-- 修改：更新MCR包对话框 - 第一步选择MCR文件 -->
     <el-dialog
       v-model="updateMcrDialogVisible"
       title="更新MCR包"
@@ -1096,61 +1096,171 @@
               </div>
             </div>
 
-            <div v-if="fileList.length === 0" class="empty-files">
-              <el-empty description="该目录为空" />
+            <div v-if="filteredFileList.length === 0" class="empty-files">
+              <el-empty :description="fileFilterText ? '未找到匹配的文件' : '该目录为空'" />
             </div>
-          </div>
-  
-          <div v-if="filteredFileList.length === 0" class="empty-files">
-            <el-empty :description="fileFilterText ? '未找到匹配的文件' : '该目录为空'" />
           </div>
         </div>
       </div>
 
       <template #footer>
         <div class="dialog-footer">
-          <!-- 左侧添加更新选项 -->
-          <div class="update-options-left">
-            <span class="options-label">更新选项：</span>
-            <el-radio-group v-model="updateOption" size="large">
-              <el-radio label="all">全部更新</el-radio>
-              <el-radio label="fw">仅更新固件</el-radio>
-              <el-radio label="no-fw">不更新固件</el-radio>
-            </el-radio-group>
+          <el-button 
+            @click="updateMcrDialogVisible = false" 
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleNextStep" 
+            :loading="upgradeMcrLoading"
+            :disabled="!selectedMcrFile"
+            size="large"
+            class="confirm-btn"
+          >
+            <el-tooltip
+              v-if="!selectedMcrFile"
+              effect="dark"
+              content="请选择MCR包"
+              placement="top"
+            >
+              <span>下一步</span>
+            </el-tooltip>
+            <span v-else>下一步</span>
+            
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 新增：MCR安装参数配置弹窗 -->
+    <el-dialog
+      v-model="mcrConfigDialogVisible"
+      title="配置MCR安装参数"
+      width="900px"
+      class="mcr-config-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="mcr-config-content" v-loading="mcrConfigLoading">
+        <div class="dialog-header">
+          <div class="device-info">
+            <el-icon class="server-icon"><Monitor /></el-icon>
+            <div class="info-content">
+              <div class="hostname">{{ currentDevice?.bmc.hostname }}</div>
+              <div class="ip-address">{{ currentDevice?.device.ip }}</div>
+            </div>
+          </div>
+          <div class="mcr-file-info">
+            <el-tag type="success" size="large">
+              <el-icon><Document /></el-icon>
+              {{ getFileName(selectedMcrFile) }}
+            </el-tag>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="section-title">
+            <el-icon><Setting /></el-icon>
+            <span>安装脚本参数配置</span>
+            <span class="config-tip">请根据需要勾选安装参数</span>
+          </div>
+
+          <div v-if="installParams.length === 0" class="no-params">
+            <el-empty description="该MCR包无需额外安装参数" />
           </div>
           
-          <!-- 右侧按钮 -->
-          <div class="footer-buttons">
-            <el-button 
-              @click="updateMcrDialogVisible = false" 
-              size="large"
-              class="cancel-btn"
+          <div v-else class="params-grid">
+            <div 
+              v-for="(param, index) in installParams" 
+              :key="param.name"
+              class="param-item"
+              :class="{
+                'has-arg': param.arg_name,
+                'single-column': param.arg_name,
+                'grid-column': !param.arg_name
+              }"
             >
-              取消
-            </el-button>
-            <el-button 
-              type="primary" 
-              @click="handleResetMcr" 
-              :loading="upgradeMcrLoading"
-              :disabled="!selectedMcrFile"
-              size="large"
-              class="confirm-btn"
-            >
-              <el-tooltip
-                v-if="!selectedMcrFile"
-                effect="dark"
-                content="请选择MCR包"
-                placement="top"
-              >
-                <span>确认更新</span>
-              </el-tooltip>
-              <span v-else>确认更新</span>
+              <div class="param-checkbox" v-if="!param.arg_name">
+                <el-checkbox 
+                  v-model="selectedParams[param.name]"
+                  @change="handleParamChange(param)"
+                >
+                  <span class="param-name">{{ param.name }}</span>
+                </el-checkbox>
+              </div>
               
-              <template #loading>
-                <el-icon class="is-loading"><Loading /></el-icon>
-              </template>
-            </el-button>
+              <div v-else class="param-with-input">
+                <div class="param-header">
+                  <el-checkbox 
+                    v-model="selectedParams[param.name]"
+                    @change="handleParamChange(param)"
+                  >
+                    <span class="param-name">{{ param.name }}</span>
+                  </el-checkbox>
+                </div>
+                
+                <div v-if="selectedParams[param.name]" class="param-input">
+                  <el-input
+                    v-model="paramValues[param.name]"
+                    :placeholder="`请输入 ${param.arg_name} 的值`"
+                    size="small"
+                    clearable
+                    @input="handleParamValueChange(param)"
+                  >
+                    <template #prepend>
+                      <span class="arg-label">{{ param.arg_name }}</span>
+                    </template>
+                  </el-input>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div class="preview-section">
+          <div class="section-title">
+            <el-icon><View /></el-icon>
+            <span>参数预览</span>
+          </div>
+          <div class="preview-content">
+            <el-input
+              v-model="generatedUpdateOptions"
+              type="textarea"
+              :rows="3"
+              placeholder="未选择任何参数或手动输入参数"
+              class="options-preview"
+              @input="handleManualInput"
+            />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button 
+            @click="handleBackToFileSelection" 
+            size="large"
+            class="back-btn"
+          >
+            返回
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleConfirmMcrUpdate" 
+            :loading="upgradeMcrLoading"
+            size="large"
+            class="confirm-btn"
+          >
+            <template #loading>
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            确认更新
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -1193,8 +1303,8 @@ import {
   PriceTag
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import { remotefsApi, tagApi, tasksApi, filterApi } from '@/api/common'
-import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse, FilteringConditions } from '@/types/api'
+import { remotefsApi, tagApi, tasksApi, filterApi, mcrApi } from '@/api/common'
+import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse, FilteringConditions, InstallDetailResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -1273,10 +1383,17 @@ const currentPath = ref('/auto/asic-dump/meta_release')
 const selectedMcrFile = ref('')
 const fileFilterText = ref('')
 const directoryCache = ref<Record<string, any[]>>({})
-const updateOption = ref<'all' | 'fw' | 'no-fw'>('all')
 const currentPathInput = ref('')
 const taskStatusMap = ref<Record<string, TaskStatusResponse>>({})
 const taskStatusTimers = ref<Record<string, number>>({})
+
+// 新增：MCR参数配置相关
+const mcrConfigDialogVisible = ref(false)
+const mcrConfigLoading = ref(false)
+const installParams = ref<InstallDetailResponse[]>([])
+const selectedParams = ref<Record<string, boolean>>({})
+const paramValues = ref<Record<string, string>>({})
+const generatedUpdateOptions = ref('')
 
 // 新增：筛选条件中间状态
 const pendingNicTypeFilter = ref<string[]>([])
@@ -2066,63 +2183,6 @@ const handleFileItemClick = async (item: any) => {
   }
 }
 
-// 方法：重置MCR包
-const handleResetMcr = async () => {
-  if (!currentDevice.value || !selectedMcrFile.value) return
-
-  try {
-    upgradeMcrLoading.value = true
-    
-    await ElMessageBox.confirm(
-      `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新服务器 "${currentDevice.value.bmc.hostname}" 吗？\n更新选项: ${getUpdateOptionText(updateOption.value)}`,
-      '确认更新MCR包',
-      {
-        type: 'warning',
-        confirmButtonText: '确定更新',
-        cancelButtonText: '取消'
-      }
-    )
-
-    // 调用重置MCR接口
-    const response = await deviceApi.upgradeMcr(currentDevice.value.id!, selectedMcrFile.value, updateOption.value)
-    
-    // 更新当前设备的task_id
-    const deviceIndex = devices.value.findIndex(d => d.id === currentDevice.value!.id)
-    if (deviceIndex > -1) {
-      devices.value[deviceIndex].task_id = response.task_id
-      // 设置初始状态
-      taskStatusMap.value[response.task_id] = {
-        id: response.task_id,
-        server_id: currentDevice.value.id!,
-        status: 'pending',
-        stage: 'waiting',
-        detail: '任务已创建，等待执行',
-        timestamp: new Date().toISOString()
-      }
-      // 启动状态查询
-      setTimeout(() => {
-        queryTaskStatus(devices.value[deviceIndex])
-      }, 1000) // 1秒后开始查询
-    }
-    
-    ElMessage.success('MCR包更新任务已开始')
-    updateMcrDialogVisible.value = false
-    
-    // 重置状态
-    selectedMcrFile.value = ''
-    currentPath.value = '/auto'
-    updateOption.value = 'all'
-    
-  } catch (error: any) {
-    if (error === 'cancel' || error === 'close') {
-      return
-    }
-    ElMessage.error(error.response?.data?.detail || '更新MCR包失败')
-  } finally {
-    upgradeMcrLoading.value = false
-  }
-}
-
 // 组件卸载时清除所有定时器
 onUnmounted(() => {
   Object.values(taskStatusTimers.value).forEach(timer => {
@@ -2134,16 +2194,6 @@ onUnmounted(() => {
   taskStatusTimers.value = {}
   taskStatusMap.value = {}
 })
-
-// 添加更新选项文本显示
-const getUpdateOptionText = (option: string) => {
-  const optionsMap = {
-    'all': '全部更新',
-    'fw': '只更新固件',
-    'no-fw': '不更新固件'
-  }
-  return optionsMap[option as keyof typeof optionsMap] || option
-}
 
 // 检查当前用户是否已关注某台服务器
 const isFollowing = (device: ServerDetailResponse) => {
@@ -2953,7 +3003,6 @@ const occupyDialogTitle = computed(() => {
   return isModifyMode.value ? '修改占用' : '占用服务器'
 })
 
-// 禁用超过3天的日期
 // 禁用超过3天的日期和时间
 const disabledDate = (time: Date) => {
   const now = new Date()
@@ -3574,6 +3623,227 @@ const handleDelete = async (device: ServerDetailResponse) => {
     loadData()
   } catch (error) {
     // 用户取消删除
+  }
+}
+
+// 新增：处理下一步按钮点击
+const handleNextStep = async () => {
+  if (!selectedMcrFile.value || !currentDevice.value) return
+  
+  try {
+    upgradeMcrLoading.value = true
+    mcrConfigLoading.value = true
+    
+    // 在获取参数前先清理现有状态
+    selectedParams.value = {}
+    paramValues.value = {}
+    generatedUpdateOptions.value = ''
+    installParams.value = []  // 先清空之前的参数
+    
+    // 获取安装脚本参数
+    const params = await mcrApi.getInstallDetail(selectedMcrFile.value)
+    installParams.value = params
+    
+    // 初始化选择状态（确保是干净的）
+    selectedParams.value = {}
+    paramValues.value = {}
+    
+    // 默认勾选 --force 参数（如果有的话）
+    const forceParam = params.find(param => param.name === '--force' || param.name.includes('force'))
+    if (forceParam) {
+      selectedParams.value[forceParam.name] = true
+    }
+    
+    // 更新生成的选项
+    updateGeneratedOptions()
+    
+    // 切换到参数配置弹窗
+    updateMcrDialogVisible.value = false
+    mcrConfigDialogVisible.value = true
+    
+  } catch (error: any) {
+    ElMessage.error(`获取安装参数失败: ${error.response?.data?.detail || '请求失败'}`)
+    // 出错时也清理状态
+    selectedParams.value = {}
+    paramValues.value = {}
+    generatedUpdateOptions.value = ''
+    installParams.value = []
+  } finally {
+    upgradeMcrLoading.value = false
+    mcrConfigLoading.value = false
+  }
+}
+
+// 新增：处理参数变化
+const handleParamChange = (param: InstallDetailResponse) => {
+  if (!selectedParams.value[param.name] && param.arg_name) {
+    // 如果取消勾选，清除对应的值
+    delete paramValues.value[param.name]
+  }
+  updateGeneratedOptions()
+}
+
+// 新增：处理参数值变化
+const handleParamValueChange = (param: InstallDetailResponse) => {
+  updateGeneratedOptions()
+}
+
+const handleManualInput = (value: string) => {
+  // 清除所有选中状态
+  Object.keys(selectedParams.value).forEach(key => {
+    selectedParams.value[key] = false
+  })
+  paramValues.value = {}
+  
+  if (!value.trim()) return
+  
+  // 解析手动输入的参数
+  const parts = value.trim().split(/\s+/)
+  for (let i = 0; i < parts.length; i++) {
+    const current = parts[i]
+    const next = parts[i + 1]
+    
+    // 检查是否是已知参数
+    const param = installParams.value.find(p => p.name === current)
+    if (param) {
+      // 选中该参数
+      selectedParams.value[param.name] = true
+      
+      // 如果该参数需要值，且下一个词不是另一个参数
+      if (param.arg_name && next && !installParams.value.some(p => p.name === next)) {
+        paramValues.value[param.name] = next
+        i++ // 跳过下一个词，因为它已经被用作值
+      }
+    }
+    // 如果不是已知参数，也允许存在（用户可能输入自定义参数）
+  }
+}
+
+// 修改原来的 updateGeneratedOptions 函数，添加防抖
+let updateTimeout: NodeJS.Timeout | null = null
+
+// 新增：更新生成的选项字符串
+const updateGeneratedOptions = () => {
+  if (updateTimeout) {
+    clearTimeout(updateTimeout)
+  }
+  
+  updateTimeout = setTimeout(() => {
+    const selected: string[] = []
+    
+    installParams.value.forEach(param => {
+      if (selectedParams.value[param.name]) {
+        if (param.arg_name && paramValues.value[param.name]) {
+          // 有参数且有值的格式：name value
+          selected.push(`${param.name} ${paramValues.value[param.name]}`)
+        } else if (param.arg_name && !paramValues.value[param.name]) {
+          // 有参数但没输入值的格式：name
+          selected.push(param.name)
+        } else if (!param.arg_name) {
+          // 无参数的格式：name
+          selected.push(param.name)
+        }
+      }
+    })
+    
+    // 检查是否有不在安装参数列表中的自定义参数
+    const currentOptions = generatedUpdateOptions.value.trim()
+    if (currentOptions) {
+      const currentParts = currentOptions.split(/\s+/)
+      for (let i = 0; i < currentParts.length; i++) {
+        const current = currentParts[i]
+        const next = currentParts[i + 1]
+        
+        // 如果不是已知参数
+        if (!installParams.value.some(p => p.name === current)) {
+          // 检查下一个词是否是值还是另一个参数
+          const isNextAValue = next && !installParams.value.some(p => p.name === next)
+          
+          if (isNextAValue) {
+            selected.push(`${current} ${next}`)
+            i++ // 跳过下一个词
+          } else {
+            selected.push(current)
+          }
+        }
+      }
+    }
+    
+    // 去重并排序
+    const uniqueOptions = [...new Set(selected)]
+    generatedUpdateOptions.value = uniqueOptions.join(' ')
+  }, 300) // 300ms防抖
+}
+
+// 新增：返回文件选择
+const handleBackToFileSelection = () => {
+  // 清理所有选择状态
+  selectedParams.value = {}
+  paramValues.value = {}
+  generatedUpdateOptions.value = ''
+  installParams.value = []  // 新增：清理参数列表
+  
+  mcrConfigDialogVisible.value = false
+  updateMcrDialogVisible.value = true
+}
+
+// 新增：确认MCR更新
+const handleConfirmMcrUpdate = async () => {
+  if (!currentDevice.value || !selectedMcrFile.value) return
+
+  try {
+    upgradeMcrLoading.value = true
+    
+    await ElMessageBox.confirm(
+      `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新服务器 "${currentDevice.value.bmc.hostname}" 吗？\n更新选项: ${generatedUpdateOptions.value || '空（不传递任何参数）'}`,
+      '确认更新MCR包',
+      {
+        type: 'warning',
+        confirmButtonText: '确定更新',
+        cancelButtonText: '取消'
+      }
+    )
+
+    // 调用更新MCR接口，传入生成的选项字符串
+    const response = await deviceApi.upgradeMcr(currentDevice.value.id!, selectedMcrFile.value, generatedUpdateOptions.value)
+    
+    // 更新当前设备的task_id
+    const deviceIndex = devices.value.findIndex(d => d.id === currentDevice.value!.id)
+    if (deviceIndex > -1) {
+      devices.value[deviceIndex].task_id = response.task_id
+      // 设置初始状态
+      taskStatusMap.value[response.task_id] = {
+        id: response.task_id,
+        server_id: currentDevice.value.id!,
+        status: 'pending',
+        stage: 'waiting',
+        detail: '任务已创建，等待执行',
+        timestamp: new Date().toISOString()
+      }
+      // 启动状态查询
+      setTimeout(() => {
+        queryTaskStatus(devices.value[deviceIndex])
+      }, 1000) // 1秒后开始查询
+    }
+    
+    ElMessage.success('MCR包更新任务已开始')
+    mcrConfigDialogVisible.value = false
+    
+    // 重置状态
+    selectedMcrFile.value = ''
+    currentPath.value = '/auto/asic-dump/meta_release'
+    installParams.value = []
+    selectedParams.value = {}
+    paramValues.value = {}
+    generatedUpdateOptions.value = ''
+    
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error(error.response?.data?.detail || '更新MCR包失败')
+  } finally {
+    upgradeMcrLoading.value = false
   }
 }
 
@@ -4846,6 +5116,159 @@ onMounted(() => {
   font-weight: 600;
 }
 
+/* MCR配置对话框样式 */
+.mcr-config-dialog {
+  :deep(.el-dialog__header) {
+    padding: 20px 20px 0;
+    margin-right: 0;
+  }
+  
+  :deep(.el-dialog__body) {
+    padding: 16px 20px;
+  }
+  
+  :deep(.el-dialog__footer) {
+    padding: 0 20px 20px;
+  }
+}
+
+.mcr-config-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.mcr-file-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.mcr-file-info .el-tag {
+  font-size: 14px;
+  padding: 8px 16px;
+}
+
+.config-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+}
+
+.config-tip {
+  font-size: 13px;
+  color: #6b7280;
+  margin-left: 12px;
+  font-weight: normal;
+}
+
+.no-params {
+  padding: 40px 0;
+}
+
+.params-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);  /* 默认4列 */
+  gap: 8px;  /* 更小的间距 */
+  margin-top: 12px;
+}
+
+/* 无参数的项 - 4列 */
+.param-item.grid-column {
+  grid-column: span 1;
+  display: flex;
+  align-items: center;
+  min-height: 32px;  /* 更小的高度 */
+  max-height: 40px;
+  padding: 4px 6px;
+}
+
+.param-item:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.param-item.single-column {
+  grid-column: span 2;
+  min-height: 40px;
+  max-height: 70px;
+  padding: 6px 8px;
+}
+
+.param-checkbox {
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.param-checkbox :deep(.el-checkbox) {
+  width: 100%;
+}
+
+.param-checkbox :deep(.el-checkbox__label) {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.param-name {
+  font-weight: 500;
+  color: #374151;
+  font-size: 12px;  /* 更小字体 */
+}
+
+/* 有参数的项内部更紧凑 */
+.param-with-input {
+  width: 100%;
+}
+
+.param-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.param-name {
+  font-weight: 500;
+  color: #374151;
+  font-size: 13px;  /* 稍微减小字体 */
+}
+
+.param-input {
+  margin-top: 2px;
+}
+
+.arg-label {
+  font-size: 11px;
+  color: #6b7280;
+  min-width: 50px;
+}
+
+.preview-content {
+  margin-top: 12px;
+}
+
+.options-preview {
+  :deep(.el-textarea__inner) {
+    font-family: 'Monaco', 'Consolas', monospace;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    resize: none;
+  }
+}
+
+.preview-tip {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 8px;
+  text-align: center;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .dialog-header {
@@ -4889,6 +5312,15 @@ onMounted(() => {
   .selected-device-item .device-status {
     margin-left: 0;
     align-self: flex-start;
+  }
+  
+  /* MCR配置响应式 */
+  .params-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .param-item.single-column {
+    grid-column: span 1;
   }
 }
 

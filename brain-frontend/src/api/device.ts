@@ -160,7 +160,7 @@ export const deviceApi = {
     return apiClient.post(`/api/servers/${serverId}/power-reset`)
   },
 
-  upgradeMcr(serverId: string, mcrFilePath: string, updateOptions: 'all' | 'fw' | 'no-fw' = 'all'): Promise<void> {
+  upgradeMcr(serverId: string, mcrFilePath: string, updateOptions: string): Promise<void> {
     const data: MCRRequest = {
       path: mcrFilePath,
       update_options: updateOptions

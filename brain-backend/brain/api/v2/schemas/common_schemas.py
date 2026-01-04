@@ -40,7 +40,7 @@ class ResetFwRequest(BaseModel):
 
 
 class MCRRequest(ResetFwRequest):
-    update_options: str = Field("all")
+    update_options: str = Field(None)
 
 
 class FilteringConditions(BaseModel):
@@ -65,3 +65,8 @@ class OperationResponse(BaseModel):
     method: str = None
     status: str = None
     date: str = None
+
+
+class InstallDetailResponse(BaseModel):
+    name: str = None
+    arg_name: str = None
