@@ -263,7 +263,7 @@
             </el-table-column>
 
             <!-- SOC IP列 -->
-            <el-table-column label="SOC IP">
+            <el-table-column label="SOC IP" width="115">
               <template #default="{ row }">
                 <div v-if="getMv200StatusForNic(row)" class="soc-ip-status">
                   <!-- 非MV200网卡，显示横线 -->
