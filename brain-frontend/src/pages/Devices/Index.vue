@@ -1188,10 +1188,9 @@
             >
               <!-- 包裹整个参数项在el-tooltip中 -->
               <el-tooltip
-                :content="getParamDescription(param)"
+                :content="param.description || ''"
                 placement="top"
                 :disabled="!param.description"
-                raw-content
               >
                 <div class="param-content-wrapper">
                   <!-- 无参数的项 -->
@@ -1247,7 +1246,8 @@
               :rows="3"
               placeholder="未选择任何参数或手动输入参数"
               class="options-preview"
-              @input="handleManualInput"
+              @keyup="handleManualInputKeyup"
+              @blur="handleManualInputBlur"
             />
           </div>
         </div>
@@ -3719,6 +3719,113 @@ const handleParamValueChange = (param: InstallDetailResponse) => {
   // 清除手动输入的内容，只使用参数配置
   generatedUpdateOptions.value = ''
   updateGeneratedOptions()
+}
+
+const handleManualInputKeyup = (event: KeyboardEvent) => {
+  // 获取当前输入框的值（包含空格）
+  const inputElement = event.target as HTMLInputElement
+  const value = inputElement.value
+  
+  // 更新数据模型
+  generatedUpdateOptions.value = value
+  
+  // 处理全选删除的情况
+  if (value === '') {
+    // 清空所有选中状态
+    Object.keys(selectedParams.value).forEach(key => {
+      selectedParams.value[key] = false
+    })
+    paramValues.value = {}
+  } else if (value.trim()) {
+    // 如果是手动输入模式，更新选中状态
+    // 清空所有选中状态
+    Object.keys(selectedParams.value).forEach(key => {
+      selectedParams.value[key] = false
+    })
+    paramValues.value = {}
+    
+    // 尝试解析参数（仅用于UI显示）
+    updateUIFromManualInput(value)
+  }
+}
+
+// 辅助函数：从手动输入更新UI状态
+const updateUIFromManualInput = (value: string) => {
+  try {
+    const parts = []
+    let currentPart = ''
+    let inQuotes = false
+    let quoteChar = ''
+    
+    for (let i = 0; i < value.length; i++) {
+      const char = value[i]
+      
+      if ((char === '"' || char === "'") && (i === 0 || value[i-1] !== '\\')) {
+        if (!inQuotes) {
+          inQuotes = true
+          quoteChar = char
+          currentPart += char
+        } else if (char === quoteChar) {
+          inQuotes = false
+          currentPart += char
+        } else {
+          currentPart += char
+        }
+      } else if (char === ' ' && !inQuotes) {
+        if (currentPart.trim()) {
+          parts.push(currentPart.trim())
+        }
+        currentPart = ''
+      } else {
+        currentPart += char
+      }
+    }
+    
+    if (currentPart.trim()) {
+      parts.push(currentPart.trim())
+    }
+    
+    // 清空所有选中状态（确保每次都是重新解析）
+    Object.keys(selectedParams.value).forEach(key => {
+      selectedParams.value[key] = false
+    })
+    paramValues.value = {}
+    
+    // 更新UI选中状态（仅用于显示）
+    for (let i = 0; i < parts.length; i++) {
+      const current = parts[i]
+      const next = parts[i + 1]
+      
+      const param = installParams.value.find(p => p.name === current)
+      if (param) {
+        selectedParams.value[param.name] = true
+        
+        if (param.arg_name && next) {
+          const cleanValue = next.replace(/^["']|["']$/g, '')
+          paramValues.value[param.name] = cleanValue
+          i++
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('手动输入解析失败', error)
+  }
+}
+
+// 添加：处理手动输入框失去焦点的事件
+const handleManualInputBlur = () => {
+  // 当输入框失去焦点时，也同步更新UI状态
+  const value = generatedUpdateOptions.value
+  
+  if (value === '') {
+    // 清空所有选中状态
+    Object.keys(selectedParams.value).forEach(key => {
+      selectedParams.value[key] = false
+    })
+    paramValues.value = {}
+  } else if (value.trim()) {
+    updateUIFromManualInput(value)
+  }
 }
 
 const handleManualInput = (value: string) => {
