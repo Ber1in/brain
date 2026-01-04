@@ -1182,42 +1182,55 @@
               :class="{
                 'has-arg': param.arg_name,
                 'single-column': param.arg_name,
-                'grid-column': !param.arg_name
+                'grid-column': !param.arg_name,
+                'has-description': param.description
               }"
             >
-              <div class="param-checkbox" v-if="!param.arg_name">
-                <el-checkbox 
-                  v-model="selectedParams[param.name]"
-                  @change="handleParamChange(param)"
-                >
-                  <span class="param-name">{{ param.name }}</span>
-                </el-checkbox>
-              </div>
-              
-              <div v-else class="param-with-input">
-                <div class="param-header">
-                  <el-checkbox 
-                    v-model="selectedParams[param.name]"
-                    @change="handleParamChange(param)"
-                  >
-                    <span class="param-name">{{ param.name }}</span>
-                  </el-checkbox>
+              <!-- 包裹整个参数项在el-tooltip中 -->
+              <el-tooltip
+                :content="getParamDescription(param)"
+                placement="top"
+                :disabled="!param.description"
+                raw-content
+              >
+                <div class="param-content-wrapper">
+                  <!-- 无参数的项 -->
+                  <div class="param-checkbox" v-if="!param.arg_name">
+                    <el-checkbox 
+                      v-model="selectedParams[param.name]"
+                      @change="handleParamChange(param)"
+                    >
+                      <span class="param-name">{{ param.name }}</span>
+                    </el-checkbox>
+                  </div>
+                  
+                  <!-- 有参数的项 -->
+                  <div v-else class="param-with-input">
+                    <div class="param-header">
+                      <el-checkbox 
+                        v-model="selectedParams[param.name]"
+                        @change="handleParamChange(param)"
+                      >
+                        <span class="param-name">{{ param.name }}</span>
+                      </el-checkbox>
+                    </div>
+                    
+                    <div v-if="selectedParams[param.name]" class="param-input">
+                      <el-input
+                        v-model="paramValues[param.name]"
+                        :placeholder="`请输入 ${param.arg_name} 的值`"
+                        size="small"
+                        clearable
+                        @input="handleParamValueChange(param)"
+                      >
+                        <template #prepend>
+                          <span class="arg-label">{{ param.arg_name }}</span>
+                        </template>
+                      </el-input>
+                    </div>
+                  </div>
                 </div>
-                
-                <div v-if="selectedParams[param.name]" class="param-input">
-                  <el-input
-                    v-model="paramValues[param.name]"
-                    :placeholder="`请输入 ${param.arg_name} 的值`"
-                    size="small"
-                    clearable
-                    @input="handleParamValueChange(param)"
-                  >
-                    <template #prepend>
-                      <span class="arg-label">{{ param.arg_name }}</span>
-                    </template>
-                  </el-input>
-                </div>
-              </div>
+              </el-tooltip>
             </div>
           </div>
         </div>
@@ -1445,6 +1458,23 @@ const loadFilteringConditions = async () => {
   } finally {
     loadingConditions.value = false
   }
+}
+
+// 新增：格式化参数描述
+const getParamDescription = (param: InstallDetailResponse) => {
+  if (!param.description) return ''
+  
+  let description = param.description
+  
+  // 如果有参数名，显示在描述中
+  if (param.arg_name) {
+    description = `<div style="margin-bottom: 6px;"><strong>参数名:</strong> ${param.arg_name}</div>${description}`
+  }
+  
+  // 如果有name，显示name
+  description = `<div style="margin-bottom: 6px; font-weight: 600;">${param.name}</div>${description}`
+  
+  return description
 }
 
 // 保存过滤条件到后端
@@ -3855,6 +3885,32 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.param-content-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* tooltip样式 */
+:deep(.param-item .el-tooltip__trigger) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.el-tooltip__popper.is-dark) {
+  max-width: 300px;
+  text-align: left;
+  line-height: 1.6;
+  padding: 10px 12px;
+}
+
+/* 为有描述的参数添加悬停效果 */
+.param-item.has-description:hover {
+  border-color: #409eff;
+  background-color: #f8fafc;
+  cursor: help;
+}
+
 /* 在现有的样式最后添加 */
 .pagination-container {
   margin-top: 20px;

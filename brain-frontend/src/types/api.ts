@@ -471,4 +471,5 @@ export interface OperationResponse {
 export interface InstallDetailResponse {
   name?: string
   arg_name?: string
+  description?: string
 }
