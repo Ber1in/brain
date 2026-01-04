@@ -169,6 +169,9 @@ async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
             repo.git.checkout(f"tags/{tag}")
             LOG.info(f"Switched to tag {tag}")
 
+        repo.git.clean("-fdx")
+        LOG.info("Workspace cleaned (git clean -fdx)")
+
     except Exception as e:
         LOG.error(f"Switch failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to switch: {e}")

@@ -275,8 +275,7 @@ async def update_device(
 
     db.update(SERVER_COLLECTION, {"id": device_id}, server)
 
-    LOG.info(f"Device updated, server: {server['device']['ip']}, "
-             f"user: {user}, time: {server.get('time', 0)}")
+    LOG.info(f"Device updated, server: {server['device']['ip']}, user: {user}")
     return server
 
 

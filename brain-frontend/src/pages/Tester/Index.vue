@@ -1979,13 +1979,49 @@ const handleCheckoutConfirm = async () => {
       currentBranch.value = ''
     }
     
-    // 清空测试用例列表
+    // ============ 新增：清理与上个分支相关的状态 ============
+    // 1. 清空已扫描的目录列表
+    directories.value = []
+    
+    // 2. 清空选中的目录列表（用于目录选择对话框）
+    selectedDirectories.value = []
+    
+    // 3. 清空目录树数据
+    directoryTree.value = []
+    
+    // 4. 清空所有测试用例相关数据
     collectedCases.value = []
     leftTestCasesTree.value = []
     rightTestCases.value = []
     leftSelectedCases.value = []
     rightTestCasesTree.value = []
     showTestCasesTree.value = false
+    
+    // 5. 清空过滤文本
+    leftFilterText.value = ''
+    rightFilterText.value = ''
+    
+    // 6. 清空目录搜索文本
+    directorySearch.value = ''
+    
+    // 7. 可选：清空选中的集合（如果需要的话）
+    // selectedCombinationId.value = ''
+    
+    // 8. 如果目录选择对话框是打开的，关闭它
+    showDirectoryPicker.value = false
+    
+    // 9. 重置树组件的勾选状态（如果引用存在）
+    if (leftTreeRef.value) {
+      leftTreeRef.value.setCheckedKeys([])
+    }
+    if (rightTreeRef.value) {
+      rightTreeRef.value.setCheckedKeys([])
+    }
+    if (directoryTreeRef.value) {
+      directoryTreeRef.value.setCheckedKeys([])
+    }
+    
+    // ============ 清理结束 ============
     
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '更新代码版本失败')
