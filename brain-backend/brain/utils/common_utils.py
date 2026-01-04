@@ -892,12 +892,30 @@ async def fetch_mcr_install_detail(path):
 def parse_options_only(text: str):
     results = []
 
+    # -c | --config <file>         Load package list ...
     both_pattern = re.compile(
-        r"\s*(-\w)\s*\|\s*(--[a-zA-Z0-9\-]+)(?:\s*<([^>]+)>)?"
+        r"""
+        \s*
+        -\w
+        \s*\|\s*
+        (--[a-zA-Z0-9\-]+)        # group(1): long option
+        (?:\s*<([^>]+)>)?         # group(2): arg name (optional)
+        \s{2,}
+        (.+?)\s*$                 # group(3): description
+        """,
+        re.VERBOSE,
     )
 
+    # --fw-update-only             Update ...
     long_pattern = re.compile(
-        r"\s*(--[a-zA-Z0-9\-]+)(?:\s*<([^>]+)>)?"
+        r"""
+        \s*
+        (--[a-zA-Z0-9\-]+)        # group(1): long option
+        (?:\s*<([^>]+)>)?         # group(2): arg name (optional)
+        \s{2,}
+        (.+?)\s*$                 # group(3): description
+        """,
+        re.VERBOSE,
     )
 
     seen = set()
@@ -905,11 +923,12 @@ def parse_options_only(text: str):
     for line in text.splitlines():
         line = ANSI_ESCAPE.sub("", line)
 
-        # -c | --config <file>
+        # -x | --xxx
         m = both_pattern.search(line)
         if m:
-            name = m.group(2)
-            arg = m.group(3)
+            name = m.group(1)
+            arg = m.group(2)
+            desc = m.group(3).strip()
 
             if name == "--help":
                 continue
@@ -918,21 +937,24 @@ def parse_options_only(text: str):
                 results.append({
                     "name": name,
                     "arg_name": arg or None,
+                    "description": desc,
                 })
                 seen.add(name)
 
             continue
 
-        # --fw-update-only / --kernel-ver <version>
+        # --xxx
         m = long_pattern.match(line)
         if m and not line.strip().startswith("#"):
             name = m.group(1)
             arg = m.group(2)
+            desc = m.group(3).strip()
 
             if name not in seen:
                 results.append({
                     "name": name,
                     "arg_name": arg or None,
+                    "description": desc,
                 })
                 seen.add(name)
 

@@ -70,3 +70,4 @@ class OperationResponse(BaseModel):
 class InstallDetailResponse(BaseModel):
     name: str = None
     arg_name: str = None
+    description: str = None
