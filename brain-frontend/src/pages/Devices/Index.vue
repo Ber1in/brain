@@ -3707,14 +3707,17 @@ const handleNextStep = async () => {
 // 新增：处理参数变化
 const handleParamChange = (param: InstallDetailResponse) => {
   if (!selectedParams.value[param.name] && param.arg_name) {
-    // 如果取消勾选，清除对应的值
     delete paramValues.value[param.name]
   }
+  // 清除手动输入的内容，只使用参数配置
+  generatedUpdateOptions.value = ''
   updateGeneratedOptions()
 }
 
 // 新增：处理参数值变化
 const handleParamValueChange = (param: InstallDetailResponse) => {
+  // 清除手动输入的内容，只使用参数配置
+  generatedUpdateOptions.value = ''
   updateGeneratedOptions()
 }
 
@@ -3725,27 +3728,68 @@ const handleManualInput = (value: string) => {
   })
   paramValues.value = {}
   
-  if (!value.trim()) return
+  // 如果手动输入为空，直接更新
+  if (!value.trim()) {
+    generatedUpdateOptions.value = ''
+    return
+  }
   
-  // 解析手动输入的参数
-  const parts = value.trim().split(/\s+/)
-  for (let i = 0; i < parts.length; i++) {
-    const current = parts[i]
-    const next = parts[i + 1]
+  // 直接使用手动输入的值
+  generatedUpdateOptions.value = value.trim()
+  
+  // 尝试解析并更新选中状态（仅用于UI显示，不会影响最终结果）
+  try {
+    const parts = []
+    let currentPart = ''
+    let inQuotes = false
+    let quoteChar = ''
     
-    // 检查是否是已知参数
-    const param = installParams.value.find(p => p.name === current)
-    if (param) {
-      // 选中该参数
-      selectedParams.value[param.name] = true
+    for (let i = 0; i < value.length; i++) {
+      const char = value[i]
       
-      // 如果该参数需要值，且下一个词不是另一个参数
-      if (param.arg_name && next && !installParams.value.some(p => p.name === next)) {
-        paramValues.value[param.name] = next
-        i++ // 跳过下一个词，因为它已经被用作值
+      if ((char === '"' || char === "'") && (i === 0 || value[i-1] !== '\\')) {
+        if (!inQuotes) {
+          inQuotes = true
+          quoteChar = char
+          currentPart += char
+        } else if (char === quoteChar) {
+          inQuotes = false
+          currentPart += char
+        } else {
+          currentPart += char
+        }
+      } else if (char === ' ' && !inQuotes) {
+        if (currentPart.trim()) {
+          parts.push(currentPart.trim())
+        }
+        currentPart = ''
+      } else {
+        currentPart += char
       }
     }
-    // 如果不是已知参数，也允许存在（用户可能输入自定义参数）
+    
+    if (currentPart.trim()) {
+      parts.push(currentPart.trim())
+    }
+    
+    // 更新UI选中状态（仅用于显示）
+    for (let i = 0; i < parts.length; i++) {
+      const current = parts[i]
+      const next = parts[i + 1]
+      
+      const param = installParams.value.find(p => p.name === current)
+      if (param) {
+        selectedParams.value[param.name] = true
+        
+        if (param.arg_name && next) {
+          const cleanValue = next.replace(/^["']|["']$/g, '')
+          paramValues.value[param.name] = cleanValue
+          i++
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('手动输入解析失败，仅使用原始字符串', error)
   }
 }
 
@@ -3754,55 +3798,33 @@ let updateTimeout: NodeJS.Timeout | null = null
 
 // 新增：更新生成的选项字符串
 const updateGeneratedOptions = () => {
-  if (updateTimeout) {
-    clearTimeout(updateTimeout)
-  }
+  const selected: string[] = []
   
-  updateTimeout = setTimeout(() => {
-    const selected: string[] = []
-    
-    installParams.value.forEach(param => {
-      if (selectedParams.value[param.name]) {
-        if (param.arg_name && paramValues.value[param.name]) {
-          // 有参数且有值的格式：name value
-          selected.push(`${param.name} ${paramValues.value[param.name]}`)
-        } else if (param.arg_name && !paramValues.value[param.name]) {
-          // 有参数但没输入值的格式：name
-          selected.push(param.name)
-        } else if (!param.arg_name) {
-          // 无参数的格式：name
-          selected.push(param.name)
-        }
-      }
-    })
-    
-    // 检查是否有不在安装参数列表中的自定义参数
-    const currentOptions = generatedUpdateOptions.value.trim()
-    if (currentOptions) {
-      const currentParts = currentOptions.split(/\s+/)
-      for (let i = 0; i < currentParts.length; i++) {
-        const current = currentParts[i]
-        const next = currentParts[i + 1]
-        
-        // 如果不是已知参数
-        if (!installParams.value.some(p => p.name === current)) {
-          // 检查下一个词是否是值还是另一个参数
-          const isNextAValue = next && !installParams.value.some(p => p.name === next)
-          
-          if (isNextAValue) {
-            selected.push(`${current} ${next}`)
-            i++ // 跳过下一个词
-          } else {
-            selected.push(current)
-          }
-        }
+  // 只处理当前勾选的参数
+  installParams.value.forEach(param => {
+    if (selectedParams.value[param.name]) {
+      if (param.arg_name && paramValues.value[param.name]) {
+        // 有参数且有值的格式：name "value"
+        const value = paramValues.value[param.name].trim()
+        // 如果值本身没有引号，添加引号
+        const quotedValue = (value.startsWith('"') && value.endsWith('"')) || 
+                            (value.startsWith("'") && value.endsWith("'"))
+                          ? value 
+                          : `"${value}"`
+        selected.push(`${param.name} ${quotedValue}`)
+      } else if (param.arg_name && !paramValues.value[param.name]) {
+        // 有参数但没输入值的格式：name
+        selected.push(param.name)
+      } else if (!param.arg_name) {
+        // 无参数的格式：name
+        selected.push(param.name)
       }
     }
-    
-    // 去重并排序
-    const uniqueOptions = [...new Set(selected)]
-    generatedUpdateOptions.value = uniqueOptions.join(' ')
-  }, 300) // 300ms防抖
+  })
+  
+  // 不处理手动输入的部分，避免重复
+  // 只使用当前勾选的状态来生成新的字符串
+  generatedUpdateOptions.value = selected.join(' ')
 }
 
 // 新增：返回文件选择
