@@ -2162,9 +2162,30 @@ const loadDirectory = async (path: string) => {
       if (a.name === '..') return -1
       if (b.name === '..') return 1
       
-      if (a.type !== b.type) {
-        return a.type === 'directory' ? -1 : 1
+      // 获取项目的优先级
+      const getPriority = (item: any): number => {
+        if (item.type === 'directory') {
+          // 目录的优先级
+          if (item.name.startsWith('GA-')) return 2
+          if (item.name.startsWith('PATCH-')) return 3
+          return 4 // 其他目录
+        } else {
+          // 文件的优先级
+          // 使用你的 isMcrFile 函数判断是否为MCR包文件
+          if (isMcrFile(item.name)) return 1
+          return 5 // 其他文件
+        }
       }
+      
+      const priorityA = getPriority(a)
+      const priorityB = getPriority(b)
+      
+      // 先按优先级排序
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB
+      }
+      
+      // 相同优先级按名称排序
       return a.name.localeCompare(b.name)
     })
   } catch (error: any) {
