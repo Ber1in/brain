@@ -1924,15 +1924,15 @@ onMounted(() => {
 }
 
 .cpu-info-card {
-  flex: 1.2;
+  flex: 1.0;
   min-width: 0;
-  max-width: calc(20% - 10px); /* 1.2/6 = 20% */
+  max-width: calc(16.67%); /* 1.0/6 = 16.67% */
 }
 
 .nic-card {
-  flex: 3.8;
+  flex: 4;
   min-width: 0;
-  max-width: calc(63.33% + 10px); /* 3.8/6 ≈ 63.33% */
+  max-width: calc(66.66%); /* 4/6 ≈ 66.66% */
 }
 
 .iface-name {
