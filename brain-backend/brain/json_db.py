@@ -431,6 +431,7 @@ class SQLiteDocumentDB:
                     params.append(self._serialize_field(v))
                 elif k.startswith("json_extract("):
                     conds.append(f"{k} = ?")
+                    params.append(self._serialize_field(v))
                 else:
                     if " " in k:
                         col, op = k.split(" ", 1)
