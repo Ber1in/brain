@@ -615,48 +615,55 @@ async def get_boot_entries(host_ip, user, pwd):
 
 
 async def ipmi_power_action(bmcip: str, action: str, host: str, user: str, pwd: str):
-    """Execute IPMI power action via ipmitool command"""
     LOG.info(f"Executing IPMI {action} on BMC {bmcip}")
 
     if action not in ("cycle", "reset"):
         raise HTTPException(status_code=400, detail=f"Unsupported IPMI action: {action}")
 
-    cmd = ["ipmitool", "-I", "lanplus", "-H", bmcip, "-U", BMC_USER, "-P", BMC_PASS,
-           "chassis", "power", action]
+    local_error = None
 
     try:
-        used_fallback = False
+        # lanplus
+        cmd = ["ipmitool", "-I", "lanplus", "-H", bmcip,
+               "-U", BMC_USER, "-P", BMC_PASS,
+               "chassis", "power", action]
+        LOG.info(f"[LOCAL] Trying lanplus for {bmcip}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
-        try:
+        if result.returncode != 0:
+            LOG.error(f"[LOCAL] lanplus failed on {bmcip}: {result.stderr.strip()}")
+
+            # lan fallback
+            cmd = ["ipmitool", "-I", "lan", "-H", bmcip,
+                   "-U", BMC_USER, "-P", BMC_PASS,
+                   "chassis", "power", action]
+            LOG.info(f"[LOCAL] Retrying with lan for {bmcip}")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            failed = result.returncode != 0
-            if failed:
-                LOG.error(f"IPMI {action} failed on BMC {bmcip} "
-                          f"(local ipmitool): {result.stderr.strip()}")
-        except subprocess.TimeoutExpired as e:
-            LOG.error(f"IPMI {action} timeout on BMC {bmcip} "
-                      f"(local ipmitool): {e}")
-            failed = True
 
-        if failed:
-            try:
-                await ssh_execute_async(host, f"ipmitool power {action}", user, pwd)
-                used_fallback = True
-            except Exception:
-                raise HTTPException(status_code=500,
-                                    detail=f"IPMI {action} failed")
-
-        if used_fallback:
-            LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip} "
-                     f"via SSH fallback")
+        if result.returncode == 0:
+            LOG.info(f"[LOCAL] IPMI {action} succeeded on {bmcip}")
+            return
         else:
-            LOG.info(f"Successfully executed IPMI {action} on BMC {bmcip} "
-                     f"via local ipmitool")
+            local_error = result.stderr.strip()
 
     except Exception as e:
-        LOG.error(f"IPMI {action} execution error on BMC {bmcip}: {e}")
-        raise HTTPException(status_code=500,
-                            detail=f"IPMI {action} execution error: {e}")
+        local_error = str(e)
+        LOG.error(f"[LOCAL] IPMI {action} crashed on {bmcip}: {local_error}")
+
+    try:
+        LOG.info(f"[SSH] Trying SSH fallback for IPMI {action} on {host}")
+        await ssh_execute_async(host, f"ipmitool power {action}", user, pwd)
+        LOG.info(f"[SSH] IPMI {action} succeeded on {host}")
+        return
+
+    except Exception as e:
+        ssh_error = str(e)
+        LOG.error(f"[SSH] IPMI {action} failed on {host}: {ssh_error}")
+        raise HTTPException(
+            status_code=500, detail=(
+                f"IPMI {action} failed.\n"
+                f"- local(BMC {bmcip}) error: {local_error}\n"
+                f"- ssh({host}) error: {ssh_error}"))
 
 
 async def collect_device_info(ip, user, password):
