@@ -8,7 +8,7 @@
             <span class="header-title">操作审计</span>
           </div>
           <div class="header-right">
-            <span class="record-count" v-if="total > 0">共 {{ total }} 条记录</span>
+            <span class="record-count" v-if="total > 0">共 {{ filteredData.length }} 条记录</span>
           </div>
         </div>
       </template>
@@ -25,7 +25,6 @@
               filterable
               style="width: 180px"
               class="user-select"
-              @change="handleUserChange"
             >
               <el-option
                 v-for="user in userList"
@@ -42,7 +41,6 @@
               v-model="selectedTimeRange"
               placeholder="选择时间范围"
               style="width: 150px"
-              @change="handleTimeRangeChange"
               class="time-range-select"
             >
               <el-option label="今天" value="today" />
@@ -63,9 +61,23 @@
               end-placeholder="结束日期"
               value-format="YYYY-MM-DD"
               format="YYYY-MM-DD"
-              @change="handleCustomDateChange"
               class="custom-date-picker"
             />
+          </el-form-item>
+
+          <!-- 搜索框 -->
+          <el-form-item class="search-item">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索"
+              clearable
+              style="width: 300px"
+              class="search-input"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
           </el-form-item>
         </el-form>
       </div>
@@ -151,13 +163,13 @@
       </div>
 
       <!-- 分页 -->
-      <div class="pagination-section" v-if="total > 0">
+      <div class="pagination-section" v-if="filteredData.length > 0">
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
           :page-sizes="[10, 15, 30, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
+          :total="filteredData.length"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
           class="audit-pagination"
@@ -165,7 +177,7 @@
       </div>
 
       <!-- 空状态 -->
-      <div class="empty-state" v-if="!loading && auditData.length === 0">
+      <div class="empty-state" v-if="!loading && filteredData.length === 0">
         <el-empty description="暂无操作记录" :image-size="100" />
       </div>
     </el-card>
@@ -174,7 +186,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Document } from '@element-plus/icons-vue'
+import { Document, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { operationApi } from '@/api/common'
 import { deviceApi } from '@/api/device'
@@ -205,12 +217,17 @@ const filterForm = ref<OperationFilterRequest>({
 const selectedTimeRange = ref('3days')
 const customDateRange = ref<[string, string]>(['', ''])
 
+// 搜索关键词
+const searchKeyword = ref('')
+
+// 防抖定时器
+let searchTimer: number | null = null
+
 // 表格数据
 const auditData = ref<OperationResponse[]>([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(15)
-const total = ref(0)
 
 // 用户列表（从数据中提取）
 const userList = ref<string[]>([])
@@ -242,11 +259,11 @@ const loadServers = async () => {
   }
 }
 
-// 在初始化时加载服务器列表
+// 初始化
 onMounted(async () => {
   setDateRangeByType('3days')
   await Promise.all([
-    handleSearch(),
+    loadData(),
     loadServers(),
     loadMv200List()
   ])
@@ -259,7 +276,202 @@ watch(customDateRange, (newVal) => {
   }
 }, { deep: true })
 
-// ========== 新增：资源ID提取函数 ==========
+// 监听用户筛选变化
+watch(() => filterForm.value.user, () => {
+  loadData()
+})
+
+// 监听时间范围变化
+watch(selectedTimeRange, (newVal) => {
+  if (newVal !== 'custom') {
+    setDateRangeByType(newVal)
+    loadData()
+  }
+})
+
+// 监听自定义日期范围变化
+watch(customDateRange, (newVal) => {
+  if (newVal && newVal[0] && newVal[1]) {
+    handleCustomDateChange(newVal)
+    loadData()
+  }
+}, { deep: true })
+
+// ========== 防抖搜索处理 ==========
+watch(searchKeyword, (newVal) => {
+  // 清除之前的定时器
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  
+  // 设置新的定时器，延迟300毫秒执行
+  searchTimer = setTimeout(() => {
+    // 搜索关键词变化时，重置到第一页
+    currentPage.value = 1
+  }, 300)
+})
+
+// ========== 过滤数据函数 ==========
+const filteredData = computed(() => {
+  if (!searchKeyword.value.trim()) {
+    return auditData.value
+  }
+
+  const keyword = searchKeyword.value.toLowerCase().trim()
+  
+  return auditData.value.filter(item => {
+    // 搜索操作文本
+    const operationText = getOperationText(item).toLowerCase()
+    if (operationText.includes(keyword)) {
+      return true
+    }
+    
+    // 搜索状态码
+    if (item.status && item.status.toString().includes(keyword)) {
+      return true
+    }
+    
+    // 搜索请求ID
+    if (item.request_id && item.request_id.toLowerCase().includes(keyword)) {
+      return true
+    }
+    
+    // 搜索用户名
+    if (item.user && item.user.toLowerCase().includes(keyword)) {
+      return true
+    }
+    
+    // 搜索资源名称
+    const resourceName = getServerName(item)
+    if (resourceName && resourceName.toLowerCase().includes(keyword)) {
+      return true
+    }
+    
+    return false
+  })
+})
+
+// ========== 当前显示的数据 ==========
+const displayedData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredData.value.slice(start, end)
+})
+
+// ========== 数据总数 ==========
+const total = computed(() => {
+  return filteredData.value.length
+})
+
+// ========== 加载数据函数 ==========
+const loadData = async () => {
+  try {
+    loading.value = true
+    
+    // 准备查询参数
+    const params: OperationFilterRequest = {}
+    
+    if (filterForm.value.user) {
+      params.user = filterForm.value.user
+    }
+    
+    if (filterForm.value.start) {
+      params.start = filterForm.value.start
+    }
+    
+    if (filterForm.value.end) {
+      params.end = filterForm.value.end
+    }
+    
+    // 调用API
+    const response = await operationApi.getOperationalAudit(params)
+    
+    // 更新数据
+    auditData.value = response
+    
+    // 提取用户列表（去重）
+    const users = new Set<string>()
+    response.forEach(item => {
+      if (item.user) {
+        users.add(item.user)
+      }
+    })
+    userList.value = Array.from(users).sort()
+    
+    // 重置到第一页
+    currentPage.value = 1
+    
+  } catch (error: any) {
+    ElMessage.error(`查询失败: ${error.response?.data?.detail || error.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// ========== 其他函数保持不变 ==========
+
+// 根据类型设置日期范围
+const setDateRangeByType = (type: string) => {
+  const now = new Date()
+  let startDate = new Date()
+  
+  switch (type) {
+    case 'today':
+      // 今天 00:00:00 - 23:59:59
+      startDate.setHours(0, 0, 0, 0)
+      const endDate = new Date(startDate)
+      endDate.setDate(endDate.getDate() + 1)
+      endDate.setSeconds(endDate.getSeconds() - 1)
+      
+      filterForm.value.start = formatDateTimeString(startDate)
+      filterForm.value.end = formatDateTimeString(endDate)
+      break
+      
+    case '3days':
+      startDate.setDate(now.getDate() - 3)
+      startDate.setHours(0, 0, 0, 0)
+      filterForm.value.start = formatDateTimeString(startDate)
+      filterForm.value.end = formatDateTimeString(now)
+      break
+      
+    case '7days':
+      startDate.setDate(now.getDate() - 7)
+      startDate.setHours(0, 0, 0, 0)
+      filterForm.value.start = formatDateTimeString(startDate)
+      filterForm.value.end = formatDateTimeString(now)
+      break
+      
+    case '30days':
+      startDate.setDate(now.getDate() - 30)
+      startDate.setHours(0, 0, 0, 0)
+      filterForm.value.start = formatDateTimeString(startDate)
+      filterForm.value.end = formatDateTimeString(now)
+      break
+  }
+}
+
+// 格式化日期时间为 YYYY-MM-DD HH:mm:ss
+const formatDateTimeString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+// 处理自定义日期选择变化
+const handleCustomDateChange = (dates: [string, string]) => {
+  if (dates && dates.length === 2 && dates[0] && dates[1]) {
+    const [start, end] = dates
+    filterForm.value.start = start ? `${start} 00:00:00` : ''
+    filterForm.value.end = end ? `${end} 23:59:59` : ''
+  }
+}
+
+// 提取资源ID
 const extractResourceId = (path: string, type: ResourceType): string | null => {
   const patterns: Record<ResourceType, RegExp[]> = {
     [ResourceType.SERVER]: [/\/servers\/([^\/]+)/],
@@ -280,7 +492,7 @@ const extractResourceId = (path: string, type: ResourceType): string | null => {
   return null
 }
 
-// ========== 新增：判断路径对应的资源类型 ==========
+// 判断路径对应的资源类型
 const getResourceType = (path: string): ResourceType | null => {
   if (path.includes('/servers/')) {
     return ResourceType.SERVER
@@ -303,7 +515,7 @@ const getResourceType = (path: string): ResourceType | null => {
   return null
 }
 
-// ========== 更新：getOperationText 函数 ==========
+// 获取操作文本
 const getOperationText = (audit: OperationResponse): string => {
   const { path, method } = audit
   
@@ -387,7 +599,7 @@ const getOperationText = (audit: OperationResponse): string => {
   return `${method} ${shortPath}`
 }
 
-// ========== 更新：getServerName 函数 ==========
+// 获取资源名称
 const getServerName = (audit: OperationResponse): string | null => {
   const { path } = audit
   const resourceType = getResourceType(path)
@@ -421,7 +633,7 @@ const getServerName = (audit: OperationResponse): string | null => {
   }
 }
 
-// ========== 更新：getServerNameClass 函数 ==========
+// 获取资源名称样式类
 const getServerNameClass = (audit: OperationResponse): string => {
   const { path } = audit
   const resourceType = getResourceType(path)
@@ -449,8 +661,6 @@ const getServerNameClass = (audit: OperationResponse): string => {
       return ''
   }
 }
-
-// ========== 原有辅助函数保持不变 ==========
 
 // 根据路径查找对应的服务器信息
 const findServerByPath = (path: string): ServerDetailResponse | null => {
@@ -568,136 +778,6 @@ const getStatusTooltip = (status: string): string => {
   return '状态码'
 }
 
-// 处理用户选择变化
-const handleUserChange = () => {
-  handleSearch()
-}
-
-// 处理时间范围选择变化
-const handleTimeRangeChange = (value: string) => {
-  if (value !== 'custom') {
-    setDateRangeByType(value)
-    // 自动触发搜索
-    handleSearch()
-  } else {
-    // 选择自定义时，清空日期
-    filterForm.value.start = ''
-    filterForm.value.end = ''
-    customDateRange.value = ['', '']
-  }
-}
-
-// 根据类型设置日期范围
-const setDateRangeByType = (type: string) => {
-  const now = new Date()
-  let startDate = new Date()
-  
-  switch (type) {
-    case 'today':
-      // 今天 00:00:00 - 23:59:59
-      startDate.setHours(0, 0, 0, 0)
-      const endDate = new Date(startDate)
-      endDate.setDate(endDate.getDate() + 1)
-      endDate.setSeconds(endDate.getSeconds() - 1)
-      
-      filterForm.value.start = formatDateTimeString(startDate)
-      filterForm.value.end = formatDateTimeString(endDate)
-      break
-      
-    case '3days':
-      startDate.setDate(now.getDate() - 3)
-      startDate.setHours(0, 0, 0, 0)
-      filterForm.value.start = formatDateTimeString(startDate)
-      filterForm.value.end = formatDateTimeString(now)
-      break
-      
-    case '7days':
-      startDate.setDate(now.getDate() - 7)
-      startDate.setHours(0, 0, 0, 0)
-      filterForm.value.start = formatDateTimeString(startDate)
-      filterForm.value.end = formatDateTimeString(now)
-      break
-      
-    case '30days':
-      startDate.setDate(now.getDate() - 30)
-      startDate.setHours(0, 0, 0, 0)
-      filterForm.value.start = formatDateTimeString(startDate)
-      filterForm.value.end = formatDateTimeString(now)
-      break
-  }
-}
-
-// 格式化日期时间为 YYYY-MM-DD HH:mm:ss
-const formatDateTimeString = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
-  
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
-
-// 处理自定义日期选择变化
-const handleCustomDateChange = (dates: [string, string]) => {
-  if (dates && dates.length === 2 && dates[0] && dates[1]) {
-    const [start, end] = dates
-    filterForm.value.start = start ? `${start} 00:00:00` : ''
-    filterForm.value.end = end ? `${end} 23:59:59` : ''
-    // 自动触发搜索
-    handleSearch()
-  }
-}
-
-// 搜索操作
-const handleSearch = async () => {
-  try {
-    loading.value = true
-    
-    // 准备查询参数
-    const params: OperationFilterRequest = {}
-    
-    if (filterForm.value.user) {
-      params.user = filterForm.value.user
-    }
-    
-    if (filterForm.value.start) {
-      params.start = filterForm.value.start
-    }
-    
-    if (filterForm.value.end) {
-      params.end = filterForm.value.end
-    }
-    
-    // 调用API
-    const response = await operationApi.getOperationalAudit(params)
-    
-    // 更新数据
-    auditData.value = response
-    
-    // 提取用户列表（去重）
-    const users = new Set<string>()
-    response.forEach(item => {
-      if (item.user) {
-        users.add(item.user)
-      }
-    })
-    userList.value = Array.from(users).sort()
-    
-    // 更新总数
-    total.value = response.length
-    
-    // 重置到第一页
-    currentPage.value = 1
-    
-  } catch (error: any) {
-    ElMessage.error(`查询失败: ${error.response?.data?.detail || error.message}`)
-  } finally {
-    loading.value = false
-  }
-}
-
 // 分页大小变化
 const handleSizeChange = (size: number) => {
   pageSize.value = size
@@ -708,13 +788,6 @@ const handleSizeChange = (size: number) => {
 const handleCurrentChange = (page: number) => {
   currentPage.value = page
 }
-
-// 计算当前页显示的数据
-const displayedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return auditData.value.slice(start, end)
-})
 </script>
 
 <style scoped>
@@ -812,6 +885,10 @@ const displayedData = computed(() => {
   --el-table-border-color: #e5e7eb;
   --el-table-header-bg-color: #f8fafc;
   --el-table-row-hover-bg-color: #f9fafb;
+}
+
+.search-item {
+  margin-left: auto;
 }
 
 .audit-table :deep(.el-table__header-wrapper th) {
