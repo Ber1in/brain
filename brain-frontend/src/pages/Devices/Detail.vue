@@ -422,7 +422,7 @@
             </el-table-column>
 
             <!-- IPv6列 -->
-            <el-table-column label="IPv6地址" width="195">
+            <el-table-column label="IPv6地址" width="210">
               <template #default="{ row }">
                 <div v-if="row.nic_info && row.nic_info.length > 0">
                   <div 
