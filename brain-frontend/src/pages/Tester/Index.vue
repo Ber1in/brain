@@ -741,7 +741,8 @@
               <div class="directory-node" :class="{ 'disabled-node': data.disabled }">
                 <el-icon class="directory-icon">
                   <Folder v-if="data.type === 'directory'" />
-                  <Document v-else />
+                  <Document v-else-if="data.type === 'file'" />
+                  <QuestionFilled v-else />
                 </el-icon>
                 <span class="directory-name">{{ node.label }}</span>
                 <el-tag v-if="data.disabled" size="small" type="info" class="disabled-tag">
@@ -1426,7 +1427,8 @@ const refreshDirectoryTree = async () => {
 
 // 处理目录点击
 const handleDirectoryClick = (data: any) => {
-  if (data.type === 'directory' && directoryTreeRef.value && !data.disabled) {
+  // 允许点击目录和文件（只要不禁用）
+  if ((data.type === 'directory' || data.type === 'file') && directoryTreeRef.value && !data.disabled) {
     const node = directoryTreeRef.value.getNode(data.path)
     if (node) {
       const isChecked = directoryTreeRef.value.getCheckedNodes().includes(data)
@@ -1435,13 +1437,15 @@ const handleDirectoryClick = (data: any) => {
   }
 }
 
+
 // 处理目录勾选变化
 const handleDirectoryCheckChange = (data: any, checked: boolean) => {
-  if (data.type === 'directory') {
+  // 修改为同时处理目录和文件
+  if (data.type === 'directory' || data.type === 'file') {
     if (checked) {
-      handleParentDirectorySelect(data)
+      handleParentSelection(data)
     } else {
-      handleParentDirectoryDeselect(data)
+      handleParentDeselection(data)
     }
     
     // 更新目录树状态
@@ -1449,28 +1453,34 @@ const handleDirectoryCheckChange = (data: any, checked: boolean) => {
   }
 }
 
-// 处理父目录选择
-const handleParentDirectorySelect = (selectedDirectory: any) => {
-  // 1. 获取所有子目录路径
-  const childPaths = getAllChildPaths(selectedDirectory)
-  
-  // 2. 移除所有子目录（避免重复扫描）
-  removeChildDirectories(childPaths)
-  
-  // 3. 添加父目录到选中列表
-  if (!selectedDirectories.value.includes(selectedDirectory.path)) {
-    selectedDirectories.value.push(selectedDirectory.path)
-  }
-  
-  if (childPaths.length > 0) {
-    ElMessage.info(`已选择父目录 ${selectedDirectory.path}，自动移除了 ${childPaths.length} 个子目录`)
+const handleParentSelection = (selectedNode: any) => {
+  if (selectedNode.type === 'directory') {
+    // 对于目录：获取所有子节点路径（包括文件和子目录）
+    const childPaths = getAllChildPaths(selectedNode)
+    
+    // 移除所有子节点（避免重复扫描）
+    removeChildNodes(childPaths)
+    
+    // 添加父目录到选中列表
+    if (!selectedDirectories.value.includes(selectedNode.path)) {
+      selectedDirectories.value.push(selectedNode.path)
+    }
+    
+    if (childPaths.length > 0) {
+      ElMessage.info(`已选择目录 ${selectedNode.path}，自动移除了 ${childPaths.length} 个子节点`)
+    }
+  } else if (selectedNode.type === 'file') {
+    // 对于文件：直接添加到选中列表
+    if (!selectedDirectories.value.includes(selectedNode.path)) {
+      selectedDirectories.value.push(selectedNode.path)
+    }
   }
 }
 
 // 处理父目录取消选择
-const handleParentDirectoryDeselect = (deselectedDirectory: any) => {
+const handleParentDeselection = (deselectedNode: any) => {
   // 从选中列表中移除
-  const index = selectedDirectories.value.indexOf(deselectedDirectory.path)
+  const index = selectedDirectories.value.indexOf(deselectedNode.path)
   if (index > -1) {
     selectedDirectories.value.splice(index, 1)
   }
@@ -1483,7 +1493,8 @@ const getAllChildPaths = (node: any): string[] => {
   const collectPaths = (currentNode: any) => {
     if (currentNode.children && currentNode.children.length > 0) {
       currentNode.children.forEach((child: any) => {
-        if (child.type === 'directory') {
+        // 同时收集目录和文件
+        if (child.type === 'directory' || child.type === 'file') {
           paths.push(child.path)
           collectPaths(child)
         }
@@ -1496,7 +1507,7 @@ const getAllChildPaths = (node: any): string[] => {
 }
 
 // 移除子目录
-const removeChildDirectories = (childPaths: string[]) => {
+const removeChildNodes = (childPaths: string[]) => {
   let removedCount = 0
   
   childPaths.forEach(childPath => {
@@ -1520,10 +1531,11 @@ const removeChildDirectories = (childPaths: string[]) => {
 
 // 更新目录树状态
 const updateDirectoryTreeState = () => {
-  // 首先重置所有目录的禁用状态
+  // 首先重置所有节点的禁用状态
   const resetDisabledState = (nodes: any[]) => {
     nodes.forEach(node => {
-      if (node.type === 'directory') {
+      // 同时处理目录和文件
+      if (node.type === 'directory' || node.type === 'file') {
         node.disabled = false
         if (node.children) {
           resetDisabledState(node.children)
@@ -1534,12 +1546,12 @@ const updateDirectoryTreeState = () => {
   
   resetDisabledState(directoryTree.value)
   
-  // 为每个选中的父目录禁用其子目录
+  // 为每个选中的父目录禁用其子节点
   selectedDirectories.value.forEach(selectedPath => {
     const findAndDisableChildren = (nodes: any[]) => {
       nodes.forEach(node => {
-        if (node.path === selectedPath) {
-          // 禁用所有子目录
+        if (node.path === selectedPath && node.type === 'directory') {
+          // 如果是目录，禁用所有子节点
           disableChildren(node)
         } else if (node.children) {
           findAndDisableChildren(node.children)
@@ -1554,10 +1566,13 @@ const updateDirectoryTreeState = () => {
 const disableChildren = (node: any) => {
   if (node.children && node.children.length > 0) {
     node.children.forEach((child: any) => {
-      if (child.type === 'directory') {
+      // 同时禁用子目录和文件
+      if (child.type === 'directory' || child.type === 'file') {
         child.disabled = true
-        // 递归禁用孙子目录
-        disableChildren(child)
+        // 递归禁用孙子节点（如果是目录）
+        if (child.type === 'directory') {
+          disableChildren(child)
+        }
       }
     })
   }

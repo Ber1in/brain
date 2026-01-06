@@ -548,8 +548,11 @@ async def copy_custom_combination(combination_id: str,
 
 @router.get("/yuntester/directory-tree")
 async def get_directory_tree(user=Depends(authenticate_user)):
-    """Get the directory tree of the test code repository (recursive scan, directory-only).
-    Node 'name' contains only the current directory name.
+    """
+    Get the directory tree of the test code repository (recursive scan, directories
+        + test_*.py files).
+
+    Node 'name' contains only the current directory or file name.
     Returned 'path' strips the user repo prefix.
     """
 
@@ -566,27 +569,28 @@ async def get_directory_tree(user=Depends(authenticate_user)):
         return p[prefix_len:] if p.startswith(str(base_path)) else p
 
     def build_node(p: Path) -> Dict:
-        LOG.debug(f"Scanning directory: {p}")
+        LOG.debug(f"Scanning: {p}")
 
         node = {
             "name": p.name,
             "path": strip_prefix(p),
-            "type": "directory",
-            "children": []
+            "type": "directory" if p.is_dir() else "file",
+            "children": [] if p.is_dir() else None
         }
-        try:
-            for item in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name)):
-                if not item.is_dir():
-                    continue
 
-                if item.name in IGNORE_DIRS:
-                    LOG.debug(f"Skipping ignored directory: {item}")
-                    continue
+        if p.is_dir():
+            try:
+                for item in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name)):
+                    if item.is_dir() and item.name in IGNORE_DIRS:
+                        LOG.debug(f"Skipping ignored directory: {item}")
+                        continue
 
-                node["children"].append(build_node(item))
+                    if (item.is_dir() or (item.is_file() and item.suffix == ".py"
+                                          and item.name.startswith("test_"))):
+                        node["children"].append(build_node(item))
 
-        except PermissionError:
-            LOG.warning(f"Permission denied while scanning: {p}")
+            except PermissionError:
+                LOG.warning(f"Permission denied while scanning: {p}")
 
         return node
 
@@ -597,5 +601,4 @@ async def get_directory_tree(user=Depends(authenticate_user)):
         LOG.warning(f"Products directory does not exist for user={user}: {products_path}")
 
     LOG.info(f"Directory tree built for user={user}, total root nodes={len(tree)}")
-
     return {"tree": tree}
