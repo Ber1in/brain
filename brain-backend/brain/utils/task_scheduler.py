@@ -409,7 +409,7 @@ async def send_feishu_group_message(server_info, status: ServerStatus):
                 
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     try:
-                        async with session.post(webhook, json=payload)
+                        async with session.post(webhook, json=payload):
                             LOG.info(f"Feishu message sent (fire-and-forget), webhook: {webhook}")
                             return True
                     except asyncio.TimeoutError:
