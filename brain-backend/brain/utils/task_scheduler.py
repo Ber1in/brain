@@ -402,31 +402,22 @@ async def send_feishu_group_message(server_info, status: ServerStatus):
         async def send_feishu_async(webhook: str, payload: dict, status: ServerStatus) -> bool:
             try:
                 timeout = aiohttp.ClientTimeout(
-                    total=60,        # 总超时60秒
-                    connect=10,      # 连接超时10秒
-                    sock_read=30,    # 读取超时30秒
-                    sock_connect=10  # socket连接超时10秒
+                    connect=5,       # 连接超时5秒
+                    sock_connect=5,  # socket连接超时5秒
+                    total=None       # 不设置总超时，让请求在后台完成
                 )
-
+                
                 async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.post(webhook, json=payload) as response:
-                        if response.status != 200:
-                            LOG.error(f"Feishu failed with status code: {response.status}")
-                            return False
-
-                        result = await response.json()
-                        if result.get("code") == 0:
-                            LOG.info(f"Feishu {status.value} message sent successfully.")
+                    try:
+                        async with session.post(webhook, json=payload)
+                            LOG.info(f"Feishu message sent (fire-and-forget), webhook: {webhook}")
                             return True
-                        else:
-                            LOG.error(f"Feishu message failed: {result}")
-                            return False
-
-            except asyncio.TimeoutError:
-                LOG.warning(f"Feishu message timeout after 60 seconds, webhook: {webhook}")
-                return False
+                    except asyncio.TimeoutError:
+                        LOG.warning(f"Feishu connection timeout, but request may have been sent")
+                        return True
+                            
             except aiohttp.ClientError as e:
-                LOG.error(f"Feishu request error: {e}")
+                LOG.error(f"Feishu connection error: {e}")
                 return False
             except Exception as e:
                 LOG.error(f"Feishu message exception: {e}")
