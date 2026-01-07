@@ -2,9 +2,8 @@
 # All rights reserved.
 
 
+import aiohttp
 from enum import Enum
-import json
-import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
@@ -400,24 +399,37 @@ async def send_feishu_group_message(server_info, status: ServerStatus):
             }
         }
 
-        def send_feishu(webhook: str, payload: dict, status: ServerStatus) -> bool:
+        async def send_feishu_async(webhook: str, payload: dict, status: ServerStatus) -> bool:
             try:
-                headers = {'Content-Type': 'application/json'}
-                resp = requests.post(webhook, headers=headers, data=json.dumps(payload), timeout=25)
+                timeout = aiohttp.ClientTimeout(
+                    total=60,        # 总超时60秒
+                    connect=10,      # 连接超时10秒
+                    sock_read=30,    # 读取超时30秒
+                    sock_connect=10  # socket连接超时10秒
+                )
 
-                if resp.status_code != 200:
-                    LOG.error(f"Feishu failed with status code: {resp.status_code}")
-                    return False
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(webhook, json=payload) as response:
+                        if response.status != 200:
+                            LOG.error(f"Feishu failed with status code: {response.status}")
+                            return False
 
-                result = resp.json()
-                if result.get("code") == 0:
-                    LOG.info(f"Feishu {status.value} message sent successfully.")
-                    return True
-                else:
-                    LOG.error(f"Feishu message failed: {result}")
-                    return False
-            except Exception as e:
+                        result = await response.json()
+                        if result.get("code") == 0:
+                            LOG.info(f"Feishu {status.value} message sent successfully.")
+                            return True
+                        else:
+                            LOG.error(f"Feishu message failed: {result}")
+                            return False
+
+            except asyncio.TimeoutError:
+                LOG.warning(f"Feishu message timeout after 60 seconds, webhook: {webhook}")
+                return False
+            except aiohttp.ClientError as e:
                 LOG.error(f"Feishu request error: {e}")
+                return False
+            except Exception as e:
+                LOG.error(f"Feishu message exception: {e}")
                 return False
 
         # Send Feishu request
@@ -431,9 +443,32 @@ async def send_feishu_group_message(server_info, status: ServerStatus):
         if not matched_webhooks:
             matched_webhooks = [settings.default_webhook]
 
+        tasks = []
         for webhook in matched_webhooks:
-            asyncio.get_running_loop().run_in_executor(
-                None, send_feishu, webhook, message_content, status)
+            task = asyncio.create_task(
+                send_feishu_async(webhook, message_content, status)
+            )
+            tasks.append(task)
+
+        try:
+            done, pending = await asyncio.wait(tasks, timeout=65)
+
+            for task in done:
+                try:
+                    result = task.result()
+                    if not result:
+                        LOG.warning("Feishu message failed for one webhook")
+                except Exception as e:
+                    LOG.error(f"Task exception: {e}")
+
+            for task in pending:
+                task.cancel()
+
+        except asyncio.TimeoutError:
+            LOG.warning("Some Feishu messages timed out during gathering")
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
 
     except Exception as e:
         LOG.error(f"Feishu message exception: {e}")
