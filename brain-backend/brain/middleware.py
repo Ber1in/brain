@@ -15,7 +15,7 @@ LOG = logging.getLogger(__name__)
 OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
 NON_AUDITED_OPERATIONS_PREFIX = (
     "/login", "/api/filtering_conditions", "/api/yuntester", "/api/tag")
-NON_AUDITED_OPERATIONS_SUFFIX = ("follow", "occupy")
+NON_AUDITED_OPERATIONS_SUFFIX = ("follow", "occupy", "release")
 
 
 request_id_var = ContextVar("request_id", default=None)
