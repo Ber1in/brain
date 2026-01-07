@@ -8,6 +8,7 @@ import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
+from email.utils import formataddr
 import smtplib
 import asyncio
 from datetime import datetime
@@ -638,8 +639,8 @@ async def create_server_reminder_email(server_info, current_recipient, status: S
 
     # Build MIME message
     msg = MIMEMultipart('alternative')
-    msg['From'] = Header(settings.smtp.user)
-    msg['To'] = Header(current_recipient)
+    msg['From'] = formataddr((str(Header("云服务器管理平台", 'utf-8')), settings.smtp.user))
+    msg['To'] = Header(f'{current_recipient}@yunsilicon.com')
     msg['Subject'] = Header(subject)
 
     # Attach HTML content
