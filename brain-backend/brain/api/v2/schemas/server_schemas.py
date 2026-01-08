@@ -106,3 +106,9 @@ class LockRequest(BaseModel):
 
 class ServerOccupyRequest(BaseModel):
     time: Optional[str] = None
+
+
+class HeartBeatResponse(BaseModel):
+    user: Optional[str] = None
+    time: Optional[str] = None
+    next_checkin: int

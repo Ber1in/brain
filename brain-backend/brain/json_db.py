@@ -286,7 +286,9 @@ class SQLiteDocumentDB:
             "id": "99b62073-21dd-440a-9d2a-5e8f5b538a81",
             "recipients": [],
             "task_id": "",
-            "lock": 0
+            "lock": 0,
+            "last_heartbeat": "",
+            "status": ""
         },
         "tags": {
             "id": "",

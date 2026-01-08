@@ -52,7 +52,7 @@ def ssh_execute(host: str, command: str, user: str, pwd: str, check=True) -> str
         exit_code = stdout.channel.recv_exit_status()
         ssh.close()
 
-        if err:
+        if check and err:
             LOG.error(f"Command {command} error on {host}: \n"
                       f"stdout: {out.strip()} \nstderr: {err.strip()}")
         if check and exit_code != 0:

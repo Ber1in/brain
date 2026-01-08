@@ -22,6 +22,7 @@ from brain.config import settings
 
 LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
+no_auth_router = APIRouter()
 BMC_USER = "ipmiadmin"
 BMC_PASS = "ymxl@2022"
 db = SQLiteDocumentDB()
@@ -731,3 +732,27 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest,
     LOG.info(f"Async MCR update task {task_id} started for server {server_id}")
 
     return {"message": "MCR update task accepted", "task_id": task_id}
+
+
+@no_auth_router.get("/servers/{server_id}/heartbeat",
+                    response_model=server_schemas.HeartBeatResponse)
+async def server_heartbeat(server_id: str):
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.debug(f"Server {server_id} not found ")
+        raise HTTPException(status_code=404, detail="Server {server_id} not found")
+
+    current_time = datetime.now()
+
+    db.update(SERVER_COLLECTION,
+              {"id": server_id}, 
+              {"last_heartbeat": current_time, "status": "online"})
+
+    if server["time"]:
+        now = datetime.now().timestamp()
+        start = server.get("start")
+        passed = int(now - start)
+        remaining = server["time"] - passed
+        server["time"] = max(remaining, 0)
+    return {"user": server["user"], "time": server["time"], "next_checkin": 180}

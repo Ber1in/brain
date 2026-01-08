@@ -194,7 +194,7 @@ ensure_packages() {{
 ensure_packages
 """  # noqa
 
-    LOG.info(f"Ensuring repo and packages on {host}: {packages}")
+    LOG.debug(f"Ensuring repo and packages on {host}: {packages}")
     await ssh_execute_async(host, cmd, user, pwd)
 
 

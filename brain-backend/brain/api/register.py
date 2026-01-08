@@ -7,6 +7,7 @@ import logging
 import os
 from fastapi import FastAPI
 
+from brain.api.v2.routers.server_router import no_auth_router
 
 LOG = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def register_routers(app: FastAPI):
     try:
         auth_module = importlib.import_module("brain.api.auth_router")
         _register_module_router(app, auth_module, "brain.api", "auth_router")
+        app.include_router(no_auth_router, prefix="/api", tags=["server"])
 
     except Exception as e:
         LOG.error(f"Failed loading auth_router: {e}")

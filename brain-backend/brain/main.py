@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import asyncio
 from datetime import datetime
 import logging
 import os
@@ -14,6 +15,7 @@ from brain import app
 from brain.config import settings
 from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
+from brain.heartbeat_monitor import HeartbeatMonitor
 from brain.middleware import RequestIdLogFilter, RequestIdMiddleware
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.task_scheduler import init_server_warning, task_scheduler, ServerStatus
@@ -141,6 +143,12 @@ async def startup_event():
 # app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
 os.makedirs(TEST_DATA_DIR, exist_ok=True)
 app.mount("/qa-auto-files", StaticFiles(directory=TEST_DATA_DIR), name="qa-auto-files")
+app.mount("/daemon", StaticFiles(directory="files"), name="daemon")
+
+
+if settings.check_heartbeat:
+    monitor = HeartbeatMonitor()
+    asyncio.create_task(monitor.start_monitoring())
 
 
 def main():
