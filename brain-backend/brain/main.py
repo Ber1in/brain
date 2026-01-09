@@ -16,7 +16,7 @@ from brain.config import settings
 from brain.api.register import register_routers
 from brain import middleware  # noqa: F401
 from brain.heartbeat_monitor import HeartbeatMonitor
-from brain.middleware import RequestIdLogFilter, RequestIdMiddleware
+from brain.middleware import RequestIdLogFilter, RequestIdMiddleware, NotRecordAccessFilter
 from brain.json_db import SQLiteDocumentDB
 from brain.utils.task_scheduler import init_server_warning, task_scheduler, ServerStatus
 
@@ -37,6 +37,7 @@ class FsyncFileHandler(logging.FileHandler):
 
 app.add_middleware(RequestIdMiddleware)
 request_id_filter = RequestIdLogFilter()
+not_record_access_filter = NotRecordAccessFilter()
 log_format = '%(asctime)s [%(levelname)s] [%(reqid)s] %(pathname)s:%(lineno)d: %(message)s'
 
 file_handler = FsyncFileHandler(LOG_FILE)
@@ -53,12 +54,14 @@ uvicorn_logger = logging.getLogger("uvicorn")
 uvicorn_logger.handlers.clear()
 uvicorn_logger.addHandler(file_handler)
 uvicorn_logger.addFilter(request_id_filter)
+uvicorn_logger.addFilter(not_record_access_filter)
 uvicorn_logger.setLevel(logging.INFO)
 
 uvicorn_access_logger = logging.getLogger("uvicorn.access")
 uvicorn_access_logger.handlers.clear()
 uvicorn_access_logger.addHandler(file_handler)
 uvicorn_access_logger.addFilter(request_id_filter)
+uvicorn_access_logger.addFilter(not_record_access_filter)
 uvicorn_access_logger.setLevel(logging.INFO)
 
 

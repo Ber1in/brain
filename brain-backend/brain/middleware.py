@@ -34,6 +34,17 @@ class RequestIdLogFilter(logging.Filter):
         record.reqid = get_request_id()
         return True
 
+class NotRecordAccessFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+
+        if '"GET / HTTP/' in msg:
+            return False
+
+        if '/heartbeat HTTP/' in msg:
+            return False
+
+        return True
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
