@@ -13,18 +13,20 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from brain.heartbeat_monitor import HeartbeatMonitor as RealHeartbeatMonitor
-from brain.utils.ssh_client import ssh_execute_async
-from brain.utils import common_utils
-from brain.config import settings
 from brain.json_db import SQLiteDocumentDB
+from brain.config import settings
+from brain.utils import common_utils
+from brain.utils.ssh_client import ssh_execute_async
+from brain.heartbeat_monitor import HeartbeatMonitor as RealHeartbeatMonitor
 
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 LOG = logging.getLogger(__name__)
 
-
 class HeartbeatMonitor:
+
+    def __init__(self):
+        self.failed_ips = set()
 
     async def start_monitoring(self, server_ips: list = None):
         """Start heartbeat monitoring loop"""
@@ -37,15 +39,20 @@ class HeartbeatMonitor:
                         server = self.get_server_by_ip(ip)
                     except Exception:
                         print(f"Server with IP {ip} not found in the database.")
+                        self.failed_ips.add(ip)
                     await self.handle_heartbeat_timeout(server)
-                        
             else:
                 # Check all servers
+
                 servers = db.find(SERVER_COLLECTION)
                 for server in servers:
                     await self.handle_heartbeat_timeout(server)
         except Exception as e:
             print(f"Heartbeat monitor loop error: {e}")
+
+        # Print failed IPs
+        if self.failed_ips:
+            print("Failed to update the following servers: " + ",".join(self.failed_ips))
 
     async def handle_heartbeat_timeout(self, server: dict):
         """Handle heartbeat timeout for a server"""
@@ -54,14 +61,13 @@ class HeartbeatMonitor:
         try:
             success = await self.inject_daemon(server)
 
-            if success:
-                pass
-                # print(f"Daemon injection succeeded for server {ip}")
-            else:
+            if not success:
                 print(f"Daemon injection failed for server {ip}")
+                self.failed_ips.add(ip)
 
         except Exception as e:
             print(f"Error while handling heartbeat timeout for server {ip}: {e}")
+            self.failed_ips.add(ip)
 
     async def inject_daemon(self, server: dict) -> bool:
         """Inject heartbeat daemon to target server"""
@@ -73,7 +79,6 @@ class HeartbeatMonitor:
         try:
             return await self.ssh_inject_daemon(ip, username, password, server_id)
         except Exception as e:
-            # print(f"Daemon injection via SSH failed for server {server_id} (ip={ip}): {e}")
             return False
 
     async def ssh_inject_daemon(
@@ -84,7 +89,6 @@ class HeartbeatMonitor:
         server_id: str
     ) -> bool:
         """Inject daemon as systemd service through SSH"""
-
         try:
             # 安装守护进程
             real = RealHeartbeatMonitor()
@@ -111,7 +115,6 @@ systemctl enable --now server-daemon.service
             return True
 
         except Exception as e:
-            # print(f"Daemon injection failed for {ip}: {e}")
             return False
 
     def get_server_by_ip(self, server_ip: str):
