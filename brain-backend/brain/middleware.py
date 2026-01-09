@@ -39,10 +39,10 @@ class NotRecordAccessFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
 
-        if '"GET / HTTP/' in msg:
+        if '"GET / HTTP/1.1" 404' in msg:
             return False
 
-        if '/heartbeat HTTP/' in msg:
+        if '/heartbeat HTTP/1.1" 200' in msg:
             return False
 
         return True
