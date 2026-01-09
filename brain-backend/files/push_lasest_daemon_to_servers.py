@@ -1,24 +1,23 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+from brain.heartbeat_monitor import HeartbeatMonitor as RealHeartbeatMonitor
+from brain.utils.ssh_client import ssh_execute_async
+from brain.utils import common_utils
+from brain.config import settings
+from brain.json_db import SQLiteDocumentDB
+import argparse
 import asyncio
 import logging
-
 import sys
 import os
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from brain.json_db import SQLiteDocumentDB
-from brain.config import settings
-from brain.utils import common_utils
-from brain.utils.ssh_client import ssh_execute_async
-from brain.heartbeat_monitor import HeartbeatMonitor as RealHeartbeatMonitor
 
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
@@ -27,19 +26,26 @@ LOG = logging.getLogger(__name__)
 
 class HeartbeatMonitor:
 
-    async def start_monitoring(self):
+    async def start_monitoring(self, server_ips: list = None):
         """Start heartbeat monitoring loop"""
         print("Heartbeat monitor started")
         try:
-            await self.check_all_servers()
+            if server_ips:
+                # Check specific servers
+                for ip in server_ips:
+                    try:
+                        server = self.get_server_by_ip(ip)
+                    except Exception:
+                        print(f"Server with IP {ip} not found in the database.")
+                    await self.handle_heartbeat_timeout(server)
+                        
+            else:
+                # Check all servers
+                servers = db.find(SERVER_COLLECTION)
+                for server in servers:
+                    await self.handle_heartbeat_timeout(server)
         except Exception as e:
             print(f"Heartbeat monitor loop error: {e}")
-
-    async def check_all_servers(self):
-        """Check heartbeat status for all servers"""
-        servers = db.find(SERVER_COLLECTION)
-        for server in servers:
-            await self.handle_heartbeat_timeout(server)
 
     async def handle_heartbeat_timeout(self, server: dict):
         """Handle heartbeat timeout for a server"""
@@ -108,9 +114,39 @@ systemctl enable --now server-daemon.service
             # print(f"Daemon injection failed for {ip}: {e}")
             return False
 
+    def get_server_by_ip(self, server_ip: str):
+        """Get server information by IP"""
+        return db.find_one(SERVER_COLLECTION, {"json_extract(device, '$.ip')": server_ip})
+
+
+def parse_arguments():
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(description="Heartbeat monitoring tool.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--server-ips",
+        type=str,
+        help="Comma-separated list of server IPs to update"
+    )
+    group.add_argument(
+        "--all",
+        action="store_true",
+        help="Update all servers"
+    )
+
+    return parser.parse_args()
+
+
 async def main():
+    args = parse_arguments()
+
     monitor = HeartbeatMonitor()
-    await monitor.start_monitoring()
+
+    if args.all:
+        await monitor.start_monitoring()
+    elif args.server_ips:
+        server_ips = args.server_ips.split(',')
+        await monitor.start_monitoring(server_ips)
 
 if __name__ == "__main__":
     asyncio.run(main())
