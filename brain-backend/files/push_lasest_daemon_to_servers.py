@@ -1,6 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
+import asyncio
 import logging
 
 import sys
@@ -106,3 +107,10 @@ systemctl enable --now server-daemon.service
         except Exception as e:
             # print(f"Daemon injection failed for {ip}: {e}")
             return False
+
+async def main():
+    monitor = HeartbeatMonitor()
+    await monitor.start_monitoring()
+
+if __name__ == "__main__":
+    asyncio.run(main())
