@@ -95,7 +95,7 @@ WantedBy=multi-user.target
             success = await self.inject_daemon(server)
 
             if success:
-                LOG.info(f"Daemon injection succeeded for server {ip}")
+                LOG.debug(f"Daemon injection succeeded for server {ip}")
             else:
                 LOG.debug(f"Daemon injection failed for server {ip}")
 
@@ -133,7 +133,7 @@ WantedBy=multi-user.target
                     username, password, 
                     False
                 )
-                if "active" in status:
+                if status.strip() == "active":
                     return True
             except Exception:
                 pass
