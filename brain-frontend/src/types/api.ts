@@ -443,6 +443,8 @@ export interface AppConfig {
   ldap_server: string;
   admin_password: string;
   release_notices: ReleaseNotice[] | null;
+  check_heartbeat: boolean
+  heartbeat_interval: number
 }
 
 export interface FilteringConditions {

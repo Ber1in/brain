@@ -108,9 +108,8 @@
             >
               {{ row.bmc.hostname }}
               
-              <!-- 离线状态图标 -->
               <el-tooltip 
-                v-if="isDeviceOffline(row)" 
+                v-if="shouldCheckOffline && isDeviceOffline(row)" 
                 effect="dark" 
                 content="服务器离线"
                 placement="top"
@@ -1330,8 +1329,8 @@ import {
   PriceTag
 } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
-import { remotefsApi, tagApi, tasksApi, filterApi, mcrApi } from '@/api/common'
-import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse, FilteringConditions, InstallDetailResponse } from '@/types/api'
+import { remotefsApi, tagApi, tasksApi, filterApi, mcrApi, settingsApi } from '@/api/common'
+import type { ServerDetailResponse, ServerUpdateRequest, TagResponse, BootEntriesResponse, TaskStatusResponse, FilteringConditions, AppConfig, InstallDetailResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -1340,6 +1339,9 @@ const loading = ref(false)
 const devices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
 const selectedDevices = ref<ServerDetailResponse[]>([])
+
+const appSettings = ref<AppConfig | null>(null)
+const loadingSettings = ref(false)
 
 // 新增：分页相关状态
 const pagination = reactive({
@@ -1858,8 +1860,8 @@ const checkInternalDuplicates = (device: ServerDetailResponse): string[] => {
 const getRowClassName = ({ row }: { row: ServerDetailResponse }) => {
   const classes = []
   
-  // 离线状态 - 最高优先级
-  if (isDeviceOffline(row)) {
+  // 只有启用心跳检测时才应用离线样式
+  if (shouldCheckOffline.value && isDeviceOffline(row)) {
     classes.push('offline-row')
   }
   // 网卡冲突 - 次优先级
@@ -2515,13 +2517,37 @@ const handleBatchConfirm = async () => {
   }
 }
 
-// 检查服务器是否离线
+// 新增方法：加载应用设置
+const loadAppSettings = async () => {
+  try {
+    loadingSettings.value = true
+    const settings = await settingsApi.getSettings()
+    appSettings.value = settings
+  } catch (error) {
+    console.error('加载应用设置失败:', error)
+  } finally {
+    loadingSettings.value = false
+  }
+}
+
+const shouldCheckOffline = computed(() => {
+  return appSettings.value?.check_heartbeat === true
+})
+
 const isDeviceOffline = (device: ServerDetailResponse): boolean => {
+  // 如果未启用心跳检测，所有服务器都显示为在线
+  if (!shouldCheckOffline.value) {
+    return false
+  }
   return device.status === 'offline'
 }
 
-// 检查服务器是否在线
+// 修改：检查服务器是否在线（考虑设置）
 const isDeviceOnline = (device: ServerDetailResponse): boolean => {
+  // 如果未启用心跳检测，所有服务器都显示为在线
+  if (!shouldCheckOffline.value) {
+    return true
+  }
   return device.status === 'online'
 }
 
@@ -4063,6 +4089,7 @@ onMounted(() => {
   loadFilteringConditions()
   loadTags()
   loadNicTypes()
+  loadAppSettings()
 })
 </script>
 
