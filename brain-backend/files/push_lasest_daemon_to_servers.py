@@ -38,7 +38,8 @@ class HeartbeatMonitor:
             success = await self.inject_daemon(server)
 
             if success:
-                print(f"Daemon injection succeeded for server {ip}")
+                pass
+                # print(f"Daemon injection succeeded for server {ip}")
             else:
                 print(f"Daemon injection failed for server {ip}")
 
@@ -55,7 +56,7 @@ class HeartbeatMonitor:
         try:
             return await self.ssh_inject_daemon(ip, username, password, server_id)
         except Exception as e:
-            print(f"Daemon injection via SSH failed for server {server_id} (ip={ip}): {e}")
+            # print(f"Daemon injection via SSH failed for server {server_id} (ip={ip}): {e}")
             return False
 
     async def ssh_inject_daemon(
@@ -93,5 +94,5 @@ systemctl enable --now server-daemon.service
             return True
 
         except Exception as e:
-            print(f"Daemon injection failed for {ip}: {e}")
+            # print(f"Daemon injection failed for {ip}: {e}")
             return False

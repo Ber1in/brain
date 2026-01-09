@@ -141,7 +141,6 @@ send_heartbeat() {
     [[ -n "$next_checkin" ]] && HEARTBEAT_INTERVAL="$next_checkin"
 
     update_profile "$user" "$time"
-    log "Heartbeat OK (interval=${HEARTBEAT_INTERVAL}s)"
 
     return 0
 }
