@@ -3,6 +3,7 @@
 
 import asyncio
 import logging
+import aiohttp
 from datetime import datetime
 
 from brain.json_db import SQLiteDocumentDB
@@ -26,10 +27,25 @@ class HeartbeatMonitor:
         LOG.info("Heartbeat monitor started")
         while settings.check_heartbeat:
             try:
-                await self.check_all_servers()
+                if not await self.check_yuntester_available():
+                    LOG.warning("yuntester.yunsilicon.com unavailable, skip heartbeat check")
+                else:
+                    await self.check_all_servers()
             except Exception as e:
                 LOG.debug(f"Heartbeat monitor loop error: {e}")
             await asyncio.sleep(self.check_interval)
+
+    async def check_yuntester_available(self, timeout: float = 3.0) -> bool:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://yuntester.yunsilicon.com",
+                    timeout=timeout,
+                    ssl=False   # 如果是内网证书/自签名
+                ) as resp:
+                    return resp.status < 500
+        except Exception:
+            return False
 
     async def check_all_servers(self):
         """Check heartbeat status for all servers"""
