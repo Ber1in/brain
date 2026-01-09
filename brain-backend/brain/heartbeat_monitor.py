@@ -75,7 +75,7 @@ Environment=API_ENDPOINT=https://yuntester.yunsilicon.com/api
 WorkingDirectory=/opt/server_daemon
 ExecStart=/opt/server_daemon/server_daemon.sh --server-id {server_id}
 ExecStop=/bin/kill -TERM $MAINPID
-Restart=always
+Restart=on-failure
 RestartSec=10
 
 [Install]

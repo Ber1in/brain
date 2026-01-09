@@ -106,12 +106,34 @@ EOF
 # 发送心跳
 ############################
 send_heartbeat() {
-    local body user time next_checkin
+    local response http_code body user time next_checkin
 
-    body=$(curl -sSk -m 10 -X "GET" \
+    response=$(curl -sSk -m 10 \
         -H "accept: application/json" \
-        "$API_ENDPOINT/api/servers/$SERVER_ID/heartbeat") || return 1
+        -w "\n%{http_code}" \
+        "$API_ENDPOINT/api/servers/$SERVER_ID/heartbeat")
 
+    if [[ $? -ne 0 || -z "$response" ]]; then
+        log "Heartbeat failed: curl error"
+        return 1
+    fi
+
+    http_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | sed '$d')
+
+    # 🔴 关键：404 直接结束 daemon
+    if [[ "$http_code" == "404" ]]; then
+        log "Heartbeat returned 404, server not found. Exiting daemon."
+        exit 0
+    fi
+
+    # 非 200 的其他情况，认为是暂时性错误
+    if [[ "$http_code" != "200" ]]; then
+        log "Heartbeat failed: HTTP $http_code"
+        return 1
+    fi
+
+    # 正常解析 JSON
     user=$(echo "$body" | sed -n 's/.*"user"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
     time=$(echo "$body" | sed -n 's/.*"time"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
     next_checkin=$(echo "$body" | sed -n 's/.*"next_checkin"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p')
@@ -123,6 +145,7 @@ send_heartbeat() {
 
     return 0
 }
+
 
 ############################
 # 主循环
