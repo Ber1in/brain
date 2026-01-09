@@ -142,17 +142,12 @@ WantedBy=multi-user.target
 
         try:
             # 检查是否已运行
-            try:
-                status = await ssh_execute_async(
-                    ip, 
-                    "systemctl is-active server-daemon.service 2>/dev/null", 
-                    username, password, 
-                    False
-                )
-                if status.strip() == "active":
-                    return True
-            except Exception:
-                pass
+            status = await ssh_execute_async(
+                ip, "systemctl is-active server-daemon.service 2>/dev/null", 
+                username, password, False
+            )
+            if status.strip() == "active":
+                return True
 
             # 安装守护进程
             service_content = self.generate_systemd_service(server_id)
