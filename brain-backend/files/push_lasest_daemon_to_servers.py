@@ -1,11 +1,6 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from brain.heartbeat_monitor import HeartbeatMonitor as RealHeartbeatMonitor
-from brain.utils.ssh_client import ssh_execute_async
-from brain.utils import common_utils
-from brain.config import settings
-from brain.json_db import SQLiteDocumentDB
 import argparse
 import asyncio
 import logging
@@ -18,6 +13,11 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from brain.heartbeat_monitor import HeartbeatMonitor as RealHeartbeatMonitor
+from brain.utils.ssh_client import ssh_execute_async
+from brain.utils import common_utils
+from brain.config import settings
+from brain.json_db import SQLiteDocumentDB
 
 db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
