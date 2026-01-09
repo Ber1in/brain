@@ -391,11 +391,13 @@
                       <p><strong>问题原因：</strong></p>
                       <ol>
                         <li>占用/释放时，服务器的操作系统与当前操作系统不一致。</li>
-                        <li>系统仅更新占用/释放时的操作系统内的提示信息</li>
+                        <li>占用信息刷新频率为1分钟一次</li>
+                        <li>操作系统root密码与平台保存不一致，导致刷新失败</li>
                       </ol>
                       <p><strong>解决方案：</strong></p>
                       <ul>
                         <li>实际占用情况以本平台服务器列表的信息为准</li>
+                        <li>等待1分钟再重新登录查看</li>
                         <li>在当前操作系统再次进行占用/释放操作以刷新当前系统的提示</li>
                       </ul>
                     </div>
@@ -458,8 +460,43 @@
               <div class="timeline">
                 <div class="timeline-item">
                   <div class="timeline-date">
+                    <span class="date">2026-01-09</span>
+                    <el-tag type="success" size="small">v2.0.5</el-tag>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="update-card">
+                      <div class="update-type">
+                        <el-tag type="success" size="small">新增功能</el-tag>
+                      </div>
+                      <ul>
+                        <li>支持服务器批量占用</li>
+                        <li>支持解析并展示MCR包安装脚本的参数，可通过勾选及手动编辑的方式进行自定义安装</li>
+                        <li>支持自动向客户端推送心跳agent，agent将定时(1min)向平台发送心跳，并根据最新占用信息在服务器内实时刷新占用信息</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="warning" size="small">功能优化</el-tag>
+                      </div>
+                      <ul>
+                        <li>查找mcr包功能支持识别软链接目录</li>
+                        <li>质量保证平台切换分支/标签后，清理掉旧分支生成的影响项目源码的文件</li>
+                        <li>增加冷热重启功能健壮性，优先尝试远程lanplus/lan，再尝试ssh到主机本地执行ipmitool</li>
+                        <li>用例扫描支持更小力度，允许直接选择具体test_*.py文件进行扫描</li>
+                        <li>操作日志页面允许模糊检索操作记录</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="info" size="small">问题修复</el-tag>
+                      </div>
+                      <ul>
+                        <li>修复质量保证平台扫描用例后，切换分支/标签后，已扫描目录及可选目录未更新的问题</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="timeline-item">
+                  <div class="timeline-date">
                     <span class="date">2025-12-26</span>
-                    <el-tag type="success" size="small">v2.0.4</el-tag>
+                    <el-tag type="primary" size="small">v2.0.4</el-tag>
                   </div>
                   <div class="timeline-content">
                     <div class="update-card">

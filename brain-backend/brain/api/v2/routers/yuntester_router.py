@@ -136,7 +136,7 @@ async def get_repo_branches_and_tags(user=Depends(authenticate_user)):
 @router.post("/yuntester/switch", status_code=204)
 async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
                                user=Depends(authenticate_user)):
-    LOG.info(f"[{user}] witching to branch={data.branch} tag={data.tag}")
+    LOG.info(f"[{user}] switching to branch={data.branch} tag={data.tag}")
 
     try:
         user_repo_dir = await get_user_repo_dir(user)
@@ -144,6 +144,10 @@ async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
 
         repo.git.fetch("--all", "--tags")
         LOG.info("Fetch completed")
+
+        repo.git.reset("--hard")
+        repo.git.clean("-fdx")
+        LOG.info("Pre-checkout cleanup done (reset --hard + clean -fdx)")
 
         if data.branch:
             branch = data.branch
@@ -154,10 +158,6 @@ async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
                 repo.git.checkout("-b", branch, f"origin/{branch}")
             else:
                 repo.git.checkout(branch)
-
-            repo.git.pull()
-            LOG.info(f"Branch {branch} updated")
-
         elif data.tag:
             tag = data.tag
             LOG.info(f"Switching to tag {tag}")
@@ -170,7 +170,11 @@ async def switch_branch_or_tag(data: yuntester_schemas.CheckoutRequest,
             LOG.info(f"Switched to tag {tag}")
 
         repo.git.clean("-fdx")
-        LOG.info("Workspace cleaned (git clean -fdx)")
+        LOG.info("Post-checkout cleanup done (git clean -fdx)")
+
+        if data.branch:
+            repo.git.pull()
+            LOG.info(f"Branch {branch} updated")
 
     except Exception as e:
         LOG.error(f"Switch failed: {e}")
