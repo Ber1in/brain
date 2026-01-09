@@ -755,4 +755,5 @@ async def server_heartbeat(server_id: str):
         passed = int(now - start)
         remaining = server["time"] - passed
         server["time"] = max(remaining, 0)
-    return {"user": server["user"], "time": server["time"], "next_checkin": 180}
+    return {"user": server["user"], "time": server["time"],
+            "next_checkin": settings.heartbeat_interval}

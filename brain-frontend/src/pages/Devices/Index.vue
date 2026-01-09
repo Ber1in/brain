@@ -87,10 +87,12 @@
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
+        :row-class-name="getRowClassName"
       >
         <!-- 多选列 -->
         <el-table-column type="selection" width="35" />
 
+        <!-- 服务器名称列 -->
         <el-table-column 
           prop="bmc.hostname" 
           label="服务器名称"
@@ -105,6 +107,18 @@
               :underline="false"
             >
               {{ row.bmc.hostname }}
+              
+              <!-- 离线状态图标 -->
+              <el-tooltip 
+                v-if="isDeviceOffline(row)" 
+                effect="dark" 
+                content="服务器离线"
+                placement="top"
+              >
+                <el-icon class="offline-icon"><WarningFilled /></el-icon>
+              </el-tooltip>
+              
+              <!-- 网卡冲突警告图标（原有的） -->
               <el-tooltip 
                 v-if="hasDuplicateNicInfo(row)" 
                 effect="dark" 
@@ -1840,12 +1854,20 @@ const checkInternalDuplicates = (device: ServerDetailResponse): string[] => {
   return duplicates
 }
 
-// 根据是否有重复信息设置行样式
+// 根据服务器状态设置行样式
 const getRowClassName = ({ row }: { row: ServerDetailResponse }) => {
-  if (hasDuplicateNicInfo(row)) {
-    return 'warning-row'
+  const classes = []
+  
+  // 离线状态 - 最高优先级
+  if (isDeviceOffline(row)) {
+    classes.push('offline-row')
   }
-  return ''
+  // 网卡冲突 - 次优先级
+  else if (hasDuplicateNicInfo(row)) {
+    classes.push('warning-row')
+  }
+  
+  return classes.join(' ')
 }
 
 const getMcrStatusType = (device: ServerDetailResponse) => {
@@ -2491,6 +2513,16 @@ const handleBatchConfirm = async () => {
   } finally {
     batchLoading.value = false
   }
+}
+
+// 检查服务器是否离线
+const isDeviceOffline = (device: ServerDetailResponse): boolean => {
+  return device.status === 'offline'
+}
+
+// 检查服务器是否在线
+const isDeviceOnline = (device: ServerDetailResponse): boolean => {
+  return device.status === 'online'
 }
 
 // 批量占用方法
@@ -5540,6 +5572,24 @@ onMounted(() => {
 .header-actions {
   display: flex;
   align-items: center;
+}
+
+:deep(.offline-row) {
+  background-color: #fef0f0 !important; /* 淡红色背景 */
+  opacity: 0.8;
+}
+
+:deep(.offline-row:hover) {
+  background-color: #fef0f0 !important;
+  opacity: 1;
+}
+
+/* 离线状态图标样式 */
+.offline-icon {
+  color: #f56c6c; /* 红色 */
+  margin-left: 4px;
+  font-size: 14px;
+  vertical-align: middle;
 }
 
 .hostname-link {

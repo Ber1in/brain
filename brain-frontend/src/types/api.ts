@@ -295,6 +295,7 @@ export interface ServerDetailResponse {
   updated_at?: string
   id?: string
   recipients?: string[]
+  status?: 'online' | 'offline'
 }
 
 export interface ServerRequest {

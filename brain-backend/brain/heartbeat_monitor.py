@@ -18,13 +18,13 @@ LOG = logging.getLogger(__name__)
 class HeartbeatMonitor:
     def __init__(self):
         self.check_interval = 60
-        self.heartbeat_timeout = 360
+        self.heartbeat_timeout = 180
         self.monitoring_tasks = {}
 
     async def start_monitoring(self):
         """Start heartbeat monitoring loop"""
         LOG.info("Heartbeat monitor started")
-        while True:
+        while settings.check_heartbeat:
             try:
                 await self.check_all_servers()
             except Exception as e:
@@ -135,7 +135,7 @@ WantedBy=multi-user.target
                 )
                 if "active" in status:
                     return True
-            except:
+            except Exception:
                 pass
 
             # 安装守护进程

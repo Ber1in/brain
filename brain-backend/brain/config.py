@@ -34,6 +34,7 @@ class AppConfig(BaseModel):
     admin_list: List[str] = Field(default_factory=lambda: [
         "mengxh", "gongyh", "nana", "chenx", "jacky", "zhangx", "weihg"])
     check_heartbeat: bool = True
+    heartbeat_interval = 60
 
 
 def load_config() -> AppConfig:
@@ -102,10 +103,14 @@ class _SettingsProxy:
     @property
     def release_notices(self) -> Optional[List[ReleaseNotice]]:
         return _current_settings.release_notices
-    
+
     @property
     def check_heartbeat(self) -> bool:
         return _current_settings.check_heartbeat
+
+    @property
+    def heartbeat_interval(self) -> bool:
+        return _current_settings.heartbeat_interval
 
     def dict(self):
         return _current_settings.dict()
