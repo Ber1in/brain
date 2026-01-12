@@ -43,24 +43,26 @@ class ExecuteNicInfo(BaseModel):
     switch: str = None
     port: str = None
 
-    @validator("type", pre=True)
-    def normalize_type(cls, v):
-        """Normalize the NIC type string."""
-        if not isinstance(v, str):
-            return v
-        clean = v.strip()
-        if "metascale-200" in clean.lower():
-            return "MS200-OCP"
-        return clean.split("-")[0].upper()
-
     @root_validator
     def validate_required_fields(cls, values):
-        t = values.get("type")
+        raw_type = values.get("type") or ""
+        t_norm = (
+            raw_type.lower()
+                    .replace("-", "")
+                    .replace(" ", "")
+        )
 
-        # When type is MV200
-        if t == "MV200":
+        mv200_aliases = (
+            "mv200",
+            "metavisor200",
+        )
+
+        is_mv200 = any(token in t_norm for token in mv200_aliases)
+
+        if is_mv200:
             if not values.get("soc"):
                 raise ValueError("Field 'soc' is required when type is MV200")
+
         else:
             # When type is NOT MV200 → iface and bdf required
             if not values.get("iface"):
