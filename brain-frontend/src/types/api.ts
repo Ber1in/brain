@@ -257,6 +257,11 @@ export interface DeviceResponse {
 
 export type GrubConfig = Record<string, string>
 
+export interface OsInfoResponse {
+  system_version?: string
+  kernel_version?: string
+}
+
 export interface NicInfo {
   mac?: string
   bdf?: string

@@ -757,3 +757,17 @@ async def server_heartbeat(server_id: str):
         server["time"] = max(remaining, 0)
     return {"user": server["user"], "time": server["time"],
             "next_checkin": settings.heartbeat_interval}
+
+
+@router.get("/servers/{server_id}/os-info", response_model=server_schemas.OsInfoResponse)
+async def get_os_information(server_id: str):
+    try:
+        server = db.find_one(SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.debug(f"Server {server_id} not found ")
+        raise HTTPException(status_code=404, detail="Server {server_id} not found")
+
+    system_version, kernel_version = await common_utils.collect_os_info(
+        server["device"]["ip"], server["device"]["username"], server["device"]["password"])
+
+    return {"system_version": system_version, "kernel_version": kernel_version}

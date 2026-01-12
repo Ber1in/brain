@@ -112,3 +112,8 @@ class HeartBeatResponse(BaseModel):
     user: Optional[str] = None
     time: Optional[str] = None
     next_checkin: int
+
+
+class OsInfoResponse(BaseModel):
+    system_version: Optional[str] = None
+    kernel_version: Optional[str] = None

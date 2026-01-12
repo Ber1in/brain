@@ -666,6 +666,24 @@ async def ipmi_power_action(bmcip: str, action: str, host: str, user: str, pwd: 
                 f"- ssh({host}) error: {ssh_error}"))
 
 
+async def collect_os_info(ip, user, password):
+    cmd = """
+. /etc/os-release 2>/dev/null || true
+if [ -n "$VERSION_ID" ]; then
+    echo "$ID$VERSION_ID"
+else
+    echo "$ID"
+fi
+uname -r
+    """
+    res = await ssh_execute_async(ip, cmd, user, password)
+    lines = [line.strip() for line in res.splitlines() if line.strip()]
+
+    system_version = lines[-2]
+    kernel_version = lines[-1]
+    return system_version, kernel_version
+
+
 async def collect_device_info(ip, user, password):
     server_sn = await ssh_execute_async(
         ip, "cat /sys/class/dmi/id/product_serial", user, password, False)

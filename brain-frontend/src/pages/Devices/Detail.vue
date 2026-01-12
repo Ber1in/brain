@@ -126,7 +126,70 @@
 
         <!-- 服务器信息 -->
         <el-descriptions-item label="服务器IP">{{ deviceData.device?.ip || '-' }}</el-descriptions-item>
-        
+
+        <el-descriptions-item label="系统版本">
+          <div style="min-height: 22px;">
+            <el-tag 
+              v-if="osInfo.system_version" 
+              size="small"
+              type="info"
+              style="border: none; background-color: #f0f9ff;"
+            >
+              {{ osInfo.system_version }}
+            </el-tag>
+            <el-tooltip 
+              v-else-if="!osInfoLoading"
+              effect="dark" 
+              content="点击加载"
+              placement="top"
+            >
+              <el-button 
+                type="text" 
+                size="small" 
+                @click="loadOsInfo"
+                style="padding: 0;"
+              >
+                加载
+              </el-button>
+            </el-tooltip>
+            <el-icon v-else class="is-loading" style="margin-right: 5px;">
+              <Loading />
+            </el-icon>
+          </div>
+        </el-descriptions-item>
+
+        <!-- 新增：内核版本 -->
+        <el-descriptions-item label="内核版本">
+          <div style="min-height: 22px;">
+            <el-tag 
+              v-if="osInfo.kernel_version" 
+              size="small"
+              type="warning"
+              style="border: none; background-color: #fff7e6;"
+            >
+              {{ osInfo.kernel_version }}
+            </el-tag>
+            <el-tooltip 
+              v-else-if="!osInfoLoading"
+              effect="dark" 
+              content="点击加载"
+              placement="top"
+            >
+              <el-button 
+                type="text" 
+                size="small" 
+                @click="loadOsInfo"
+                style="padding: 0;"
+              >
+                加载
+              </el-button>
+            </el-tooltip>
+            <el-icon v-else class="is-loading" style="margin-right: 5px;">
+              <Loading />
+            </el-icon>
+          </div>
+        </el-descriptions-item>
+
         <!-- 新增的管理口信息 -->
         <el-descriptions-item label="管理口MAC地址">{{ deviceData.device?.mac || '-' }}</el-descriptions-item>
         <el-descriptions-item label="管理网网关">{{ deviceData.device?.gateway || '-' }}</el-descriptions-item>
@@ -801,6 +864,9 @@ const occupyForm = reactive({
   endTime: null as Date | null
 })
 
+const osInfo = ref<OsInfoResponse>({})
+const osInfoLoading = ref(false)
+
 // 启动项管理相关
 const bootEntryDialogVisible = ref(false)
 const bootEntryLoading = ref(false)
@@ -1396,6 +1462,21 @@ const loadBootEntries = async () => {
   }
 }
 
+// 添加获取系统信息的方法
+const loadOsInfo = async () => {
+  try {
+    osInfoLoading.value = true
+    const data = await deviceApi.getOSInfo(deviceId.value)
+    osInfo.value = data
+  } catch (error) {
+    console.error('获取系统信息失败:', error)
+    // 静默失败，不提示用户
+    osInfo.value = {}
+  } finally {
+    osInfoLoading.value = false
+  }
+}
+
 // 加载服务器详情
 const loadDeviceDetail = async () => {
   try {
@@ -1403,12 +1484,13 @@ const loadDeviceDetail = async () => {
     
     deviceData.value = { ...data }
     
-    // 同时加载启动项信息、MV200数据、网卡信息和Grub配置
+    // 同时加载启动项信息、MV200数据、网卡信息、Grub配置和系统信息
     await Promise.all([
       loadBootEntries(),
       loadAllMv200s(),
       loadNics(),
-      loadGrubConfig()  // 添加这行
+      loadGrubConfig(),
+      loadOsInfo()  // 添加这行
     ])
   } catch (error) {
     ElMessage.error('加载服务器详情失败')

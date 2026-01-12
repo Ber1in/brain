@@ -89,7 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = async (): Promise<boolean> => {
     if (!autoLogin.value) {
       console.log('自动登录未启用，不刷新token')
-      throw new Error('自动登录未启用')
+      throw new Error('登录失效')
     }
 
     const storedRefreshToken = localStorage.getItem('refresh_token')

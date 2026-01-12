@@ -239,11 +239,97 @@
             </div>
           </template>
         </el-table-column>
+
+        <el-table-column 
+          prop="arch" 
+          label="架构"
+          width="65"
+        >
+          <template #default="{ row }">
+            <el-tag size="small" >
+              {{ row.device.arch }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column 
+          label="系统版本"
+          width="120"
+        >
+          <template #default="{ row }">
+            <div style="min-height: 22px;">
+              <el-tag 
+                v-if="osInfoMap[row.id!]" 
+                size="small"
+                type="warning"
+                style="border: none; background-color: #f0f9ef;"
+              >
+                {{ osInfoMap[row.id!].system_version || '-' }}
+              </el-tag>
+              <el-tooltip 
+                v-else-if="!osInfoLoading[row.id!]"
+                effect="dark" 
+                content="点击加载"
+                placement="top"
+              >
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="loadOsInfoForDevice(row)"
+                  style="padding: 0;"
+                >
+                  加载
+                </el-button>
+              </el-tooltip>
+              <el-icon v-else class="is-loading" style="margin-right: 5px;">
+                <Loading />
+              </el-icon>
+            </div>
+          </template>
+        </el-table-column>
+
+        <!-- 修改内核版本列，也使用el-tag包裹 -->
+        <el-table-column 
+          label="内核版本"
+          width="220"
+        >
+          <template #default="{ row }">
+            <div style="min-height: 22px;">
+              <el-tag 
+                v-if="osInfoMap[row.id!]" 
+                size="small"
+                type="info"
+                style="border: none; background-color: #fff7e6;"
+              >
+                {{ osInfoMap[row.id!].kernel_version || '-' }}
+              </el-tag>
+              <el-tooltip 
+                v-else-if="!osInfoLoading[row.id!]"
+                effect="dark" 
+                content="点击加载"
+                placement="top"
+              >
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="loadOsInfoForDevice(row)"
+                  style="padding: 0;"
+                >
+                  加载
+                </el-button>
+              </el-tooltip>
+              <el-icon v-else class="is-loading" style="margin-right: 5px;">
+                <Loading />
+              </el-icon>
+            </div>
+          </template>
+        </el-table-column>
+
         <el-table-column 
           prop="notes" 
           label="备注"
           show-overflow-tooltip
-          min-width="240"
+          min-width="200"
         >
           <template #default="{ row }">
             <span v-if="row.notes">{{ row.notes }}</span>
@@ -1339,6 +1425,9 @@ const loading = ref(false)
 const devices = ref<ServerDetailResponse[]>([])
 const searchKeyword = ref('')
 const selectedDevices = ref<ServerDetailResponse[]>([])
+
+const osInfoMap = ref<Record<string, OsInfoResponse>>({})
+const osInfoLoading = ref<Record<string, boolean>>({})
 
 const appSettings = ref<AppConfig | null>(null)
 const loadingSettings = ref(false)
@@ -3453,6 +3542,10 @@ const handleSortChange = ({ prop, order }: {
   loadData()
 }
 
+const getOsInfo = (deviceId: string): OsInfoResponse | undefined => {
+  return osInfoMap.value[deviceId]
+}
+
 const loadData = async (page?: number) => { 
   loading.value = true
   try {
@@ -3494,6 +3587,8 @@ const loadData = async (page?: number) => {
     
     devices.value = response.data
     
+    autoLoadVisibleOsInfo()
+
     if (response.pagination) {    
       pagination.total = response.pagination.total
       pagination.total_pages = response.pagination.total_pages
@@ -3516,6 +3611,38 @@ const loadData = async (page?: number) => {
   } finally {
     loading.value = false
   }
+}
+
+// 加载单个设备的系统信息
+const loadOsInfoForDevice = async (device: ServerDetailResponse) => {
+  if (!device.id || osInfoLoading.value[device.id] || osInfoMap.value[device.id]) return
+  
+  try {
+    osInfoLoading.value[device.id] = true
+    const osInfo = await deviceApi.getOSInfo(device.id)
+    osInfoMap.value[device.id] = osInfo
+  } catch (error) {
+    console.error(`获取系统信息失败 ${device.id}:`, error)
+    // 静默失败，不提示用户
+    osInfoMap.value[device.id] = {}
+  } finally {
+    osInfoLoading.value[device.id] = false
+  }
+}
+
+// 可选：自动加载当前页面可见设备的系统信息（不阻塞）
+const autoLoadVisibleOsInfo = () => {
+  // 延迟执行，确保页面先渲染
+  setTimeout(() => {
+    // 假设当前页面显示20条数据
+    const visibleDevices = devices.value.slice(0, 20)
+    
+    visibleDevices.forEach(device => {
+      if (device.id && !osInfoMap.value[device.id] && !osInfoLoading.value[device.id]) {
+        loadOsInfoForDevice(device)
+      }
+    })
+  }, 100) // 延迟100ms，让页面先出来
 }
 
 // 在 loadData 方法后面添加翻页方法

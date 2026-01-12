@@ -65,7 +65,7 @@ def ssh_execute(host: str, command: str, user: str, pwd: str, check=True) -> str
         return out.strip()
     except (ssh_exception.NoValidConnectionsError, TimeoutError) as e:
         LOG.error(e)
-        raise HTTPException(status_code=503, detail=f"{e}")
+        raise HTTPException(status_code=504, detail=f"{e}")
     except ssh_exception.AuthenticationException as e:
         LOG.error(e)
         raise HTTPException(status_code=509, detail=f"{e}")

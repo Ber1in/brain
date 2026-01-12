@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest, ResetFwRequest, NicResponse, DeviceResponse, GrubConfig } from '@/types/api'
+import type { ServerRequest, ServerDetailResponse, ServerUpdateRequest, BootEntriesResponse, MCRRequest, ResetFwRequest, NicResponse, DeviceResponse, GrubConfig, OsInfoResponse } from '@/types/api'
 
 export const deviceApi = {
   getAllWithPagination(params?: {
@@ -197,5 +197,9 @@ export const deviceApi = {
 
   getAllNicTypes(): Promise<string[]> {
     return apiClient.get('/api/servers/nic_types')
+  },
+
+  getOSInfo(serverId: string): Promise<OsInfoResponse> {
+    return apiClient.get(`/api/servers/${serverId}/os-info`)
   },
 }
