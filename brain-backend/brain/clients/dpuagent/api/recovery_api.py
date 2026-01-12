@@ -20,6 +20,10 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
+from pydantic import StrictStr
+
+from typing import Optional
+
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.recovery_mode_request import RecoveryModeRequest
 from brain.clients.dpuagent.models.recovery_mode_response import RecoveryModeResponse
@@ -47,15 +51,17 @@ class RecoveryApi:
         self.api_client = api_client
 
     @validate_arguments
-    def clear_recovery_file_dpu_agent_v1_records_clear_delete(self, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def clear_recovery_file_dpu_agent_v1_records_clear_delete(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Clear Recovery File  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.clear_recovery_file_dpu_agent_v1_records_clear_delete(async_req=True)
+        >>> thread = api.clear_recovery_file_dpu_agent_v1_records_clear_delete(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -71,18 +77,20 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info(**kwargs)  # noqa: E501
+        return self.clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Clear Recovery File  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info(async_req=True)
+        >>> thread = api.clear_recovery_file_dpu_agent_v1_records_clear_delete_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -111,6 +119,7 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -143,6 +152,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -157,6 +169,7 @@ class RecoveryApi:
 
         _response_types_map = {
             '200': "BaseResponseBody",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(
@@ -177,16 +190,18 @@ class RecoveryApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def get_recovery_status_dpu_agent_v1_recovery_status_get(self, **kwargs) -> RecoveryStatusResponse:  # noqa: E501
+    def get_recovery_status_dpu_agent_v1_recovery_status_get(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> RecoveryStatusResponse:  # noqa: E501
         """Get Recovery Status  # noqa: E501
 
         Query the current recovery process status.  Possible values for `status`: - `\"idle\"`: Recovery not triggered yet. - `\"recovering\"`: Recovery is in progress. - `\"done\"`: Recovery completed successfully. - `\"failed\"`: Recovery has failed.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_recovery_status_dpu_agent_v1_recovery_status_get(async_req=True)
+        >>> thread = api.get_recovery_status_dpu_agent_v1_recovery_status_get(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -202,19 +217,21 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info(**kwargs)  # noqa: E501
+        return self.get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Get Recovery Status  # noqa: E501
 
         Query the current recovery process status.  Possible values for `status`: - `\"idle\"`: Recovery not triggered yet. - `\"recovering\"`: Recovery is in progress. - `\"done\"`: Recovery completed successfully. - `\"failed\"`: Recovery has failed.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info(async_req=True)
+        >>> thread = api.get_recovery_status_dpu_agent_v1_recovery_status_get_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -243,6 +260,7 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -275,6 +293,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -289,6 +310,7 @@ class RecoveryApi:
 
         _response_types_map = {
             '200': "RecoveryStatusResponse",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(
@@ -309,16 +331,18 @@ class RecoveryApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def query_recovery_mode_dpu_agent_v1_recoverymode_query_get(self, **kwargs) -> RecoveryModeResponse:  # noqa: E501
+    def query_recovery_mode_dpu_agent_v1_recoverymode_query_get(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> RecoveryModeResponse:  # noqa: E501
         """Query Recovery Mode  # noqa: E501
 
         Query the current recovery mode.  Returns:     - mode (str): Current recovery mode, either \"auto\" or \"manual\".  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.query_recovery_mode_dpu_agent_v1_recoverymode_query_get(async_req=True)
+        >>> thread = api.query_recovery_mode_dpu_agent_v1_recoverymode_query_get(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -334,19 +358,21 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info(**kwargs)  # noqa: E501
+        return self.query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Query Recovery Mode  # noqa: E501
 
         Query the current recovery mode.  Returns:     - mode (str): Current recovery mode, either \"auto\" or \"manual\".  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info(async_req=True)
+        >>> thread = api.query_recovery_mode_dpu_agent_v1_recoverymode_query_get_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -375,6 +401,7 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -407,6 +434,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -421,6 +451,7 @@ class RecoveryApi:
 
         _response_types_map = {
             '200': "RecoveryModeResponse",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(
@@ -441,18 +472,20 @@ class RecoveryApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def reset_recovery_status_dpu_agent_v1_recovery_status_post(self, recovery_status_request : RecoveryStatusRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def reset_recovery_status_dpu_agent_v1_recovery_status_post(self, recovery_status_request : RecoveryStatusRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Reset Recovery Status  # noqa: E501
 
         Reset the recovery status of the DPU agent.  Args:      status (str): Required. Must be either \"done\" or \"recovering\".  Behavior: - If `status` is `\"done\"`:     - Marks the recovery process as completed.     - Unlocks the DPU agent, allowing it to accept all incoming requests. - If `status` is `\"recovering\"`:     - Marks the agent as undergoing recovery.     - Locks the DPU agent, rejecting all requests except GET,       to ensure isolation and consistency during recovery.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.reset_recovery_status_dpu_agent_v1_recovery_status_post(recovery_status_request, async_req=True)
+        >>> thread = api.reset_recovery_status_dpu_agent_v1_recovery_status_post(recovery_status_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param recovery_status_request: (required)
         :type recovery_status_request: RecoveryStatusRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -468,21 +501,23 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info(recovery_status_request, **kwargs)  # noqa: E501
+        return self.reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info(recovery_status_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info(self, recovery_status_request : RecoveryStatusRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info(self, recovery_status_request : RecoveryStatusRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Reset Recovery Status  # noqa: E501
 
         Reset the recovery status of the DPU agent.  Args:      status (str): Required. Must be either \"done\" or \"recovering\".  Behavior: - If `status` is `\"done\"`:     - Marks the recovery process as completed.     - Unlocks the DPU agent, allowing it to accept all incoming requests. - If `status` is `\"recovering\"`:     - Marks the agent as undergoing recovery.     - Locks the DPU agent, rejecting all requests except GET,       to ensure isolation and consistency during recovery.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info(recovery_status_request, async_req=True)
+        >>> thread = api.reset_recovery_status_dpu_agent_v1_recovery_status_post_with_http_info(recovery_status_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param recovery_status_request: (required)
         :type recovery_status_request: RecoveryStatusRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -511,7 +546,8 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
-            'recovery_status_request'
+            'recovery_status_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -544,6 +580,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -589,16 +628,18 @@ class RecoveryApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post(self, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Restore From Checkpoint  # noqa: E501
 
         Restore the checkpoint from a file.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post(async_req=True)
+        >>> thread = api.restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -614,19 +655,21 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info(**kwargs)  # noqa: E501
+        return self.restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Restore From Checkpoint  # noqa: E501
 
         Restore the checkpoint from a file.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info(async_req=True)
+        >>> thread = api.restore_from_checkpoint_dpu_agent_v1_checkpoint_restore_post_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -655,6 +698,7 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -687,6 +731,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -701,6 +748,7 @@ class RecoveryApi:
 
         _response_types_map = {
             '200': "BaseResponseBody",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(
@@ -721,16 +769,18 @@ class RecoveryApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def save_checkpoint_dpu_agent_v1_checkpoint_save_post(self, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def save_checkpoint_dpu_agent_v1_checkpoint_save_post(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Save Checkpoint  # noqa: E501
 
         Save the checkpoint to a file.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.save_checkpoint_dpu_agent_v1_checkpoint_save_post(async_req=True)
+        >>> thread = api.save_checkpoint_dpu_agent_v1_checkpoint_save_post(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -746,19 +796,21 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info(**kwargs)  # noqa: E501
+        return self.save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Save Checkpoint  # noqa: E501
 
         Save the checkpoint to a file.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info(async_req=True)
+        >>> thread = api.save_checkpoint_dpu_agent_v1_checkpoint_save_post_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -787,6 +839,7 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -819,6 +872,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -833,6 +889,7 @@ class RecoveryApi:
 
         _response_types_map = {
             '200': "BaseResponseBody",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(
@@ -853,18 +910,20 @@ class RecoveryApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def update_recovery_mode_dpu_agent_v1_recoverymode_update_post(self, recovery_mode_request : RecoveryModeRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def update_recovery_mode_dpu_agent_v1_recoverymode_update_post(self, recovery_mode_request : RecoveryModeRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Update Recovery Mode  # noqa: E501
 
         Update the recovery mode.  Args:      - mode (str): Required. Must be either \"auto\" or \"manual\".  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.update_recovery_mode_dpu_agent_v1_recoverymode_update_post(recovery_mode_request, async_req=True)
+        >>> thread = api.update_recovery_mode_dpu_agent_v1_recoverymode_update_post(recovery_mode_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param recovery_mode_request: (required)
         :type recovery_mode_request: RecoveryModeRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -880,21 +939,23 @@ class RecoveryApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info(recovery_mode_request, **kwargs)  # noqa: E501
+        return self.update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info(recovery_mode_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info(self, recovery_mode_request : RecoveryModeRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info(self, recovery_mode_request : RecoveryModeRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Update Recovery Mode  # noqa: E501
 
         Update the recovery mode.  Args:      - mode (str): Required. Must be either \"auto\" or \"manual\".  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info(recovery_mode_request, async_req=True)
+        >>> thread = api.update_recovery_mode_dpu_agent_v1_recoverymode_update_post_with_http_info(recovery_mode_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param recovery_mode_request: (required)
         :type recovery_mode_request: RecoveryModeRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -923,7 +984,8 @@ class RecoveryApi:
         _params = locals()
 
         _all_params = [
-            'recovery_mode_request'
+            'recovery_mode_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -956,6 +1018,9 @@ class RecoveryApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}

@@ -29,7 +29,7 @@ class Ethernet(BaseModel):
     Ethernet
     """
     name: StrictStr = Field(..., description="ethernet name")
-    mac: Optional[constr(strict=True)] = None
+    mac: constr(strict=True) = Field(...)
     driver: Optional[StrictStr] = None
     dhcp4: StrictBool = Field(...)
     dhcp6: StrictBool = Field(...)
@@ -43,9 +43,6 @@ class Ethernet(BaseModel):
     @validator('mac')
     def mac_validate_regular_expression(cls, value):
         """Validates the regular expression"""
-        if value is None:
-            return value
-
         if not re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", value):
             raise ValueError(r"must validate the regular expression /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/")
         return value

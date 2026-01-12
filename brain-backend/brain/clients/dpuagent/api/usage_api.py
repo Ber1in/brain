@@ -20,6 +20,10 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
+from pydantic import StrictStr
+
+from typing import Optional
+
 from brain.clients.dpuagent.models.uuid_usage_response import UuidUsageResponse
 
 from brain.clients.dpuagent.api_client import ApiClient
@@ -43,15 +47,17 @@ class UsageApi:
         self.api_client = api_client
 
     @validate_arguments
-    def get_uuid_usage_dpu_agent_v1_uuid_get(self, **kwargs) -> UuidUsageResponse:  # noqa: E501
+    def get_uuid_usage_dpu_agent_v1_uuid_get(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> UuidUsageResponse:  # noqa: E501
         """Get Uuid Usage  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_uuid_usage_dpu_agent_v1_uuid_get(async_req=True)
+        >>> thread = api.get_uuid_usage_dpu_agent_v1_uuid_get(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -67,18 +73,20 @@ class UsageApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info(**kwargs)  # noqa: E501
+        return self.get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Get Uuid Usage  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info(async_req=True)
+        >>> thread = api.get_uuid_usage_dpu_agent_v1_uuid_get_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -107,6 +115,7 @@ class UsageApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -139,6 +148,9 @@ class UsageApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -153,6 +165,7 @@ class UsageApi:
 
         _response_types_map = {
             '200': "UuidUsageResponse",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(

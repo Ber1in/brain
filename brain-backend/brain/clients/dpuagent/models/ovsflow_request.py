@@ -30,11 +30,11 @@ class OvsflowRequest(BaseModel):
     uuid: conint(strict=True, le=63, ge=0) = Field(...)
     vlan: conint(strict=True, le=4095, ge=1) = Field(...)
     ip: StrictStr = Field(..., description="IP/Netmask (support IPv4/IPv6)")
-    gw_ip: StrictStr = Field(...)
     src_mac: constr(strict=True) = Field(...)
+    gw_ip: Optional[StrictStr] = None
     dns: Optional[conlist(StrictStr)] = None
     dhcp_server: Optional[StrictStr] = None
-    __properties = ["uuid", "vlan", "ip", "gw_ip", "src_mac", "dns", "dhcp_server"]
+    __properties = ["uuid", "vlan", "ip", "src_mac", "gw_ip", "dns", "dhcp_server"]
 
     @validator('src_mac')
     def src_mac_validate_regular_expression(cls, value):
@@ -82,8 +82,8 @@ class OvsflowRequest(BaseModel):
             "uuid": obj.get("uuid"),
             "vlan": obj.get("vlan"),
             "ip": obj.get("ip"),
-            "gw_ip": obj.get("gw_ip"),
             "src_mac": obj.get("src_mac"),
+            "gw_ip": obj.get("gw_ip"),
             "dns": obj.get("dns"),
             "dhcp_server": obj.get("dhcp_server")
         })

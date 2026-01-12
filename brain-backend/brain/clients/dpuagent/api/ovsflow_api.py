@@ -20,6 +20,10 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
+from pydantic import StrictStr
+
+from typing import Optional
+
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.ovsflow_delete_request import OvsflowDeleteRequest
 from brain.clients.dpuagent.models.ovsflow_request import OvsflowRequest
@@ -45,17 +49,19 @@ class OvsflowApi:
         self.api_client = api_client
 
     @validate_arguments
-    def add_ovsflow_dpu_agent_v1_ovsflow_add_post(self, ovsflow_request : OvsflowRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def add_ovsflow_dpu_agent_v1_ovsflow_add_post(self, ovsflow_request : OvsflowRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Add Ovsflow  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.add_ovsflow_dpu_agent_v1_ovsflow_add_post(ovsflow_request, async_req=True)
+        >>> thread = api.add_ovsflow_dpu_agent_v1_ovsflow_add_post(ovsflow_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param ovsflow_request: (required)
         :type ovsflow_request: OvsflowRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -71,20 +77,22 @@ class OvsflowApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info(ovsflow_request, **kwargs)  # noqa: E501
+        return self.add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info(ovsflow_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info(self, ovsflow_request : OvsflowRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info(self, ovsflow_request : OvsflowRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Add Ovsflow  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info(ovsflow_request, async_req=True)
+        >>> thread = api.add_ovsflow_dpu_agent_v1_ovsflow_add_post_with_http_info(ovsflow_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param ovsflow_request: (required)
         :type ovsflow_request: OvsflowRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -113,7 +121,8 @@ class OvsflowApi:
         _params = locals()
 
         _all_params = [
-            'ovsflow_request'
+            'ovsflow_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -146,6 +155,9 @@ class OvsflowApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -191,17 +203,19 @@ class OvsflowApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def del_ovsflow_dpu_agent_v1_ovsflow_del_post(self, ovsflow_delete_request : OvsflowDeleteRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def del_ovsflow_dpu_agent_v1_ovsflow_del_post(self, ovsflow_delete_request : OvsflowDeleteRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Del Ovsflow  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.del_ovsflow_dpu_agent_v1_ovsflow_del_post(ovsflow_delete_request, async_req=True)
+        >>> thread = api.del_ovsflow_dpu_agent_v1_ovsflow_del_post(ovsflow_delete_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param ovsflow_delete_request: (required)
         :type ovsflow_delete_request: OvsflowDeleteRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -217,20 +231,22 @@ class OvsflowApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info(ovsflow_delete_request, **kwargs)  # noqa: E501
+        return self.del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info(ovsflow_delete_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info(self, ovsflow_delete_request : OvsflowDeleteRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info(self, ovsflow_delete_request : OvsflowDeleteRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Del Ovsflow  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info(ovsflow_delete_request, async_req=True)
+        >>> thread = api.del_ovsflow_dpu_agent_v1_ovsflow_del_post_with_http_info(ovsflow_delete_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param ovsflow_delete_request: (required)
         :type ovsflow_delete_request: OvsflowDeleteRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -259,7 +275,8 @@ class OvsflowApi:
         _params = locals()
 
         _all_params = [
-            'ovsflow_delete_request'
+            'ovsflow_delete_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -292,6 +309,9 @@ class OvsflowApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}

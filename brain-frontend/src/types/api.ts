@@ -212,7 +212,7 @@ export interface InterfaceCreate {
   mv200_id: string
   ip: string
   vlan_tag: number
-  gateway: string
+  gateway?: string
   mtu?: number
   mac?: string
   dns?: string[]

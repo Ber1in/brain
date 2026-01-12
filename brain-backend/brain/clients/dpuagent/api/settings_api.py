@@ -20,6 +20,10 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
+from pydantic import StrictStr
+
+from typing import Optional
+
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.cloud_disk_enable_request import CloudDiskEnableRequest
 from brain.clients.dpuagent.models.cloud_disk_response import CloudDiskResponse
@@ -45,18 +49,20 @@ class SettingsApi:
         self.api_client = api_client
 
     @validate_arguments
-    def enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put(self, cloud_disk_enable_request : CloudDiskEnableRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put(self, cloud_disk_enable_request : CloudDiskEnableRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Enable Pxe  # noqa: E501
 
         Set whether the host supports cloud disk boot  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put(cloud_disk_enable_request, async_req=True)
+        >>> thread = api.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put(cloud_disk_enable_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param cloud_disk_enable_request: (required)
         :type cloud_disk_enable_request: CloudDiskEnableRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -72,21 +78,23 @@ class SettingsApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info(cloud_disk_enable_request, **kwargs)  # noqa: E501
+        return self.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info(cloud_disk_enable_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info(self, cloud_disk_enable_request : CloudDiskEnableRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info(self, cloud_disk_enable_request : CloudDiskEnableRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Enable Pxe  # noqa: E501
 
         Set whether the host supports cloud disk boot  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info(cloud_disk_enable_request, async_req=True)
+        >>> thread = api.enable_pxe_dpu_agent_v1_settings_clouddisk_enable_put_with_http_info(cloud_disk_enable_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param cloud_disk_enable_request: (required)
         :type cloud_disk_enable_request: CloudDiskEnableRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -115,7 +123,8 @@ class SettingsApi:
         _params = locals()
 
         _all_params = [
-            'cloud_disk_enable_request'
+            'cloud_disk_enable_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -148,6 +157,9 @@ class SettingsApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -193,16 +205,18 @@ class SettingsApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(self, **kwargs) -> CloudDiskResponse:  # noqa: E501
+    def get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> CloudDiskResponse:  # noqa: E501
         """Get Clouddisk Enable Setting  # noqa: E501
 
         Retrieve the current cloud disk boot support setting  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(async_req=True)
+        >>> thread = api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -218,19 +232,21 @@ class SettingsApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info(**kwargs)  # noqa: E501
+        return self.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Get Clouddisk Enable Setting  # noqa: E501
 
         Retrieve the current cloud disk boot support setting  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info(async_req=True)
+        >>> thread = api.get_clouddisk_enable_setting_dpu_agent_v1_settings_clouddisk_enable_get_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -259,6 +275,7 @@ class SettingsApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -291,6 +308,9 @@ class SettingsApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -305,6 +325,7 @@ class SettingsApi:
 
         _response_types_map = {
             '200': "CloudDiskResponse",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(

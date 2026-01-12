@@ -20,6 +20,10 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
+from pydantic import StrictStr
+
+from typing import Optional
+
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.cloud_init_request import CloudInitRequest
 from brain.clients.dpuagent.models.cloud_init_response import CloudInitResponse
@@ -45,17 +49,19 @@ class CloudinitApi:
         self.api_client = api_client
 
     @validate_arguments
-    def create_cloudinit_dpu_agent_v1_cloudinit_create_post(self, cloud_init_request : CloudInitRequest, **kwargs) -> CloudInitResponse:  # noqa: E501
+    def create_cloudinit_dpu_agent_v1_cloudinit_create_post(self, cloud_init_request : CloudInitRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> CloudInitResponse:  # noqa: E501
         """Create Cloudinit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.create_cloudinit_dpu_agent_v1_cloudinit_create_post(cloud_init_request, async_req=True)
+        >>> thread = api.create_cloudinit_dpu_agent_v1_cloudinit_create_post(cloud_init_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param cloud_init_request: (required)
         :type cloud_init_request: CloudInitRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -71,20 +77,22 @@ class CloudinitApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info(cloud_init_request, **kwargs)  # noqa: E501
+        return self.create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info(cloud_init_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info(self, cloud_init_request : CloudInitRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info(self, cloud_init_request : CloudInitRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Create Cloudinit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info(cloud_init_request, async_req=True)
+        >>> thread = api.create_cloudinit_dpu_agent_v1_cloudinit_create_post_with_http_info(cloud_init_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param cloud_init_request: (required)
         :type cloud_init_request: CloudInitRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -113,7 +121,8 @@ class CloudinitApi:
         _params = locals()
 
         _all_params = [
-            'cloud_init_request'
+            'cloud_init_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -146,6 +155,9 @@ class CloudinitApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -191,15 +203,17 @@ class CloudinitApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def delete_cloudinit_dpu_agent_v1_cloudinit_delete_post(self, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def delete_cloudinit_dpu_agent_v1_cloudinit_delete_post(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Delete Cloudinit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post(async_req=True)
+        >>> thread = api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -215,18 +229,20 @@ class CloudinitApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info(**kwargs)  # noqa: E501
+        return self.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Delete Cloudinit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info(async_req=True)
+        >>> thread = api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -255,6 +271,7 @@ class CloudinitApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -287,6 +304,9 @@ class CloudinitApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -301,6 +321,7 @@ class CloudinitApi:
 
         _response_types_map = {
             '200': "BaseResponseBody",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(

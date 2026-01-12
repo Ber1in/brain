@@ -88,6 +88,27 @@
           <div class="form-tip">例: 192.168.10.101/24</div>
         </el-form-item>
 
+        <el-form-item label="VLAN ID" prop="vlan_tag">
+          <el-input-number
+            v-model="form.vlan_tag"
+            :min="0"
+            :max="4094"
+            placeholder="输入VLAN ID"
+            style="width: 150px;"
+            :controls="false"
+          />
+        </el-form-item>
+
+        <el-form-item label="MTU" prop="mtu">
+          <el-input-number
+            v-model="form.mtu"
+            :min="68"
+            :max="9000"
+            placeholder="输入MTU值"
+            style="width: 150px;"
+          />
+        </el-form-item>
+
         <el-form-item label="网关" prop="gateway">
           <div class="ip-segments">
             <el-input
@@ -135,27 +156,6 @@
               style="width: 60px; text-align: center;"
             />
           </div>
-        </el-form-item>
-
-        <el-form-item label="VLAN ID" prop="vlan_tag">
-          <el-input-number
-            v-model="form.vlan_tag"
-            :min="0"
-            :max="4094"
-            placeholder="输入VLAN ID"
-            style="width: 150px;"
-            :controls="false"
-          />
-        </el-form-item>
-
-        <el-form-item label="MTU" prop="mtu">
-          <el-input-number
-            v-model="form.mtu"
-            :min="68"
-            :max="9000"
-            placeholder="输入MTU值"
-            style="width: 150px;"
-          />
         </el-form-item>
 
         <el-form-item label="MAC地址">
@@ -301,7 +301,7 @@ const dnsInputRefs = ref<Record<string, any>>({})
 const form = reactive<InterfaceCreate>({
   mv200_id: '',
   ip: '',
-  gateway: '',
+  gateway: undefined,
   vlan_tag: undefined,
   mtu: 1500,
   mac: undefined,
@@ -508,8 +508,9 @@ const validateIP = (rule: any, value: string, callback: any) => {
 
 // 网关验证
 const validateGateway = (rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请输入网关地址'))
+  // 如果网关为空，直接通过验证
+  if (value === undefined) {
+    callback()
     return
   }
   
@@ -555,7 +556,7 @@ const rules: FormRules = {
     { required: true, validator: validateIP, trigger: 'blur' }
   ],
   gateway: [
-    { required: true, validator: validateGateway, trigger: 'blur' }
+    { validator: validateGateway, trigger: 'blur' }
   ],
   vlan_tag: [
     { required: true, message: '请输入VLAN ID', trigger: 'blur' },
@@ -614,6 +615,10 @@ const handleSubmit = async () => {
     // 如果MAC地址为空，设置为undefined，不传该参数
     if (!form.mac || form.mac.trim() === '') {
       form.mac = undefined
+    }
+
+    if (!form.gateway || form.gateway.trim() === '') {
+      form.gateway = undefined
     }
 
     await networkApi.create(form)

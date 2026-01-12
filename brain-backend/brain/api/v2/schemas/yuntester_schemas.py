@@ -1,7 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from pydantic import BaseModel, validator, root_validator
+from pydantic import BaseModel, root_validator
 from typing import Any, Dict, List, Optional
 
 

@@ -65,7 +65,7 @@ class InterfaceCreate(BaseModel):
     mv200_id: str = Field(..., description="Target SoC ID to perform network operation")
     ip: IPWithNetmask = Field(..., description="IP address with CIDR mask, e.g., 192.168.1.10/24")
     vlan_tag: int = Field(..., description="VLAN tag for the interface")
-    gateway: str = Field(..., description="Gateway address for the interface")
+    gateway: str = Field(None, description="Gateway address for the interface")
     mtu: int = Field(1500, description="Optional field, MTU size", example=1500)
     mac: Optional[Mac] = Field(None, description="MAC address of the interface (optional)")
     dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
@@ -96,4 +96,5 @@ class InterfaceInfo(InterfaceCreate):
     ifname: str = Field(None)
     creator: str = Field(None)
     dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
+    xsc_id: int
 

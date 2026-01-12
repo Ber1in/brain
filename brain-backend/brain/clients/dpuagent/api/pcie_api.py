@@ -20,6 +20,10 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
+from pydantic import StrictStr
+
+from typing import Optional
+
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.qos_ratio_request import QosRatioRequest
 
@@ -44,18 +48,20 @@ class PcieApi:
         self.api_client = api_client
 
     @validate_arguments
-    def set_pcie_qos_dpu_agent_v1_pcieqos_set_post(self, qos_ratio_request : QosRatioRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def set_pcie_qos_dpu_agent_v1_pcieqos_set_post(self, qos_ratio_request : QosRatioRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Set Pcie Qos  # noqa: E501
 
         Set the PCIe traffic QoS ratio between storage and network.  Args:      - storage (int): Storage traffic weight.     - network (int): Network traffic weight.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.set_pcie_qos_dpu_agent_v1_pcieqos_set_post(qos_ratio_request, async_req=True)
+        >>> thread = api.set_pcie_qos_dpu_agent_v1_pcieqos_set_post(qos_ratio_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param qos_ratio_request: (required)
         :type qos_ratio_request: QosRatioRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -71,21 +77,23 @@ class PcieApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info(qos_ratio_request, **kwargs)  # noqa: E501
+        return self.set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info(qos_ratio_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info(self, qos_ratio_request : QosRatioRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info(self, qos_ratio_request : QosRatioRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Set Pcie Qos  # noqa: E501
 
         Set the PCIe traffic QoS ratio between storage and network.  Args:      - storage (int): Storage traffic weight.     - network (int): Network traffic weight.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info(qos_ratio_request, async_req=True)
+        >>> thread = api.set_pcie_qos_dpu_agent_v1_pcieqos_set_post_with_http_info(qos_ratio_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param qos_ratio_request: (required)
         :type qos_ratio_request: QosRatioRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -114,7 +122,8 @@ class PcieApi:
         _params = locals()
 
         _all_params = [
-            'qos_ratio_request'
+            'qos_ratio_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -147,6 +156,9 @@ class PcieApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}

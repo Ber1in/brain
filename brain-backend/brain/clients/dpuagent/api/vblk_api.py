@@ -20,7 +20,7 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
-from pydantic import conint
+from pydantic import StrictStr, conint
 
 from typing import Optional
 
@@ -53,17 +53,19 @@ class VblkApi:
         self.api_client = api_client
 
     @validate_arguments
-    def create_vblk_dpu_agent_v1_vblk_add_post(self, dpuagent_api_v1_schemas_vblk_schemas_create_request : DpuagentApiV1SchemasVblkSchemasCreateRequest, **kwargs) -> DpuagentApiV1SchemasVblkSchemasCreateResponseBody:  # noqa: E501
+    def create_vblk_dpu_agent_v1_vblk_add_post(self, dpuagent_api_v1_schemas_vblk_schemas_create_request : DpuagentApiV1SchemasVblkSchemasCreateRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> DpuagentApiV1SchemasVblkSchemasCreateResponseBody:  # noqa: E501
         """Create Vblk  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.create_vblk_dpu_agent_v1_vblk_add_post(dpuagent_api_v1_schemas_vblk_schemas_create_request, async_req=True)
+        >>> thread = api.create_vblk_dpu_agent_v1_vblk_add_post(dpuagent_api_v1_schemas_vblk_schemas_create_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_vblk_schemas_create_request: (required)
         :type dpuagent_api_v1_schemas_vblk_schemas_create_request: DpuagentApiV1SchemasVblkSchemasCreateRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -79,20 +81,22 @@ class VblkApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the create_vblk_dpu_agent_v1_vblk_add_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.create_vblk_dpu_agent_v1_vblk_add_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_create_request, **kwargs)  # noqa: E501
+        return self.create_vblk_dpu_agent_v1_vblk_add_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_create_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def create_vblk_dpu_agent_v1_vblk_add_post_with_http_info(self, dpuagent_api_v1_schemas_vblk_schemas_create_request : DpuagentApiV1SchemasVblkSchemasCreateRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def create_vblk_dpu_agent_v1_vblk_add_post_with_http_info(self, dpuagent_api_v1_schemas_vblk_schemas_create_request : DpuagentApiV1SchemasVblkSchemasCreateRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Create Vblk  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.create_vblk_dpu_agent_v1_vblk_add_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_create_request, async_req=True)
+        >>> thread = api.create_vblk_dpu_agent_v1_vblk_add_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_create_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_vblk_schemas_create_request: (required)
         :type dpuagent_api_v1_schemas_vblk_schemas_create_request: DpuagentApiV1SchemasVblkSchemasCreateRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -121,7 +125,8 @@ class VblkApi:
         _params = locals()
 
         _all_params = [
-            'dpuagent_api_v1_schemas_vblk_schemas_create_request'
+            'dpuagent_api_v1_schemas_vblk_schemas_create_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -154,6 +159,9 @@ class VblkApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -199,17 +207,19 @@ class VblkApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def delete_vblk_dpu_agent_v1_vblk_del_post(self, dpuagent_api_v1_schemas_vblk_schemas_delete_request : DpuagentApiV1SchemasVblkSchemasDeleteRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def delete_vblk_dpu_agent_v1_vblk_del_post(self, dpuagent_api_v1_schemas_vblk_schemas_delete_request : DpuagentApiV1SchemasVblkSchemasDeleteRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Delete Vblk  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.delete_vblk_dpu_agent_v1_vblk_del_post(dpuagent_api_v1_schemas_vblk_schemas_delete_request, async_req=True)
+        >>> thread = api.delete_vblk_dpu_agent_v1_vblk_del_post(dpuagent_api_v1_schemas_vblk_schemas_delete_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_vblk_schemas_delete_request: (required)
         :type dpuagent_api_v1_schemas_vblk_schemas_delete_request: DpuagentApiV1SchemasVblkSchemasDeleteRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -225,20 +235,22 @@ class VblkApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_delete_request, **kwargs)  # noqa: E501
+        return self.delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_delete_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info(self, dpuagent_api_v1_schemas_vblk_schemas_delete_request : DpuagentApiV1SchemasVblkSchemasDeleteRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info(self, dpuagent_api_v1_schemas_vblk_schemas_delete_request : DpuagentApiV1SchemasVblkSchemasDeleteRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Delete Vblk  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_delete_request, async_req=True)
+        >>> thread = api.delete_vblk_dpu_agent_v1_vblk_del_post_with_http_info(dpuagent_api_v1_schemas_vblk_schemas_delete_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_vblk_schemas_delete_request: (required)
         :type dpuagent_api_v1_schemas_vblk_schemas_delete_request: DpuagentApiV1SchemasVblkSchemasDeleteRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -267,7 +279,8 @@ class VblkApi:
         _params = locals()
 
         _all_params = [
-            'dpuagent_api_v1_schemas_vblk_schemas_delete_request'
+            'dpuagent_api_v1_schemas_vblk_schemas_delete_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -300,6 +313,9 @@ class VblkApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -345,17 +361,19 @@ class VblkApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get(self, uuid : conint(strict=True, le=63, ge=0), **kwargs) -> BdevQosInfoResponse:  # noqa: E501
+    def get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get(self, uuid : conint(strict=True, le=63, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BdevQosInfoResponse:  # noqa: E501
         """Get Bdev Qos Limit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get(uuid, async_req=True)
+        >>> thread = api.get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get(uuid, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid: (required)
         :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -371,20 +389,22 @@ class VblkApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info(uuid, **kwargs)  # noqa: E501
+        return self.get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info(uuid, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), **kwargs) -> ApiResponse:  # noqa: E501
+    def get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Get Bdev Qos Limit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info(uuid, async_req=True)
+        >>> thread = api.get_bdev_qos_limit_dpu_agent_v1_bdev_qos_get_get_with_http_info(uuid, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid: (required)
         :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -413,7 +433,8 @@ class VblkApi:
         _params = locals()
 
         _all_params = [
-            'uuid'
+            'uuid',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -449,6 +470,9 @@ class VblkApi:
 
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -484,18 +508,20 @@ class VblkApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def list_vblk_controllers_dpu_agent_v1_vblk_list_get(self, uuid : Optional[conint(strict=True, le=63, ge=0)] = None, **kwargs) -> VBlkListResponse:  # noqa: E501
+    def list_vblk_controllers_dpu_agent_v1_vblk_list_get(self, uuid : Optional[conint(strict=True, le=63, ge=0)] = None, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> VBlkListResponse:  # noqa: E501
         """List Vblk Controllers  # noqa: E501
 
         List virtual block controllers  Args: - `uuid`: Optional controller uuid to filter the results. If provided, only returns                information about the specified controller.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.list_vblk_controllers_dpu_agent_v1_vblk_list_get(uuid, async_req=True)
+        >>> thread = api.list_vblk_controllers_dpu_agent_v1_vblk_list_get(uuid, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid:
         :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -511,21 +537,23 @@ class VblkApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info(uuid, **kwargs)  # noqa: E501
+        return self.list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info(uuid, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info(self, uuid : Optional[conint(strict=True, le=63, ge=0)] = None, **kwargs) -> ApiResponse:  # noqa: E501
+    def list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info(self, uuid : Optional[conint(strict=True, le=63, ge=0)] = None, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """List Vblk Controllers  # noqa: E501
 
         List virtual block controllers  Args: - `uuid`: Optional controller uuid to filter the results. If provided, only returns                information about the specified controller.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info(uuid, async_req=True)
+        >>> thread = api.list_vblk_controllers_dpu_agent_v1_vblk_list_get_with_http_info(uuid, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid:
         :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -554,7 +582,8 @@ class VblkApi:
         _params = locals()
 
         _all_params = [
-            'uuid'
+            'uuid',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -590,6 +619,9 @@ class VblkApi:
 
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -625,17 +657,19 @@ class VblkApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post(self, qos_set_request : QosSetRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post(self, qos_set_request : QosSetRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Set Bdev Qos Limit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post(qos_set_request, async_req=True)
+        >>> thread = api.set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post(qos_set_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param qos_set_request: (required)
         :type qos_set_request: QosSetRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -651,20 +685,22 @@ class VblkApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info(qos_set_request, **kwargs)  # noqa: E501
+        return self.set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info(qos_set_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info(self, qos_set_request : QosSetRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info(self, qos_set_request : QosSetRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Set Bdev Qos Limit  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info(qos_set_request, async_req=True)
+        >>> thread = api.set_bdev_qos_limit_dpu_agent_v1_bdev_qos_set_post_with_http_info(qos_set_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param qos_set_request: (required)
         :type qos_set_request: QosSetRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -693,7 +729,8 @@ class VblkApi:
         _params = locals()
 
         _all_params = [
-            'qos_set_request'
+            'qos_set_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -726,6 +763,9 @@ class VblkApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}

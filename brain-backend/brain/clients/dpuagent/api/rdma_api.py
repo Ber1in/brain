@@ -22,6 +22,8 @@ from pydantic import validate_arguments, ValidationError
 
 from pydantic import StrictStr
 
+from typing import Optional
+
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.dscp2_prio_request import Dscp2PrioRequest
 from brain.clients.dpuagent.models.dscp_request import DscpRequest
@@ -52,20 +54,22 @@ class RdmaApi:
         self.api_client = api_client
 
     @validate_arguments
-    def configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post(self, bdf : StrictStr, dscp_request : DscpRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post(self, bdf : StrictStr, dscp_request : DscpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Cma Dscp  # noqa: E501
 
         Configure the CMA DSCP value.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post(bdf, dscp_request, async_req=True)
+        >>> thread = api.configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post(bdf, dscp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param dscp_request: (required)
         :type dscp_request: DscpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -81,23 +85,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info(bdf, dscp_request, **kwargs)  # noqa: E501
+        return self.configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info(bdf, dscp_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info(self, bdf : StrictStr, dscp_request : DscpRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info(self, bdf : StrictStr, dscp_request : DscpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Cma Dscp  # noqa: E501
 
         Configure the CMA DSCP value.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info(bdf, dscp_request, async_req=True)
+        >>> thread = api.configure_cma_dscp_dpu_agent_v1_rdma_qos_bdf_cma_dscp_post_with_http_info(bdf, dscp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param dscp_request: (required)
         :type dscp_request: DscpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -127,7 +133,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'dscp_request'
+            'dscp_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -163,6 +170,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -208,20 +218,22 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post(self, bdf : StrictStr, pcp_request : PcpRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post(self, bdf : StrictStr, pcp_request : PcpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Cma Pcp  # noqa: E501
 
         Configure the CMA PCP value.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post(bdf, pcp_request, async_req=True)
+        >>> thread = api.configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post(bdf, pcp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param pcp_request: (required)
         :type pcp_request: PcpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -237,23 +249,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info(bdf, pcp_request, **kwargs)  # noqa: E501
+        return self.configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info(bdf, pcp_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info(self, bdf : StrictStr, pcp_request : PcpRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info(self, bdf : StrictStr, pcp_request : PcpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Cma Pcp  # noqa: E501
 
         Configure the CMA PCP value.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info(bdf, pcp_request, async_req=True)
+        >>> thread = api.configure_cma_pcp_dpu_agent_v1_rdma_qos_bdf_cma_pcp_post_with_http_info(bdf, pcp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param pcp_request: (required)
         :type pcp_request: PcpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -283,7 +297,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'pcp_request'
+            'pcp_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -319,6 +334,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -364,20 +382,22 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post(self, bdf : StrictStr, dscp2_prio_request : Dscp2PrioRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post(self, bdf : StrictStr, dscp2_prio_request : Dscp2PrioRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Device Dscp2Prio  # noqa: E501
 
         Set/unset a (dscp,prio) mapping.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post(bdf, dscp2_prio_request, async_req=True)
+        >>> thread = api.configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post(bdf, dscp2_prio_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param dscp2_prio_request: (required)
         :type dscp2_prio_request: Dscp2PrioRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -393,23 +413,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info(bdf, dscp2_prio_request, **kwargs)  # noqa: E501
+        return self.configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info(bdf, dscp2_prio_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info(self, bdf : StrictStr, dscp2_prio_request : Dscp2PrioRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info(self, bdf : StrictStr, dscp2_prio_request : Dscp2PrioRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Device Dscp2Prio  # noqa: E501
 
         Set/unset a (dscp,prio) mapping.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info(bdf, dscp2_prio_request, async_req=True)
+        >>> thread = api.configure_device_dscp2prio_dpu_agent_v1_rdma_qos_bdf_dscp2prio_post_with_http_info(bdf, dscp2_prio_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param dscp2_prio_request: (required)
         :type dscp2_prio_request: Dscp2PrioRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -439,7 +461,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'dscp2_prio_request'
+            'dscp2_prio_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -475,6 +498,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -520,20 +546,22 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post(self, bdf : StrictStr, pfc_request : PfcRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post(self, bdf : StrictStr, pfc_request : PfcRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Device Pfc  # noqa: E501
 
         Configure the PFC for the device.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post(bdf, pfc_request, async_req=True)
+        >>> thread = api.configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post(bdf, pfc_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param pfc_request: (required)
         :type pfc_request: PfcRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -549,23 +577,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info(bdf, pfc_request, **kwargs)  # noqa: E501
+        return self.configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info(bdf, pfc_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info(self, bdf : StrictStr, pfc_request : PfcRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info(self, bdf : StrictStr, pfc_request : PfcRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Device Pfc  # noqa: E501
 
         Configure the PFC for the device.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info(bdf, pfc_request, async_req=True)
+        >>> thread = api.configure_device_pfc_dpu_agent_v1_rdma_qos_bdf_pfc_post_with_http_info(bdf, pfc_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param pfc_request: (required)
         :type pfc_request: PfcRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -595,7 +625,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'pfc_request'
+            'pfc_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -631,6 +662,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -676,20 +710,22 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post(self, bdf : StrictStr, trust_request : TrustRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post(self, bdf : StrictStr, trust_request : TrustRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Device Trust  # noqa: E501
 
         Configure the trust mode for the device.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post(bdf, trust_request, async_req=True)
+        >>> thread = api.configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post(bdf, trust_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param trust_request: (required)
         :type trust_request: TrustRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -705,23 +741,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info(bdf, trust_request, **kwargs)  # noqa: E501
+        return self.configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info(bdf, trust_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info(self, bdf : StrictStr, trust_request : TrustRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info(self, bdf : StrictStr, trust_request : TrustRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Device Trust  # noqa: E501
 
         Configure the trust mode for the device.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info(bdf, trust_request, async_req=True)
+        >>> thread = api.configure_device_trust_dpu_agent_v1_rdma_qos_bdf_trush_post_with_http_info(bdf, trust_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param trust_request: (required)
         :type trust_request: TrustRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -751,7 +789,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'trust_request'
+            'trust_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -787,6 +826,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -832,20 +874,22 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post(self, bdf : StrictStr, dscp_request : DscpRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post(self, bdf : StrictStr, dscp_request : DscpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Force Dscp  # noqa: E501
 
         Configure PF force dscp .  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post(bdf, dscp_request, async_req=True)
+        >>> thread = api.configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post(bdf, dscp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param dscp_request: (required)
         :type dscp_request: DscpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -861,23 +905,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info(bdf, dscp_request, **kwargs)  # noqa: E501
+        return self.configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info(bdf, dscp_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info(self, bdf : StrictStr, dscp_request : DscpRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info(self, bdf : StrictStr, dscp_request : DscpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Force Dscp  # noqa: E501
 
         Configure PF force dscp .  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info(bdf, dscp_request, async_req=True)
+        >>> thread = api.configure_force_dscp_dpu_agent_v1_rdma_qos_bdf_force_dscp_post_with_http_info(bdf, dscp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param dscp_request: (required)
         :type dscp_request: DscpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -907,7 +953,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'dscp_request'
+            'dscp_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -943,6 +990,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -988,20 +1038,22 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post(self, bdf : StrictStr, pcp_request : PcpRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post(self, bdf : StrictStr, pcp_request : PcpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Configure Force Pcp  # noqa: E501
 
         Configure PF force pcp .  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post(bdf, pcp_request, async_req=True)
+        >>> thread = api.configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post(bdf, pcp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param pcp_request: (required)
         :type pcp_request: PcpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -1017,23 +1069,25 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info(bdf, pcp_request, **kwargs)  # noqa: E501
+        return self.configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info(bdf, pcp_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info(self, bdf : StrictStr, pcp_request : PcpRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info(self, bdf : StrictStr, pcp_request : PcpRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Configure Force Pcp  # noqa: E501
 
         Configure PF force pcp .  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info(bdf, pcp_request, async_req=True)
+        >>> thread = api.configure_force_pcp_dpu_agent_v1_rdma_qos_bdf_force_pcp_post_with_http_info(bdf, pcp_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
         :param pcp_request: (required)
         :type pcp_request: PcpRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -1063,7 +1117,8 @@ class RdmaApi:
 
         _all_params = [
             'bdf',
-            'pcp_request'
+            'pcp_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -1099,6 +1154,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -1144,18 +1202,20 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get(self, bdf : StrictStr, **kwargs) -> QosInfo:  # noqa: E501
+    def get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get(self, bdf : StrictStr, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> QosInfo:  # noqa: E501
         """Get Nic Qos  # noqa: E501
 
         Get the qos information for the device.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get(bdf, async_req=True)
+        >>> thread = api.get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get(bdf, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -1171,21 +1231,23 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info(bdf, **kwargs)  # noqa: E501
+        return self.get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info(bdf, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info(self, bdf : StrictStr, **kwargs) -> ApiResponse:  # noqa: E501
+    def get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info(self, bdf : StrictStr, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Get Nic Qos  # noqa: E501
 
         Get the qos information for the device.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info(bdf, async_req=True)
+        >>> thread = api.get_nic_qos_dpu_agent_v1_rdma_qos_bdf_get_with_http_info(bdf, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param bdf: (required)
         :type bdf: str
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -1214,7 +1276,8 @@ class RdmaApi:
         _params = locals()
 
         _all_params = [
-            'bdf'
+            'bdf',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -1250,6 +1313,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -1285,16 +1351,18 @@ class RdmaApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def list_nics_info_dpu_agent_v1_rdma_list_nics_get(self, **kwargs) -> NicsInfoResponse:  # noqa: E501
+    def list_nics_info_dpu_agent_v1_rdma_list_nics_get(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> NicsInfoResponse:  # noqa: E501
         """List Nics Info  # noqa: E501
 
         Get the NICs information from rdma.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.list_nics_info_dpu_agent_v1_rdma_list_nics_get(async_req=True)
+        >>> thread = api.list_nics_info_dpu_agent_v1_rdma_list_nics_get(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -1310,19 +1378,21 @@ class RdmaApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info(**kwargs)  # noqa: E501
+        return self.list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info(x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info(self, **kwargs) -> ApiResponse:  # noqa: E501
+    def list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info(self, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """List Nics Info  # noqa: E501
 
         Get the NICs information from rdma.  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info(async_req=True)
+        >>> thread = api.list_nics_info_dpu_agent_v1_rdma_list_nics_get_with_http_info(x_internal_auth, async_req=True)
         >>> result = thread.get()
 
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -1351,6 +1421,7 @@ class RdmaApi:
         _params = locals()
 
         _all_params = [
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -1383,6 +1454,9 @@ class RdmaApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -1397,6 +1471,7 @@ class RdmaApi:
 
         _response_types_map = {
             '200': "NicsInfoResponse",
+            '422': "HTTPValidationError",
         }
 
         return self.api_client.call_api(

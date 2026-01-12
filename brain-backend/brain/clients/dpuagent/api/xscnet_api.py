@@ -20,7 +20,9 @@ import warnings
 
 from pydantic import validate_arguments, ValidationError
 
-from pydantic import conint
+from pydantic import StrictStr, conint
+
+from typing import Optional
 
 from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.dpuagent_api_v1_schemas_xscnet_schemas_create_request import DpuagentApiV1SchemasXscnetSchemasCreateRequest
@@ -50,17 +52,19 @@ class XscnetApi:
         self.api_client = api_client
 
     @validate_arguments
-    def create_xscnet_dpu_agent_v1_xscnet_add_post(self, dpuagent_api_v1_schemas_xscnet_schemas_create_request : DpuagentApiV1SchemasXscnetSchemasCreateRequest, **kwargs) -> DpuagentApiV1SchemasXscnetSchemasCreateResponseBody:  # noqa: E501
+    def create_xscnet_dpu_agent_v1_xscnet_add_post(self, dpuagent_api_v1_schemas_xscnet_schemas_create_request : DpuagentApiV1SchemasXscnetSchemasCreateRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> DpuagentApiV1SchemasXscnetSchemasCreateResponseBody:  # noqa: E501
         """Create Xscnet  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.create_xscnet_dpu_agent_v1_xscnet_add_post(dpuagent_api_v1_schemas_xscnet_schemas_create_request, async_req=True)
+        >>> thread = api.create_xscnet_dpu_agent_v1_xscnet_add_post(dpuagent_api_v1_schemas_xscnet_schemas_create_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_xscnet_schemas_create_request: (required)
         :type dpuagent_api_v1_schemas_xscnet_schemas_create_request: DpuagentApiV1SchemasXscnetSchemasCreateRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -76,20 +80,22 @@ class XscnetApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_create_request, **kwargs)  # noqa: E501
+        return self.create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_create_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info(self, dpuagent_api_v1_schemas_xscnet_schemas_create_request : DpuagentApiV1SchemasXscnetSchemasCreateRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info(self, dpuagent_api_v1_schemas_xscnet_schemas_create_request : DpuagentApiV1SchemasXscnetSchemasCreateRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Create Xscnet  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_create_request, async_req=True)
+        >>> thread = api.create_xscnet_dpu_agent_v1_xscnet_add_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_create_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_xscnet_schemas_create_request: (required)
         :type dpuagent_api_v1_schemas_xscnet_schemas_create_request: DpuagentApiV1SchemasXscnetSchemasCreateRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -118,7 +124,8 @@ class XscnetApi:
         _params = locals()
 
         _all_params = [
-            'dpuagent_api_v1_schemas_xscnet_schemas_create_request'
+            'dpuagent_api_v1_schemas_xscnet_schemas_create_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -151,6 +158,9 @@ class XscnetApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -196,17 +206,19 @@ class XscnetApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def delete_xscnet_dpu_agent_v1_xscnet_del_post(self, dpuagent_api_v1_schemas_xscnet_schemas_delete_request : DpuagentApiV1SchemasXscnetSchemasDeleteRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def delete_xscnet_dpu_agent_v1_xscnet_del_post(self, dpuagent_api_v1_schemas_xscnet_schemas_delete_request : DpuagentApiV1SchemasXscnetSchemasDeleteRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Delete Xscnet  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.delete_xscnet_dpu_agent_v1_xscnet_del_post(dpuagent_api_v1_schemas_xscnet_schemas_delete_request, async_req=True)
+        >>> thread = api.delete_xscnet_dpu_agent_v1_xscnet_del_post(dpuagent_api_v1_schemas_xscnet_schemas_delete_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_xscnet_schemas_delete_request: (required)
         :type dpuagent_api_v1_schemas_xscnet_schemas_delete_request: DpuagentApiV1SchemasXscnetSchemasDeleteRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -222,20 +234,22 @@ class XscnetApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_delete_request, **kwargs)  # noqa: E501
+        return self.delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_delete_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info(self, dpuagent_api_v1_schemas_xscnet_schemas_delete_request : DpuagentApiV1SchemasXscnetSchemasDeleteRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info(self, dpuagent_api_v1_schemas_xscnet_schemas_delete_request : DpuagentApiV1SchemasXscnetSchemasDeleteRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Delete Xscnet  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_delete_request, async_req=True)
+        >>> thread = api.delete_xscnet_dpu_agent_v1_xscnet_del_post_with_http_info(dpuagent_api_v1_schemas_xscnet_schemas_delete_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param dpuagent_api_v1_schemas_xscnet_schemas_delete_request: (required)
         :type dpuagent_api_v1_schemas_xscnet_schemas_delete_request: DpuagentApiV1SchemasXscnetSchemasDeleteRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -264,7 +278,8 @@ class XscnetApi:
         _params = locals()
 
         _all_params = [
-            'dpuagent_api_v1_schemas_xscnet_schemas_delete_request'
+            'dpuagent_api_v1_schemas_xscnet_schemas_delete_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -297,6 +312,9 @@ class XscnetApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -342,20 +360,22 @@ class XscnetApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def set_qos_dpu_agent_v1_xscqos_uuid_post(self, uuid : conint(strict=True, le=63, ge=0), qo_s_request : QoSRequest, **kwargs) -> BaseResponseBody:  # noqa: E501
+    def set_qos_dpu_agent_v1_xscqos_uuid_post(self, uuid : conint(strict=True, le=63, ge=0), qo_s_request : QoSRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
         """Set Qos  # noqa: E501
 
         Set QoS rate limit for a specific id (PF/VF).  When limit is 0, it means unsetting  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.set_qos_dpu_agent_v1_xscqos_uuid_post(uuid, qo_s_request, async_req=True)
+        >>> thread = api.set_qos_dpu_agent_v1_xscqos_uuid_post(uuid, qo_s_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid: (required)
         :type uuid: int
         :param qo_s_request: (required)
         :type qo_s_request: QoSRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -371,23 +391,25 @@ class XscnetApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info(uuid, qo_s_request, **kwargs)  # noqa: E501
+        return self.set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info(uuid, qo_s_request, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), qo_s_request : QoSRequest, **kwargs) -> ApiResponse:  # noqa: E501
+    def set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), qo_s_request : QoSRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Set Qos  # noqa: E501
 
         Set QoS rate limit for a specific id (PF/VF).  When limit is 0, it means unsetting  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info(uuid, qo_s_request, async_req=True)
+        >>> thread = api.set_qos_dpu_agent_v1_xscqos_uuid_post_with_http_info(uuid, qo_s_request, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid: (required)
         :type uuid: int
         :param qo_s_request: (required)
         :type qo_s_request: QoSRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -417,7 +439,8 @@ class XscnetApi:
 
         _all_params = [
             'uuid',
-            'qo_s_request'
+            'qo_s_request',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -453,6 +476,9 @@ class XscnetApi:
         _query_params = []
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
@@ -498,20 +524,22 @@ class XscnetApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
-    def show_qos_dpu_agent_v1_xscqos_uuid_get(self, uuid : conint(strict=True, le=63, ge=0), prio : conint(strict=True, le=7, ge=0), **kwargs) -> QosResponse:  # noqa: E501
+    def show_qos_dpu_agent_v1_xscqos_uuid_get(self, uuid : conint(strict=True, le=63, ge=0), prio : conint(strict=True, le=7, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> QosResponse:  # noqa: E501
         """Show Qos  # noqa: E501
 
         Get current QoS configuration for a specific id (PF/VF).  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.show_qos_dpu_agent_v1_xscqos_uuid_get(uuid, prio, async_req=True)
+        >>> thread = api.show_qos_dpu_agent_v1_xscqos_uuid_get(uuid, prio, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid: (required)
         :type uuid: int
         :param prio: (required)
         :type prio: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _request_timeout: timeout setting for this request.
@@ -527,23 +555,25 @@ class XscnetApi:
         if '_preload_content' in kwargs:
             message = "Error! Please call the show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
             raise ValueError(message)
-        return self.show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info(uuid, prio, **kwargs)  # noqa: E501
+        return self.show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info(uuid, prio, x_internal_auth, **kwargs)  # noqa: E501
 
     @validate_arguments
-    def show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), prio : conint(strict=True, le=7, ge=0), **kwargs) -> ApiResponse:  # noqa: E501
+    def show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), prio : conint(strict=True, le=7, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
         """Show Qos  # noqa: E501
 
         Get current QoS configuration for a specific id (PF/VF).  # noqa: E501
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
 
-        >>> thread = api.show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info(uuid, prio, async_req=True)
+        >>> thread = api.show_qos_dpu_agent_v1_xscqos_uuid_get_with_http_info(uuid, prio, x_internal_auth, async_req=True)
         >>> result = thread.get()
 
         :param uuid: (required)
         :type uuid: int
         :param prio: (required)
         :type prio: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
         :param async_req: Whether to execute the request asynchronously.
         :type async_req: bool, optional
         :param _preload_content: if False, the ApiResponse.data will
@@ -573,7 +603,8 @@ class XscnetApi:
 
         _all_params = [
             'uuid',
-            'prio'
+            'prio',
+            'x_internal_auth'
         ]
         _all_params.extend(
             [
@@ -612,6 +643,9 @@ class XscnetApi:
 
         # process the header parameters
         _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
         # process the form parameters
         _form_params = []
         _files = {}
