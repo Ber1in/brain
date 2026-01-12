@@ -58,6 +58,23 @@
                       <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
                     </el-tooltip>
                   </el-dropdown-item>
+                  <el-dropdown-item 
+                    command="batchUpdateMcr" 
+                    class="batch-update-mcr-item"
+                    :disabled="!canBatchUpdateMcr"
+                    divided
+                  >
+                    <el-icon><Upload /></el-icon>
+                    <span>更新MCR</span>
+                    <el-tooltip 
+                      v-if="!canBatchUpdateMcr && selectedDevices.length > 0"
+                      effect="dark" 
+                      :content="getBatchUpdateMcrTooltip()"
+                      placement="top"
+                    >
+                      <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </el-dropdown-item>
                   <el-dropdown-item command="batchPowerCycle" divided class="batch-power-item">
                     <el-icon><Refresh /></el-icon>
                     <span>冷重启</span>
@@ -1122,27 +1139,57 @@
     <!-- 修改：更新MCR包对话框 - 第一步选择MCR文件 -->
     <el-dialog
       v-model="updateMcrDialogVisible"
-      title="更新MCR包"
+      :title="updateMcrDialogTitle"
       width="800px"
       class="update-mcr-dialog"
       :close-on-click-modal="false"
     >
+      <!-- 在对话框内容开头添加批量模式信息 -->
+      <div v-if="isBatchMcrMode" class="batch-mcr-info">
+        <el-alert
+          :title="`将对 ${selectedDevices.length} 台服务器更新相同的MCR包`"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+        
+        <div class="device-preview">
+          <div class="preview-title">
+            服务器列表 ({{ selectedDevices.length }} 台):
+          </div>
+          <div class="device-list">
+            <div 
+              v-for="device in selectedDevices.slice(0, 3)" 
+              :key="device.id"
+              class="device-preview-item"
+            >
+              <span class="hostname">{{ device.bmc.hostname }}</span>
+              <span class="ip">{{ device.device.ip }}</span>
+            </div>
+            <div v-if="selectedDevices.length > 3" class="more-devices">
+              等 {{ selectedDevices.length }} 台服务器...
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="update-mcr-content" v-loading="mcrLoading">
         <div class="dialog-header">
           <div class="device-info">
             <el-icon class="server-icon"><Monitor /></el-icon>
             <div class="info-content">
-              <div class="hostname">{{ currentDevice?.bmc.hostname }}</div>
-              <div class="ip-address">{{ currentDevice?.device.ip }}</div>
+              <div class="hostname">
+                {{ isBatchMcrMode ? '批量操作模式' : currentDevice?.bmc.hostname }}
+              </div>
+              <div class="ip-address">
+                {{ isBatchMcrMode ? `已选择 ${selectedDevices.length} 台服务器` : currentDevice?.device.ip }}
+              </div>
             </div>
           </div>
-          <div class="current-path">
-            <el-input
-              v-model="currentPathInput"
-              @keyup.enter="handlePathInputEnter"
-              @blur="handlePathInputBlur"
-              class="path-input"
-            />
+          <div class="user-info">
+            <el-avatar :size="32" style="background-color: #409eff;">
+              {{ currentUser?.charAt(0).toUpperCase() }}
+            </el-avatar>
+            <span class="username">{{ currentUser }}</span>
           </div>
         </div>
 
@@ -1246,7 +1293,7 @@
     <!-- 新增：MCR安装参数配置弹窗 -->
     <el-dialog
       v-model="mcrConfigDialogVisible"
-      title="配置MCR安装参数"
+      :title="mcrConfigDialogTitle"
       width="900px"
       class="mcr-config-dialog"
       :close-on-click-modal="false"
@@ -1256,8 +1303,12 @@
           <div class="device-info">
             <el-icon class="server-icon"><Monitor /></el-icon>
             <div class="info-content">
-              <div class="hostname">{{ currentDevice?.bmc.hostname }}</div>
-              <div class="ip-address">{{ currentDevice?.device.ip }}</div>
+              <div class="hostname">
+                {{ isBatchMcrMode ? '批量操作模式' : currentDevice?.bmc.hostname }}
+              </div>
+              <div class="ip-address">
+                {{ isBatchMcrMode ? `已选择 ${selectedDevices.length} 台服务器` : currentDevice?.device.ip }}
+              </div>
             </div>
           </div>
           <div class="mcr-file-info">
@@ -1480,6 +1531,7 @@ const setAsDefaultBoot = ref(false)
 const batchDialogVisible = ref(false)
 const batchLoading = ref(false)
 const batchOperation = ref<string>('')
+const isBatchMcrMode = ref(false)
 
 // 电源操作相关
 const powerDialogVisible = ref(false)
@@ -2318,7 +2370,17 @@ const loadDirectory = async (path: string) => {
 
 watch(updateMcrDialogVisible, (visible) => {
   if (!visible) {
-    fileFilterText.value = ''
+    // 对话框关闭时，重置批量模式
+    resetMcrDialogState()
+  }
+})
+
+watch(mcrConfigDialogVisible, (visible) => {
+  if (!visible) {
+    // 确保返回文件选择时也重置状态
+    if (!updateMcrDialogVisible.value) {
+      resetMcrDialogState()
+    }
   }
 })
 
@@ -2608,10 +2670,86 @@ const clearSelection = () => {
   }
 }
 
+// 计算是否可以批量更新MCR
+const canBatchUpdateMcr = computed(() => {
+  if (selectedDevices.value.length === 0) return false
+  
+  // 检查所有选中的设备是否都没有正在运行的MCR任务
+  return selectedDevices.value.every(device => 
+    !isMcrTaskRunning(device)
+  )
+})
+
+// 获取批量MCR更新操作的提示信息
+const getBatchUpdateMcrTooltip = () => {
+  if (selectedDevices.value.length === 0) return ''
+  
+  const invalidDevices = selectedDevices.value.filter(device => 
+    isMcrTaskRunning(device)
+  )
+  
+  if (invalidDevices.length > 0) {
+    return `勾选了 ${invalidDevices.length} 台有MCR任务正在运行的服务器`
+  }
+  
+  return ''
+}
+
+// 处理批量MCR更新
+const handleBatchUpdateMcr = async () => {
+  if (selectedDevices.value.length === 0) return
+  
+  // 检查是否可以批量更新
+  if (!canBatchUpdateMcr.value) {
+    const invalidDevices = selectedDevices.value.filter(device => 
+      isMcrTaskRunning(device)
+    )
+    
+    if (invalidDevices.length > 0) {
+      const deviceNames = invalidDevices.slice(0, 3).map(d => d.bmc.hostname).join(', ')
+      const moreText = invalidDevices.length > 3 ? `等 ${invalidDevices.length} 台` : ''
+      ElMessage.warning(`无法批量更新MCR：${deviceNames}${moreText} 有MCR任务正在运行，请等待任务完成后再操作`)
+    }
+    return
+  }
+  
+  // 设置批量模式
+  isBatchMcrMode.value = true
+  
+  // 设置当前设备为第一个选中的设备（用于对话框显示）
+  currentDevice.value = selectedDevices.value[0]
+  
+  // 初始化路径和选择
+  currentPath.value = '/auto/asic-dump/meta_release'
+  selectedMcrFile.value = ''
+  updateMcrDialogVisible.value = true
+  
+  // 加载初始目录
+  await loadDirectory(currentPath.value)
+}
+
+// 添加MCR对话框标题的计算属性
+const updateMcrDialogTitle = computed(() => {
+  return isBatchMcrMode.value 
+    ? `批量更新MCR（${selectedDevices.value.length} 台服务器）`
+    : '更新MCR包'
+})
+
+const mcrConfigDialogTitle = computed(() => {
+  return isBatchMcrMode.value 
+    ? `批量MCR参数配置（${selectedDevices.value.length} 台服务器）`
+    : '配置MCR安装参数'
+})
+
 // 处理批量操作命令
 const handleBatchCommand = (command: string) => {
   if (command === 'batchOccupy') {
     handleBatchOccupy()
+    return
+  }
+  
+  if (command === 'batchUpdateMcr') {
+    handleBatchUpdateMcr()
     return
   }
   
@@ -4200,7 +4338,7 @@ const updateGeneratedOptions = () => {
 
 // 新增：返回文件选择
 const handleBackToFileSelection = () => {
-  // 清理所有选择状态
+  // 清理所有选择状态，但保留批量模式
   selectedParams.value = {}
   paramValues.value = {}
   generatedUpdateOptions.value = ''
@@ -4212,53 +4350,101 @@ const handleBackToFileSelection = () => {
 
 // 新增：确认MCR更新
 const handleConfirmMcrUpdate = async () => {
-  if (!currentDevice.value || !selectedMcrFile.value) return
+  if (!selectedMcrFile.value) return
 
   try {
     upgradeMcrLoading.value = true
     
+    const deviceCount = isBatchMcrMode.value ? selectedDevices.value.length : 1
+    
+    // 确认对话框
     await ElMessageBox.confirm(
-      `确定要使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 更新服务器 "${currentDevice.value.bmc.hostname}" 吗？\n更新选项: ${generatedUpdateOptions.value || '空（不传递任何参数）'}`,
-      '确认更新MCR包',
+      `确定要对 ${deviceCount} 台服务器使用 MCR 包 "${getFileName(selectedMcrFile.value)}" 进行更新吗？\n更新选项: ${generatedUpdateOptions.value || '空（不传递任何参数）'}`,
+      `确认${isBatchMcrMode.value ? '批量' : ''}更新MCR包`,
       {
         type: 'warning',
-        confirmButtonText: '确定更新',
+        confirmButtonText: `确定${isBatchMcrMode.value ? '批量' : ''}更新`,
         cancelButtonText: '取消'
       }
     )
 
-    // 调用更新MCR接口，传入生成的选项字符串
-    const response = await deviceApi.upgradeMcr(currentDevice.value.id!, selectedMcrFile.value, generatedUpdateOptions.value)
+    let successCount = 0
+    let failedDevices: string[] = []
     
-    // 更新当前设备的task_id
-    const deviceIndex = devices.value.findIndex(d => d.id === currentDevice.value!.id)
-    if (deviceIndex > -1) {
-      devices.value[deviceIndex].task_id = response.task_id
-      // 设置初始状态
-      taskStatusMap.value[response.task_id] = {
-        id: response.task_id,
-        server_id: currentDevice.value.id!,
-        status: 'pending',
-        stage: 'waiting',
-        detail: '任务已创建，等待执行',
-        timestamp: new Date().toISOString()
+    if (isBatchMcrMode.value) {
+      // 批量更新
+      const promises = selectedDevices.value.map(async (device) => {
+        try {
+          const response = await deviceApi.upgradeMcr(device.id!, selectedMcrFile.value, generatedUpdateOptions.value)
+          
+          // 更新当前设备的task_id
+          const deviceIndex = devices.value.findIndex(d => d.id === device.id)
+          if (deviceIndex > -1) {
+            devices.value[deviceIndex].task_id = response.task_id
+            // 设置初始状态
+            taskStatusMap.value[response.task_id] = {
+              id: response.task_id,
+              server_id: device.id!,
+              status: 'pending',
+              stage: 'waiting',
+              detail: '任务已创建，等待执行',
+              timestamp: new Date().toISOString()
+            }
+            // 启动状态查询
+            setTimeout(() => {
+              queryTaskStatus(devices.value[deviceIndex])
+            }, 1000)
+          }
+          successCount++
+        } catch (error: any) {
+          failedDevices.push(device.bmc.hostname)
+          console.error(`服务器 ${device.bmc.hostname} MCR更新失败:`, error)
+        }
+      })
+      
+      await Promise.all(promises)
+      
+      // 显示结果
+      if (failedDevices.length === 0) {
+        ElMessage.success(`已成功对 ${successCount} 台服务器发起MCR更新任务`)
+      } else {
+        const failedNames = failedDevices.slice(0, 3).join(', ')
+        const moreText = failedDevices.length > 3 ? `等 ${failedDevices.length} 台` : ''
+        ElMessage.warning(`成功 ${successCount} 台，失败 ${failedDevices.length} 台（${failedNames}${moreText}）`)
       }
-      // 启动状态查询
-      setTimeout(() => {
-        queryTaskStatus(devices.value[deviceIndex])
-      }, 1000) // 1秒后开始查询
+      
+    } else {
+      // 单个更新（原有逻辑）
+      if (!currentDevice.value) return
+      
+      const response = await deviceApi.upgradeMcr(currentDevice.value.id!, selectedMcrFile.value, generatedUpdateOptions.value)
+      
+      // 更新当前设备的task_id
+      const deviceIndex = devices.value.findIndex(d => d.id === currentDevice.value!.id)
+      if (deviceIndex > -1) {
+        devices.value[deviceIndex].task_id = response.task_id
+        // 设置初始状态
+        taskStatusMap.value[response.task_id] = {
+          id: response.task_id,
+          server_id: currentDevice.value.id!,
+          status: 'pending',
+          stage: 'waiting',
+          detail: '任务已创建，等待执行',
+          timestamp: new Date().toISOString()
+        }
+        // 启动状态查询
+        setTimeout(() => {
+          queryTaskStatus(devices.value[deviceIndex])
+        }, 1000)
+      }
+      
+      ElMessage.success('MCR包更新任务已开始')
     }
     
-    ElMessage.success('MCR包更新任务已开始')
     mcrConfigDialogVisible.value = false
     
     // 重置状态
-    selectedMcrFile.value = ''
-    currentPath.value = '/auto/asic-dump/meta_release'
-    installParams.value = []
-    selectedParams.value = {}
-    paramValues.value = {}
-    generatedUpdateOptions.value = ''
+    resetMcrDialogState()
     
   } catch (error: any) {
     if (error === 'cancel' || error === 'close') {
@@ -4270,6 +4456,17 @@ const handleConfirmMcrUpdate = async () => {
   }
 }
 
+const resetMcrDialogState = () => {
+  selectedMcrFile.value = ''
+  currentPath.value = '/auto/asic-dump/meta_release'
+  installParams.value = []
+  selectedParams.value = {}
+  paramValues.value = {}
+  generatedUpdateOptions.value = ''
+  isBatchMcrMode.value = false
+  currentDevice.value = null
+}
+
 onMounted(() => {
   loadFilteringConditions()
   loadTags()
@@ -4279,6 +4476,34 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 批量MCR更新按钮样式 */
+:deep(.batch-update-mcr-item.is-disabled) {
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-update-mcr-item.is-disabled .el-icon) {
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-update-mcr-item.is-disabled:hover) {
+  background-color: transparent !important;
+  color: #c0c4cc !important;
+}
+
+:deep(.batch-update-mcr-item:not(.is-disabled)) {
+  color: #7239ea !important;
+}
+
+:deep(.batch-update-mcr-item:not(.is-disabled):hover) {
+  color: #5f2bc3 !important;
+  background-color: #f8f5ff !important;
+}
+
+/* 批量MCR信息样式 */
+.batch-mcr-info {
+  margin-bottom: 16px;
+}
+
 .param-content-wrapper {
   width: 100%;
   height: 100%;
