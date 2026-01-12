@@ -206,6 +206,8 @@ export interface InterfaceInfo {
   id: string
   ifname?: string
   creator?: string
+  dhcp_server?: string
+  xsc_id: number
 }
 
 export interface InterfaceCreate {
@@ -217,6 +219,7 @@ export interface InterfaceCreate {
   mac?: string
   dns?: string[]
   description?: string
+  dhcp_server?: string
 }
 
 export interface InterfaceUpdate {

@@ -77,13 +77,14 @@ async def create_interface(data: network_schemas.InterfaceCreate, user=Depends(a
             "uuid": interface_data["xsc_id"],
             "vlan": data.vlan_tag,
             "ip": str(data.ip),
-            "src_mac": interface_data["mac"],
-            "dhcp_server": data.gateway,
+            "src_mac": interface_data["mac"]
         }
         if data.dns:
             params["dns"] = data.dns
         if data.gateway:
             params["gw_ip"] = data.gateway
+        if data.dhcp_server:
+            params["dhcp_server"] = data.dhcp_server
         res = ovsapi.add_ovsflow_dpu_agent_v1_ovsflow_add_post(params)
         if res.code != 0:
             LOG.error(

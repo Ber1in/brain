@@ -258,7 +258,8 @@ class SQLiteDocumentDB:
             "description": "",
             "xsc_id": 0,
             "ifname": "",
-            "creator": ""
+            "creator": "",
+            "dhcp_server": ""
         },
         SERVER_COLLECTION: {
             "bmc": {

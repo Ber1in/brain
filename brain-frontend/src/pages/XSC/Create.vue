@@ -158,6 +158,55 @@
           </div>
         </el-form-item>
 
+        <el-form-item label="DHCP服务器" prop="dhcp_server">
+          <div class="ip-segments">
+            <el-input
+              ref="dhcpInput1"
+              v-model="dhcpSegments[0]"
+              placeholder=""
+              maxlength="3"
+              @input="validateDhcpSegment(0, $event)"
+              @keydown="(e) => handleKeydown(e, 0, 'dhcp')" 
+              @blur="combineDhcp"
+              @paste="handleDhcpPaste"
+              style="width: 60px; text-align: center;"
+            />
+            <span class="ip-dot">.</span>
+            <el-input
+              ref="dhcpInput2"
+              v-model="dhcpSegments[1]"
+              placeholder=""
+              maxlength="3"
+              @input="validateDhcpSegment(1, $event)"
+              @keydown="(e) => handleKeydown(e, 1, 'dhcp')" 
+              @blur="combineDhcp"
+              style="width: 60px; text-align: center;"
+            />
+            <span class="ip-dot">.</span>
+            <el-input
+              ref="dhcpInput3"
+              v-model="dhcpSegments[2]"
+              placeholder=""
+              maxlength="3"
+              @input="validateDhcpSegment(2, $event)"
+              @keydown="(e) => handleKeydown(e, 2, 'dhcp')" 
+              @blur="combineDhcp"
+              style="width: 60px; text-align: center;"
+            />
+            <span class="ip-dot">.</span>
+            <el-input
+              ref="dhcpInput4"
+              v-model="dhcpSegments[3]"
+              placeholder=""
+              maxlength="3"
+              @input="validateDhcpSegment(3, $event)"
+              @keydown="(e) => handleKeydown(e, 3, 'dhcp')" 
+              @blur="combineDhcp"
+              style="width: 60px; text-align: center;"
+            />
+          </div>
+        </el-form-item>
+
         <el-form-item label="MAC地址">
           <el-input 
             v-model="form.mac" 
@@ -285,6 +334,15 @@ const gatewaySegments = ref(['', '', '', ''])
 // DNS相关 - 每个DNS是一个包含4个段的数组
 const dnsList = ref<string[][]>([['', '', '', '']])
 
+// DHCP服务器相关
+const dhcpSegments = ref(['', '', '', ''])
+
+// Refs for DHCP inputs
+const dhcpInput1 = ref()
+const dhcpInput2 = ref()
+const dhcpInput3 = ref()
+const dhcpInput4 = ref()
+
 // Refs for inputs
 const ipInput1 = ref()
 const ipInput2 = ref()
@@ -302,6 +360,7 @@ const form = reactive<InterfaceCreate>({
   mv200_id: '',
   ip: '',
   gateway: undefined,
+  dhcp_server: undefined,
   vlan_tag: undefined,
   mtu: 1500,
   mac: undefined,
@@ -352,8 +411,33 @@ const handleDnsPaste = async (dnsIndex: number, event: ClipboardEvent) => {
   await parseAndSetIp(pastedText, dnsList.value[dnsIndex], 'dns', dnsIndex)
 }
 
+// DHCP段验证
+const validateDhcpSegment = (index: number, value: string) => {
+  let cleanValue = value.replace(/[^\d]/g, '')
+  dhcpSegments.value[index] = cleanValue
+}
+
+// 处理DHCP服务器粘贴
+const handleDhcpPaste = async (event: ClipboardEvent) => {
+  event.preventDefault()
+  const pastedText = event.clipboardData?.getData('text') || ''
+  await parseAndSetIp(pastedText, dhcpSegments.value, 'dhcp')
+}
+
+// 组合DHCP服务器地址
+const combineDhcp = () => {
+  const dhcp = dhcpSegments.value.join('.')
+  console.log('组合DHCP服务器:', dhcp)
+  if (dhcp && dhcp !== '...') {
+    form.dhcp_server = dhcp
+  } else {
+    form.dhcp_server = undefined
+  }
+  console.log('最终form.dhcp_server:', form.dhcp_server)
+}
+
 // 解析并设置IP地址
-const parseAndSetIp = async (text: string, segments: string[], type: 'ip' | 'gateway' | 'dns', dnsIndex?: number) => {
+const parseAndSetIp = async (text: string, segments: string[], type: 'ip' | 'gateway' | 'dns' | 'dhcp', dnsIndex?: number) => {
   text = text.trim()
   
   console.log('粘贴的内容:', text)
@@ -375,6 +459,8 @@ const parseAndSetIp = async (text: string, segments: string[], type: 'ip' | 'gat
       combineIP()
     } else if (type === 'gateway') {
       combineGateway()
+    } else if (type === 'dhcp') {
+      combineDhcp()
     } else if (type === 'dns' && dnsIndex !== undefined) {
       combineDns(dnsIndex)
     }
@@ -443,7 +529,7 @@ const combineDns = (dnsIndex: number) => {
 
 
 // 键盘事件处理
-const handleKeydown = (event: KeyboardEvent, index: number, type: 'ip' | 'gateway' | 'dns', dnsIndex?: number) => {
+const handleKeydown = (event: KeyboardEvent, index: number, type: 'ip' | 'gateway' | 'dhcp' | 'dns', dnsIndex?: number) => {
   // 如果是小数点键
   if (event.key === '.' || event.key === 'Period') {
     event.preventDefault() // 阻止默认行为，避免输入小数点
@@ -458,6 +544,13 @@ const handleKeydown = (event: KeyboardEvent, index: number, type: 'ip' | 'gatewa
     } else if (type === 'gateway') {
       if (index < 3) {
         const nextInput = [gatewayInput2, gatewayInput3, gatewayInput4][index]
+        if (nextInput.value) {
+          nextInput.value.focus()
+        }
+      }
+    } else if (type === 'dhcp') {  // 新增：DHCP服务器
+      if (index < 3) {
+        const nextInput = [dhcpInput2, dhcpInput3, dhcpInput4][index]
         if (nextInput.value) {
           nextInput.value.focus()
         }
@@ -548,6 +641,33 @@ const validateMAC = (rule: any, value: string, callback: any) => {
   callback()
 }
 
+// DHCP服务器验证（可选）
+const validateDhcpServer = (rule: any, value: string, callback: any) => {
+  // 如果DHCP服务器为空，直接通过验证
+  if (value === undefined) {
+    callback()
+    return
+  }
+  
+  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/
+  if (!ipPattern.test(value)) {
+    callback(new Error('请输入有效的DHCP服务器地址格式'))
+    return
+  }
+  
+  const parts = value.split('.')
+  for (const part of parts) {
+    const num = parseInt(part)
+    if (num < 0 || num > 255) {
+      callback(new Error('DHCP服务器地址每个数字段应在0-255之间'))
+      return
+    }
+  }
+  
+  callback()
+}
+
+// 在 rules 中添加 dhcp_server 验证规则
 const rules: FormRules = {
   mv200_id: [
     { required: true, message: '请选择MV200', trigger: 'blur' }
@@ -557,6 +677,9 @@ const rules: FormRules = {
   ],
   gateway: [
     { validator: validateGateway, trigger: 'blur' }
+  ],
+  dhcp_server: [
+    { validator: validateDhcpServer, trigger: 'blur' }
   ],
   vlan_tag: [
     { required: true, message: '请输入VLAN ID', trigger: 'blur' },
@@ -612,13 +735,17 @@ const handleSubmit = async () => {
     // 处理DNS列表，过滤空值
     form.dns = form.dns.filter(dns => dns && dns.trim() !== '' && dns !== '...')
     
-    // 如果MAC地址为空，设置为undefined，不传该参数
+    // 清理数据：将空字符串转为 undefined
     if (!form.mac || form.mac.trim() === '') {
       form.mac = undefined
     }
 
     if (!form.gateway || form.gateway.trim() === '') {
       form.gateway = undefined
+    }
+
+    if (!form.dhcp_server || form.dhcp_server.trim() === '') {
+      form.dhcp_server = undefined
     }
 
     await networkApi.create(form)

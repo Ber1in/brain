@@ -69,6 +69,7 @@ class InterfaceCreate(BaseModel):
     mtu: int = Field(1500, description="Optional field, MTU size", example=1500)
     mac: Optional[Mac] = Field(None, description="MAC address of the interface (optional)")
     dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
+    dhcp_server:  str = Field(None, description="Dhcp server address for the interface")
     description: Optional[str] = Field(None, description="Description of the network interface")
 
 
