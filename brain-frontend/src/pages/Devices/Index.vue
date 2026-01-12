@@ -82,15 +82,21 @@
       </template>
 
       <el-table 
+        ref="tableRef"
         :data="devices"
         v-loading="loading"
         :default-sort="{ prop: 'device.ip', order: 'ascending' }"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
         :row-class-name="getRowClassName"
+        :row-key="(row) => row.id"
       >
-        <!-- 多选列 -->
-        <el-table-column type="selection" width="35" />
+        <el-table-column 
+          type="selection" 
+          width="35"
+          :selectable="() => true"
+          :reserve-selection="true"
+        />
 
         <!-- 服务器名称列 -->
         <el-table-column 
@@ -1433,6 +1439,7 @@ const appSettings = ref<AppConfig | null>(null)
 const loadingSettings = ref(false)
 
 // 新增：分页相关状态
+const tableRef = ref()
 const pagination = reactive({
   page: 1,
   page_size: 20,
@@ -2540,14 +2547,65 @@ const getBatchConfirmButtonText = () => {
   return texts[batchOperation.value] || '确认'
 }
 
-// 处理选择变化
-const handleSelectionChange = (selection: ServerDetailResponse[]) => {
-  selectedDevices.value = selection
+const getRowKey = (row: ServerDetailResponse) => {
+  return row.id || row.bmc.hostname // 确保有唯一标识
 }
+
+// 处理选择变化 - 跨页保持选中
+const handleSelectionChange = (selection: ServerDetailResponse[]) => {
+  // 获取当前页所有设备的ID
+  const currentPageDeviceIds = new Set(devices.value.map(device => device.id))
+  
+  // 创建所有已选中设备的Map，方便查找
+  const allSelectedMap = new Map(selectedDevices.value.map(device => [device.id, device]))
+  
+  // 更新当前页的设备选中状态
+  selection.forEach(device => {
+    allSelectedMap.set(device.id, device)
+  })
+  
+  // 移除当前页取消选中的设备
+  currentPageDeviceIds.forEach(deviceId => {
+    const isSelectedInCurrentPage = selection.some(selected => selected.id === deviceId)
+    if (!isSelectedInCurrentPage) {
+      allSelectedMap.delete(deviceId)
+    }
+  })
+  
+  // 更新选中的设备列表
+  selectedDevices.value = Array.from(allSelectedMap.values())
+}
+
+// 监听设备数据变化，保持选中状态
+watch(() => devices.value, (newDevices, oldDevices) => {
+  if (!tableRef.value || !newDevices.length) return
+  
+  // 延迟到DOM更新后
+  nextTick(() => {
+    // 确保表格有数据
+    if (!tableRef.value || !tableRef.value.tableData || tableRef.value.tableData.length === 0) {
+      return
+    }
+    
+    // 设置当前页的选中状态
+    newDevices.forEach(device => {
+      const isSelected = selectedDevices.value.some(selected => selected.id === device.id)
+      try {
+        // 使用toggleRowSelection设置选中状态
+        tableRef.value.toggleRowSelection(device, isSelected)
+      } catch (error) {
+        console.warn('设置选中状态失败:', error)
+      }
+    })
+  })
+}, { deep: true })
 
 // 清空选择
 const clearSelection = () => {
   selectedDevices.value = []
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
 }
 
 // 处理批量操作命令
