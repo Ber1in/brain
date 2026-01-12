@@ -2181,8 +2181,17 @@ const getStatisticTooltip = (statistic?: TestStatistic): string => {
 const isMv200Nic = (nicType: string | undefined): boolean => {
   if (!nicType) return false
   const typeLower = nicType.toLowerCase()
-  // 这里可以根据实际的MV200标识来调整
-  return typeLower.includes('mv200') || typeLower === 'mv200'
+  
+  // 支持多种MV200标识，包括metaVisor-200等变体
+  const mv200Patterns = [
+    'mv200',
+    'metavisor-200',
+    'metavisor200',
+    'meta visor 200',
+    'meta-visor-200',
+  ]
+  
+  return mv200Patterns.some(pattern => typeLower.includes(pattern))
 }
 
 // 检查网卡是否被选择（包括MV200和非MV200）
