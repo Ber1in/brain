@@ -299,7 +299,7 @@
                 v-if="osInfoMap[row.id!]" 
                 size="small"
                 type="info"
-                style="border: none; background-color: #ffccc6;"
+                style="border: none; background-color: #36cfc915;"
               >
                 {{ osInfoMap[row.id!].kernel_version || '-' }}
               </el-tag>
