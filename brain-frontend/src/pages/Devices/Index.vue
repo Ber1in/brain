@@ -3587,7 +3587,7 @@ const loadData = async (page?: number) => {
     
     devices.value = response.data
     
-    autoLoadVisibleOsInfo()
+    await autoLoadVisibleOsInfo() 
 
     if (response.pagination) {    
       pagination.total = response.pagination.total
@@ -3634,15 +3634,15 @@ const loadOsInfoForDevice = async (device: ServerDetailResponse) => {
 const autoLoadVisibleOsInfo = () => {
   // 延迟执行，确保页面先渲染
   setTimeout(() => {
-    // 假设当前页面显示20条数据
-    const visibleDevices = devices.value.slice(0, 20)
+    // 使用当前分页大小，而不是硬编码的20
+    const visibleDevices = devices.value.slice(0, pagination.page_size)
     
     visibleDevices.forEach(device => {
       if (device.id && !osInfoMap.value[device.id] && !osInfoLoading.value[device.id]) {
         loadOsInfoForDevice(device)
       }
     })
-  }, 100) // 延迟100ms，让页面先出来
+  }, 100)
 }
 
 // 在 loadData 方法后面添加翻页方法
