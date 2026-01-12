@@ -45,6 +45,12 @@ class NotRecordAccessFilter(logging.Filter):
         if '/heartbeat HTTP/1.1" 200' in msg:
             return False
 
+        if '/api/tasks/' in msg and 'HTTP/1.1" 200' in msg:
+            return False
+
+        if '/os-info HTTP/1.1" 200' in msg:
+            return False
+
         return True
 
 
