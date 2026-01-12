@@ -16,6 +16,12 @@ OPERATIONAL_AUDIT_COLLECTION = "operational_audit"
 NON_AUDITED_OPERATIONS_PREFIX = (
     "/login", "/api/filtering_conditions", "/api/yuntester", "/api/tag")
 NON_AUDITED_OPERATIONS_SUFFIX = ("follow", "occupy", "release")
+DROP_RULES = (
+    lambda m: '"GET / HTTP/1.1" 404' in m,
+    lambda m: '/heartbeat HTTP/1.1" 200' in m,
+    lambda m: '/api/tasks/' in m and 'HTTP/1.1" 200' in m,
+    lambda m: '/os-info HTTP/1.1" 200' in m,
+)
 
 
 request_id_var = ContextVar("request_id", default=None)
@@ -38,20 +44,7 @@ class RequestIdLogFilter(logging.Filter):
 class NotRecordAccessFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
-
-        if '"GET / HTTP/1.1" 404' in msg:
-            return False
-
-        if '/heartbeat HTTP/1.1" 200' in msg:
-            return False
-
-        if '/api/tasks/' in msg and 'HTTP/1.1" 200' in msg:
-            return False
-
-        if '/os-info HTTP/1.1" 200' in msg:
-            return False
-
-        return True
+        return not any(rule(msg) for rule in DROP_RULES)
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
