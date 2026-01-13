@@ -91,3 +91,5 @@ from brain.clients.dpuagent.models.uuid_usage_response import UuidUsageResponse
 from brain.clients.dpuagent.models.v_blk_list_response import VBlkListResponse
 from brain.clients.dpuagent.models.validation_error import ValidationError
 from brain.clients.dpuagent.models.version_rsp import VersionRsp
+from brain.clients.dpuagent.models.xscnet_info import XscnetInfo
+from brain.clients.dpuagent.models.xscnet_list_response import XscnetListResponse
