@@ -2,8 +2,10 @@
 # All rights reserved.
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from ipaddress import IPv4Address
+
+from brain.api.v1.schemas.network_schemas import IPWithNetmask, Mac
 
 
 class MVServerCreate(BaseModel):
@@ -45,3 +47,15 @@ class MVServer(BaseModel):
                                                      "value is one of auto and manual")
 
     task_id: str = None
+
+
+class XscnetInfoResponse(BaseModel):
+    uuid: int
+    mtu: int
+    mac: Mac
+    vlan: Optional[int] = None
+    ip: Optional[IPWithNetmask] = None
+    gateway: Optional[str] = None
+    dhcp_server: Optional[str] = None
+    ifname: Optional[str] = None
+    dns: List[str] = []

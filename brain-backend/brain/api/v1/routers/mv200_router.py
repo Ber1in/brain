@@ -3,8 +3,8 @@
 
 import asyncio
 import copy
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional
 import logging
 import uuid
 import urllib3
@@ -385,3 +385,66 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest):
 
     return {"message": "MCR update task accepted", "task_id": task_id}
 
+
+@router.get("/xsc/{mv200_id}", response_model=List[mv200_schemas.XscnetInfoResponse])
+async def get_interface(mv200_id: str, uuid: Optional[int] = Query(None, ge=1, le=100)):
+    """Get network interface(s) info"""
+    try:
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    except Exception:
+        LOG.warning(f"mv200 {mv200_id} not found")
+        raise HTTPException(status_code=404, detail="mv200 not found")
+
+    mv200_ip = mv200["ip_address"]
+    LOG.info(f"Fetching interface for {mv200_ip}")
+
+    try:
+        dpuagentclient = get_dpuagentclient(mv200_ip)
+
+        if uuid is None:
+            res = dpuagentApi.XscnetApi(
+                dpuagentclient).list_xsc_controllers_dpu_agent_v1_xscnet_list_get()
+        else:
+            res = dpuagentApi.XscnetApi(
+                dpuagentclient).list_xsc_controllers_dpu_agent_v1_xscnet_list_get(uuid)
+
+        if res.code != 0:
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail=f"Failed to connect to DPU agent at {mv200_ip}"
+            )
+
+        xscs = res.to_dict().get("xscnets") or []
+
+        res = dpuagentApi.RdmaApi(dpuagentclient).list_nics_info_dpu_agent_v1_rdma_list_nics_get()
+
+        nics_info = res.nics_info or []
+
+        nic_index = {}
+        for nic in nics_info:
+            if not nic.mac or not nic.ip_addr:
+                continue
+            if nic.ip_addr == "0.0.0.0":
+                continue
+
+            mac = nic.mac.lower().replace("-", ":")
+            ip = nic.ip_addr.strip()
+
+            nic_index[(mac, ip)] = nic.ifname
+
+        for xsc in xscs:
+            if not xsc.get("mac") or not xsc.get("ip"):
+                continue
+
+            xsc_mac = xsc["mac"].lower()
+            xsc_ip = xsc["ip"].split("/", 1)[0]
+
+            ifname = nic_index.get((xsc_mac, xsc_ip))
+            if ifname:
+                xsc["ifname"] = ifname
+
+    except Exception as e:
+        LOG.warning(f"Failed to obtain the network port name, error: {e}")
+
+    LOG.info(f"Interface for {mv200_ip} fetched successfully")
+    return xscs
