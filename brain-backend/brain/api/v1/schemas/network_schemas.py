@@ -62,7 +62,6 @@ class Mac(ConstrainedStr):
 
 
 class InterfaceCreate(BaseModel):
-    mv200_id: str = Field(..., description="Target SoC ID to perform network operation")
     ip: IPWithNetmask = Field(..., description="IP address with CIDR mask, e.g., 192.168.1.10/24")
     vlan_tag: int = Field(..., description="VLAN tag for the interface")
     gateway: str = Field(None, description="Gateway address for the interface")
@@ -70,7 +69,6 @@ class InterfaceCreate(BaseModel):
     mac: Optional[Mac] = Field(None, description="MAC address of the interface (optional)")
     dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
     dhcp_server: str = Field(None, description="Dhcp server address for the interface")
-    description: Optional[str] = Field(None, description="Description of the network interface")
 
 
 class InterfaceUpdate(BaseModel):

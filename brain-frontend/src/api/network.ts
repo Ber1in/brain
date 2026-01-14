@@ -2,20 +2,11 @@ import apiClient from './client'
 import type { 
   InterfaceInfo, 
   InterfaceCreate, 
-  InterfaceUpdate
+  InterfaceUpdate,
+  XscnetInfo
 } from '@/types/api'
 
 export const networkApi = {
-  // 获取所有网口
-  getAll(): Promise<InterfaceInfo[]> {
-    return apiClient.get('/networks')
-  },
-
-  // 根据ID获取单个网口
-  getById(id: string): Promise<InterfaceInfo> {
-    return apiClient.get(`/networks/${id}`)
-  },
-
   // 创建网口
   create(data: InterfaceCreate): Promise<InterfaceInfo> {
     return apiClient.post('/networks', data)
@@ -30,4 +21,16 @@ export const networkApi = {
   delete(id: string): Promise<void> {
     return apiClient.delete(`/networks/${id}`, )
   },
+
+  getAll(mv200Id: string, uuid?: number): Promise<XscnetInfo[]> {
+    const params: Record<string, any> = {}
+    if (uuid !== undefined && uuid !== null) {
+      params.uuid = uuid
+    }
+    return apiClient.get(`/xsc/${mv200Id}`, { params })
+  },
+
+  getById(mv200Id: string, uuid: number): Promise<XscnetInfo> {
+    return apiClient.get(`/xsc/${mv200Id}/${uuid}`)
+  }
 }

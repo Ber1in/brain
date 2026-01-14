@@ -49,6 +49,15 @@ class MVServer(BaseModel):
     task_id: str = None
 
 
+class InterfaceCreate(BaseModel):
+    pxe: bool = Field(False)
+    uuid: int = None
+    vq_count: int = Field(2, description="Optional field, vq count", example=2)
+    vq_size: int = Field(512, description="Optional field, vq size", example=512)
+    mtu: int = Field(1500, description="Optional field, MTU size", example=1500)
+    mac: Optional[Mac] = Field(None, description="MAC address of the interface (optional)")
+
+
 class XscnetInfoResponse(BaseModel):
     uuid: int
     mtu: int
@@ -59,3 +68,12 @@ class XscnetInfoResponse(BaseModel):
     dhcp_server: Optional[str] = None
     ifname: Optional[str] = None
     dns: List[str] = []
+
+
+class OvsflowRequest(BaseModel):
+    mac: str
+    ip: IPWithNetmask = Field(..., description="IP address with CIDR mask, e.g., 192.168.1.10/24")
+    vlan_tag: int = Field(..., description="VLAN tag for the interface")
+    gateway: str = Field(None, description="Gateway address for the interface")
+    dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
+    dhcp_server: str = Field(None, description="Dhcp server address for the interface")

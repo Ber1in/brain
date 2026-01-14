@@ -3,6 +3,7 @@
 
 import asyncio
 import copy
+import random
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 import logging
@@ -17,6 +18,7 @@ from brain.clients.dpuagent import api as dpuagentApi
 from brain.utils.get_client import get_dpuagentclient
 from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils
+from brain import exceptions
 
 router = APIRouter(dependencies=[Depends(authenticate_user)])
 LOG = logging.getLogger(__name__)
@@ -411,40 +413,205 @@ async def get_interface(mv200_id: str, uuid: Optional[int] = Query(None, ge=1, l
         if res.code != 0:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail=f"Failed to connect to DPU agent at {mv200_ip}"
+                detail=f"Failed to list xscnet at {mv200_ip}"
             )
 
         xscs = res.to_dict().get("xscnets") or []
-
-        res = dpuagentApi.RdmaApi(dpuagentclient).list_nics_info_dpu_agent_v1_rdma_list_nics_get()
-
-        nics_info = res.nics_info or []
-
-        nic_index = {}
-        for nic in nics_info:
-            if not nic.mac or not nic.ip_addr:
-                continue
-            if nic.ip_addr == "0.0.0.0":
-                continue
-
-            mac = nic.mac.lower().replace("-", ":")
-            ip = nic.ip_addr.strip()
-
-            nic_index[(mac, ip)] = nic.ifname
-
-        for xsc in xscs:
-            if not xsc.get("mac") or not xsc.get("ip"):
-                continue
-
-            xsc_mac = xsc["mac"].lower()
-            xsc_ip = xsc["ip"].split("/", 1)[0]
-
-            ifname = nic_index.get((xsc_mac, xsc_ip))
-            if ifname:
-                xsc["ifname"] = ifname
-
     except Exception as e:
         LOG.warning(f"Failed to obtain the network port name, error: {e}")
+        return []
+
+    try:
+        res = dpuagentApi.RdmaApi(dpuagentclient).list_nics_info_dpu_agent_v1_rdma_list_nics_get()
+        nics_info = res.nics_info or []
+    except Exception as e:
+        LOG.warning(f"Failed to obtain the network port name, error: {e}")
+        nics_info = []
+
+    nic_index = {}
+    for nic in nics_info:
+        if not nic.mac or not nic.ip_addr:
+            continue
+        if nic.ip_addr == "0.0.0.0":
+            continue
+
+        mac = nic.mac.lower().replace("-", ":")
+        ip = nic.ip_addr.strip()
+
+        nic_index[(mac, ip)] = nic.ifname
+
+    for xsc in xscs:
+        if not xsc.get("mac") or not xsc.get("ip"):
+            continue
+
+        xsc_mac = xsc["mac"].lower()
+        xsc_ip = xsc["ip"].split("/", 1)[0]
+
+        ifname = nic_index.get((xsc_mac, xsc_ip))
+        if ifname:
+            xsc["ifname"] = ifname
 
     LOG.info(f"Interface for {mv200_ip} fetched successfully")
     return xscs
+
+
+@router.post("/xsc/{mv200_id}", response_model=mv200_schemas.XscnetInfoResponse)
+async def create_interface(mv200_id: str, data: mv200_schemas.InterfaceCreate):
+    """Create a new network interface"""
+    LOG.info(f"Creating interface on SoC {mv200_id}")
+
+    try:
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    except Exception:
+        LOG.warning(f"MV server {mv200_id} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="MV server not found"
+        )
+
+    iface_data = data.dict()
+    if not iface_data.get("mac"):
+        iface_data["mac"] = "02:00:%02x:%02x:%02x:%02x" % (
+            random.randint(0x00, 0x7f),
+            random.randint(0x00, 0xff),
+            random.randint(0x00, 0xff),
+            random.randint(0x00, 0xff),
+        )
+        LOG.info(f"Generated MAC {iface_data['mac']} for interface")
+
+    dpuagentclient = get_dpuagentclient(server["ip_address"])
+    xscapi = dpuagentApi.XscnetApi(dpuagentclient)
+    try:
+        res = xscapi.create_xscnet_dpu_agent_v1_xscnet_add_post(
+            {
+                "pxe": data.pxe,
+                "vq_count": data.vq_count,
+                "vq_size": data.vq_size,
+                "mac": iface_data["mac"],
+                "mtu": data.mtu,
+            }
+        )
+        if res.code != 0:
+            LOG.error(
+                f"Failed to create XSC network for interface "
+                f"on SoC {server['ip_address']}: {res.message}"
+            )
+            raise HTTPException(status_code=500, detail=res.message)
+        iface_data["xsc_id"] = res.uuid
+        LOG.info(
+            f"XSC network created for interface {res.uuid}, uuid={res.uuid}"
+        )
+    except Exception as e:
+        LOG.error(f"Exception creating XSC network: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for xsc {iface_data.get('xsc_id')}")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(
+                f"Failed to save checkpoint for xsc {iface_data.get('xsc_id')}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for xsc {iface_data.get('xsc_id')}")
+    except Exception as e:
+        LOG.error(
+            f"Failed to save checkpoint after creating xsc {iface_data.get('xsc_id')}: {e}")
+        raise
+
+    return {"uuid": iface_data.get('xsc_id'), "mtu": data.mtu, "mac": iface_data["mac"]}
+
+
+@router.post("/xsc/{mv200_id}/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
+async def configure_interface_flow_tables(
+        mv200_id: str, uuid:int,  data: mv200_schemas.OvsflowRequest):
+    # Fetch server information
+    try:
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    except Exception as e:
+        LOG.error(f"Failed to fetch server {mv200_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch server info")
+
+    dpuagentclient = get_dpuagentclient(mv200["ip_address"])
+    ovsapi = dpuagentApi.OvsflowApi(dpuagentclient)
+    try:
+        params = {
+            "uuid": uuid,
+            "vlan": data.vlan_tag,
+            "ip": str(data.ip),
+            "src_mac": data.mac
+        }
+        if data.dns:
+            params["dns"] = data.dns
+        if data.gateway:
+            params["gw_ip"] = data.gateway
+        if data.dhcp_server:
+            params["dhcp_server"] = data.dhcp_server
+        res = ovsapi.add_ovsflow_dpu_agent_v1_ovsflow_add_post(params)
+        if res.code != 0:
+            LOG.error(
+                f"Failed to add OVS flow for interface {uuid} "
+                f"on SoC {mv200['ip_address']}: {res.message}"
+            )
+            raise HTTPException(status_code=500, detail=res.message)
+        LOG.info(f"OVS flow added for interface {uuid} successfully")
+    except Exception as e:
+        LOG.error(f"Exception adding OVS flow for {uuid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for xsc interface {uuid}")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for interface {uuid}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for interface {uuid}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after creating interface {uuid}: {e}")
+        raise
+
+
+@router.delete("/xsc/{mv200_id}/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_interface(mv200_id: str, uuid: int):
+    """Delete an existing network interface"""
+    try:
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    except Exception:
+        LOG.warning(f"MV server {mv200_id} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="MV server not found"
+        )
+
+    LOG.info(f"Deleting interface {uuid} on SoC {server['ip_address']}")
+    dpuagentclient = get_dpuagentclient(server['ip_address'])
+    try:
+        res = dpuagentApi.XscnetApi(dpuagentclient).delete_xscnet_dpu_agent_v1_xscnet_del_post(
+            {"uuid": uuid}
+        )
+        if res.code != 0:
+            LOG.error(
+                f"Failed to delete XSC network for interface {uuid} "
+                f"on SoC {server['ip_address']}: {res.message}"
+            )
+            raise HTTPException(status_code=500, detail=res.message)
+        LOG.info(f"XSC network for interface {uuid} deleted successfully")
+    except Exception as e:
+        LOG.error(f"Exception deleting XSC network for {uuid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for xsc interface {uuid}")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for interface {uuid}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for interface {uuid}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after deleting interface {uuid}: {e}")
+        raise
+    LOG.info(f"Interface {uuid} deleted successfully")
+    return

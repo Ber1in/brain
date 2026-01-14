@@ -53,11 +53,6 @@
               <el-icon><DataBoard /></el-icon>
               <span>云系统盘管理</span>
             </el-menu-item>
-            <!-- XSC网口管理 -->
-            <el-menu-item index="/xsc-interface" @click.stop>
-              <el-icon><Connection /></el-icon>
-              <span>XSC网口管理</span>
-            </el-menu-item>
           </el-sub-menu>
           
           <!-- 4. 质量保证平台 -->

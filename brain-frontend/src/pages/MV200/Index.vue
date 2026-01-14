@@ -325,7 +325,10 @@
                       <span>编辑</span>
                     </div>
                   </el-dropdown-item>
-                  
+                  <el-dropdown-item command="viewXsc" class="dropdown-item">
+                    <el-icon><Link /></el-icon>
+                    <span>查看XSC网口</span>
+                  </el-dropdown-item>                  
                   <!-- 新增：更新MCR包 -->
                   <el-dropdown-item 
                     command="updateMcr" 
@@ -1348,6 +1351,9 @@ const handleCommand = (command: string, server: MVServer & {
     case 'detail':
       handleDetail(server)
       break
+    case 'viewXsc':  // 新增
+      handleViewXsc(server)
+      break
     case 'edit':
       handleEdit(server)
       break
@@ -1358,6 +1364,17 @@ const handleCommand = (command: string, server: MVServer & {
       handleDelete(server)
       break
   }
+}
+
+// 新增：跳转到XSC网口页面
+const handleViewXsc = (server: MVServer) => {
+  router.push({
+    path: `/xsc-interface/mv200/${server.id}`,
+    query: {
+      name: server.name,
+      ip: server.ip_address
+    }
+  })
 }
 
 const handleEdit = (server: MVServer & { 

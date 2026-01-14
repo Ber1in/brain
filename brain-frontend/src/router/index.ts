@@ -203,6 +203,11 @@ const router = createRouter({
       path: '/help',
       name: '帮助文档',
       component: () => import('@/pages/Help.vue')
+    },
+    {
+      path: '/xsc-interface/mv200/:mv200_id',
+      name: 'XSC网口管理',
+      component: () => import('@/pages/XSC/Index.vue')
     }
   ],
 })

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest } from '@/types/api'
+import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest } from '@/types/api'
 
 export const mv200Api = {
   getAll(): Promise<MVServer[]> {
@@ -30,4 +30,15 @@ export const mv200Api = {
     return apiClient.post(`/mv-servers/${serverId}/update_mcr`, data)
   },
 
+  createXsc(mv200_id: string, data: InterfaceCreate): Promise<InterfaceInfo> {
+    return apiClient.post(`/xsc/${mv200_id}`, data)
+  },
+
+  configXsc(mv200_id: string, uuid: number, data: OvsflowRequest): Promise<void> {
+    return apiClient.post(`/xsc/${mv200_id}/${uuid}`, data)
+  },
+
+  deleteXsc(mv200_id: string, uuid: number): Promise<void> {
+    return apiClient.delete(`/xsc/${mv200_id}/${uuid}`)
+  },
 }
