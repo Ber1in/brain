@@ -173,15 +173,15 @@
                     command="config" 
                     divided 
                     class="dropdown-item"
-                    :disabled="!!row.ip && row.ip.trim() !== '' || row.deleting"
+                    :disabled="row.deleting"
                   >
                     <div class="dropdown-item-content">
                       <el-icon><Setting /></el-icon>
-                      <span>配置网口</span>
+                      <span>{{ row.vlan ? '清理配置' : '配置网口' }}</span>
                       <el-tooltip 
-                        v-if="row.ip && row.ip.trim() !== ''"
+                        v-if="row.vlan"
                         effect="dark" 
-                        content="该网口已配置，请先删除配置后再配置"
+                        content="该网口已有配置，点击清理现有配置"
                         placement="top"
                       >
                         <el-icon style="margin-left: 4px;"><InfoFilled /></el-icon>
@@ -1140,11 +1140,44 @@ const handleCommand = (command: string, intf: XscnetInfo & { deleting?: boolean 
       handleDetail(intf)
       break
     case 'config':
-      handleConfigDialog(intf)
+      // 根据是否有vlan决定是清理配置还是新增配置
+      if (intf.vlan) {
+        handleCleanConfig(intf)
+      } else {
+        handleConfigDialog(intf)
+      }
       break
     case 'delete':
       handleDelete(intf)
       break
+  }
+}
+
+// 清理配置（删除流表）
+const handleCleanConfig = async (intf: XscnetInfo & { deleting?: boolean }) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要清理网口 UUID: ${intf.uuid} 的配置吗？\n这将删除所有流表配置。`,
+      '确认清理配置',
+      {
+        type: 'warning',
+        confirmButtonText: '确定清理',
+        cancelButtonText: '取消'
+      }
+    )
+    
+    // 调用删除流表接口
+    await mv200Api.removeXscOvsFlow(mv200Id.value, intf.uuid)
+    
+    ElMessage.success(`网口 UUID: ${intf.uuid} 配置已清理`)
+    
+    // 重新加载数据
+    await loadXscInterfaces()
+    
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('清理配置失败，请重试')
+    }
   }
 }
 
@@ -1545,7 +1578,19 @@ const handleConfig = async () => {
       configData.dns = configForm.value.dns.filter(dns => dns && dns.trim() !== '')
     }
     
-    await mv200Api.configXsc(mv200Id.value, selectedInterface.value.uuid, configData)
+    // 如果有现有配置，先清理再配置
+    if (selectedInterface.value.vlan) {
+      try {
+        // 先清理现有配置
+        await mv200Api.removeXscOvsFlow(mv200Id.value, selectedInterface.value.uuid)
+        ElMessage.info('已清理现有配置')
+      } catch (cleanError) {
+        console.warn('清理现有配置失败，继续尝试新增配置:', cleanError)
+      }
+    }
+    
+    // 新增配置
+    await mv200Api.addXscOvsFlow(mv200Id.value, selectedInterface.value.uuid, configData)
     
     ElMessage.success('网口配置成功')
     configDialogVisible.value = false

@@ -522,9 +522,9 @@ async def create_interface(mv200_id: str, data: mv200_schemas.InterfaceCreate):
     return {"uuid": iface_data.get('xsc_id'), "mtu": data.mtu, "mac": iface_data["mac"]}
 
 
-@router.post("/xsc/{mv200_id}/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/xsc/{mv200_id}/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
 async def configure_interface_flow_tables(
-        mv200_id: str, uuid:int,  data: mv200_schemas.OvsflowRequest):
+        mv200_id: str, uuid: int, data: mv200_schemas.OvsflowRequest):
     # Fetch server information
     try:
         mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
@@ -570,6 +570,48 @@ async def configure_interface_flow_tables(
         LOG.info(f"Successfully saved checkpoint for interface {uuid}")
     except Exception as e:
         LOG.error(f"Failed to save checkpoint after creating interface {uuid}: {e}")
+        raise
+
+
+@router.delete("/xsc/{mv200_id}/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_interface_flow_tables(
+        mv200_id: str, uuid: int):
+    # Fetch server information
+    try:
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    except Exception as e:
+        LOG.error(f"Failed to fetch server {mv200_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch server info")
+
+    dpuagentclient = get_dpuagentclient(mv200["ip_address"])
+    ovsapi = dpuagentApi.OvsflowApi(dpuagentclient)
+    try:
+        params = {
+            "uuid": uuid
+        }
+        res = ovsapi.del_ovsflow_dpu_agent_v1_ovsflow_del_post(params)
+        if res.code != 0:
+            LOG.error(
+                f"Failed to del OVS flow for interface {uuid} "
+                f"on SoC {mv200['ip_address']}: {res.message}"
+            )
+            raise HTTPException(status_code=500, detail=res.message)
+        LOG.info(f"OVS flow deleted for interface {uuid} successfully")
+    except Exception as e:
+        LOG.error(f"Exception deleting OVS flow for {uuid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for xsc interface {uuid}")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for interface {uuid}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for interface {uuid}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after deleting interface {uuid}: {e}")
         raise
 
 

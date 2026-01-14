@@ -34,8 +34,12 @@ export const mv200Api = {
     return apiClient.post(`/xsc/${mv200_id}`, data)
   },
 
-  configXsc(mv200_id: string, uuid: number, data: OvsflowRequest): Promise<void> {
-    return apiClient.post(`/xsc/${mv200_id}/${uuid}`, data)
+  addXscOvsFlow(mv200_id: string, uuid: number, data: OvsflowRequest): Promise<void> {
+    return apiClient.post(`/xsc/${mv200_id}/${uuid}/flowtables`, data)
+  },
+
+  removeXscOvsFlow(mv200_id: string, uuid: number): Promise<void> {
+    return apiClient.delete(`/xsc/${mv200_id}/${uuid}/flowtables`)
   },
 
   deleteXsc(mv200_id: string, uuid: number): Promise<void> {
