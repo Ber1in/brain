@@ -20,8 +20,8 @@ import re  # noqa: F401
 import json
 
 
-
-from pydantic import BaseModel, Field, StrictBool, StrictStr
+from typing import List, Optional
+from pydantic import BaseModel, Field, StrictBool, StrictStr, conlist
 
 class BdevInfo(BaseModel):
     """
@@ -29,7 +29,8 @@ class BdevInfo(BaseModel):
     """
     readonly: StrictBool = Field(..., description="Indicates if the block device is read-only")
     bdev: StrictStr = Field(..., description="Name of the block device")
-    __properties = ["readonly", "bdev"]
+    gws: Optional[conlist(StrictStr)] = None
+    __properties = ["readonly", "bdev", "gws"]
 
     class Config:
         """Pydantic configuration"""
@@ -68,7 +69,8 @@ class BdevInfo(BaseModel):
 
         _obj = BdevInfo.parse_obj({
             "readonly": obj.get("readonly"),
-            "bdev": obj.get("bdev")
+            "bdev": obj.get("bdev"),
+            "gws": obj.get("gws")
         })
         return _obj
 

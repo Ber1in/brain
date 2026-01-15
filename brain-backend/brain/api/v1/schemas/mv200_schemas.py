@@ -1,7 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from pydantic import BaseModel, Field,Extra
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from ipaddress import IPv4Address
 
@@ -79,15 +79,14 @@ class OvsflowRequest(BaseModel):
     dhcp_server: str = Field(None, description="Dhcp server address for the interface")
 
 
-
-
 class BdevInfo(BaseModel):
     readonly: bool = Field(...,
                            description="Indicates if the block device is read-only", example=False)
     bdev: str = Field(..., description="Name of the block device")
-
-    class Config:
-        extra = Extra.allow
+    gws: Optional[List[str]] = Field(None)
+    rbd_path: str = None
+    parent: str = None
+    size: int = None
 
 
 class BackendSpecific(BaseModel):

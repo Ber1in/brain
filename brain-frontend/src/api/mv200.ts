@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest, XscnetInfo } from '@/types/api'
+import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest, XscnetInfo, ControllerInfo } from '@/types/api'
 
 export const mv200Api = {
   getAll(): Promise<MVServer[]> {
@@ -53,4 +53,8 @@ export const mv200Api = {
     }
     return apiClient.get(`/mv-servers/${mv200Id}/xsc`, { params })
   },
+
+  getSystemDisks(mv200Id:string):  Promise<ControllerInfo[]> {
+    return apiClient.get(`/mv-servers/${mv200Id}/systemdisks`)
+  }
 }

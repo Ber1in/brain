@@ -9,13 +9,15 @@ from typing import List, Optional
 import logging
 import uuid
 import urllib3
+from urllib.parse import quote
 from brain.api.v2.schemas import common_schemas
 
 from brain.json_db import SQLiteDocumentDB
 from brain.auth import authenticate_user
 from brain.api.v1.schemas import mv200_schemas
 from brain.clients.dpuagent import api as dpuagentApi
-from brain.utils.get_client import get_dpuagentclient
+from brain.clients.ceph import api as ceph_api
+from brain.utils.get_client import get_cephclient, get_dpuagentclient
 from brain.utils.ssh_client import ssh_execute_async
 from brain.utils import common_utils
 from brain import exceptions
@@ -522,7 +524,8 @@ async def create_interface(server_id: str, data: mv200_schemas.InterfaceCreate):
     return {"uuid": iface_data.get('xsc_id'), "mtu": data.mtu, "mac": iface_data["mac"]}
 
 
-@router.post("/mv-servers/{server_id}/xsc/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/mv-servers/{server_id}/xsc/{uuid}/flowtables", 
+             status_code=status.HTTP_204_NO_CONTENT)
 async def configure_interface_flow_tables(
         server_id: str, uuid: int, data: mv200_schemas.OvsflowRequest):
     # Fetch server information
@@ -573,7 +576,8 @@ async def configure_interface_flow_tables(
         raise
 
 
-@router.delete("/mv-servers/{server_id}/xsc/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/mv-servers/{server_id}/xsc/{uuid}/flowtables",
+               status_code=status.HTTP_204_NO_CONTENT)
 async def delete_interface_flow_tables(
         server_id: str, uuid: int):
     # Fetch server information
@@ -658,9 +662,12 @@ async def delete_interface(server_id: str, uuid: int):
     LOG.info(f"Interface {uuid} deleted successfully")
     return
 
-@router.get("/mv-servers/{server_id}/systemdisks", response_model=List[mv200_schemas.ControllerInfo])
+
+@router.get("/mv-servers/{server_id}/systemdisks", 
+            response_model=List[mv200_schemas.ControllerInfo])
 async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1, le=100)):
     """Get network interface(s) info"""
+
     try:
         mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
     except Exception:
@@ -670,6 +677,7 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
     mv200_ip = mv200["ip_address"]
     LOG.info(f"Fetching interface for {mv200_ip}")
 
+    blocks = []
     try:
         dpuagentclient = get_dpuagentclient(mv200_ip)
 
@@ -685,9 +693,36 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail=f"Failed to list xscnet at {mv200_ip}"
             )
+        blocks = res.dict()["vblks"]
+        ceph_clients = {}
+        for block in blocks:
+            backend_block = block.get("backend_specific", {}).get("block", {})
+            gws = backend_block.get("gws") or []
+
+            for gw in gws:
+                if gw not in ceph_clients:
+                    ceph_clients[gw] = get_cephclient(mon_host=gw)
+
+                ceph_client = ceph_clients[gw]
+                rbd_api = ceph_api.RbdApi(ceph_client)
+
+                bdev_parts = backend_block.get("bdev", "").split("_")
+                if len(bdev_parts) != 4:
+                    continue
+
+                rbd_path = f"{bdev_parts[0]}/{bdev_parts[1]}"
+                backend_block["rbd_path"] = rbd_path
+
+                rbd = rbd_api.api_block_image_image_spec_get(
+                    image_spec=quote(rbd_path, safe="")
+                )
+
+                backend_block["parent"] = f"{rbd.parent['pool_name']}/{rbd.parent['image_name']}"
+                backend_block["size"] = rbd.size / 1024 /1024 /1024
+
     except Exception as e:
         LOG.warning(f"Failed to obtain the network port name, error: {e}")
         return []
 
     LOG.info(f"Interface for {mv200_ip} fetched successfully")
-    return res.vblks
+    return blocks

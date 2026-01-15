@@ -2100,8 +2100,16 @@
                         "title": "Bdev",
                         "type": "string",
                         "description": "Name of the block device"
+                    },
+                    "gws": {
+                        "title": "Gws",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     }
-                }
+                },
+                "additionalProperties": false
             },
             "BdevQosInfoResponse": {
                 "title": "BdevQosInfoResponse",

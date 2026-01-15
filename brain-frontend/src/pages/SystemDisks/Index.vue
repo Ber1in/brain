@@ -1,106 +1,136 @@
 <template>
-  <div class="system-disks">
+  <div class="system-disks-mv200">
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>裸金属云系统磁盘</span>
-          <div class="header-actions">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索ID、镜像名、SOC IP、裸金属服务器、创建人或描述"
-              clearable
-              style="width: 410px; margin-right: 16px;"
-              @input="handleSearch"
-              @clear="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-button type="primary" @click="$router.push('/system-disks/create')">
-              创建云系统盘
-            </el-button>
+          <div class="header-info">
+            <div class="title-section">
+              <h3>云系统盘管理</h3>
+              <div class="mv200-info">
+                <el-tag type="primary" size="large" class="name-tag">
+                  <el-icon><Monitor /></el-icon>
+                  {{ mv200Info.name }}
+                </el-tag>
+                <el-tag type="info" size="large">
+                  <el-icon><Link /></el-icon>
+                  {{ mv200Info.ip }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <el-button 
+                type="default" 
+                @click="refreshData"
+                :loading="loading"
+              >
+                <el-icon><Refresh /></el-icon>
+                刷新
+              </el-button>
+            </div>
           </div>
         </div>
       </template>
 
       <el-table 
-        :data="filteredDisks" 
-        v-loading="loading" 
+        :data="systemDisks" 
+        v-loading="loading"
         style="width: 100%"
-        :default-sort="{ prop: 'mv200_ip', order: 'ascending' }"
       >
-        <el-table-column label="镜像名称">
-          <template #default="{ row }">
-            <template v-if="imageMap.get(row.image_id)">
-              <div class="highlight-name">{{ getImageName(row.image_id) }}</div>
-              <div class="highlight-ip">({{ row.mon_host }})</div>
-            </template>
-            <template v-else>
-              <div class="highlight-deleted">源镜像已删除</div>
-            </template>
-          </template>
-        </el-table-column>
+        <!-- 1. UUID列 -->
         <el-table-column 
-          prop="mv200_ip" 
-          label="SOC IP"
-          sortable
-          :sort-method="ipSortMethod"
-        >
-          <template #default="{ row }">
-            <div class="highlight-name">{{ getMV200Name(row.mv200_id) }}</div>
-            <div class="highlight-ip">({{ row.mv200_ip }})</div>
-          </template>
-        </el-table-column>
-        <el-table-column 
-          label="裸金属服务器"
-          sortable
-          :sort-method="hostIpSortMethod"
-        >
-          <template #default="{ row }">
-            <div class="highlight-name">{{ getHostName(row.mv200_id) }}</div>
-            <div class="highlight-ip">({{ getHostIP(row.mv200_id) }})</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="size_gb" label="磁盘大小(GB)" width="120">
-          <template #default="{ row }">
-            <span class="highlight-size">{{ row.size_gb }} GB</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="Flatten" width="120">
-          <template #header>
-            <span>Flatten</span>
-            <el-tooltip 
-              effect="dark" 
-              content="已经flatten过的系统盘会脱离对镜像的依赖，性能会有所提升"
-              placement="top"
-            >
-              <el-icon style="margin-left: 4px; cursor: help;">
-                <QuestionFilled />
-              </el-icon>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <span :class="row.flatten ? 'highlight-true' : 'highlight-false'">
-              {{ row.flatten ? '是' : '否' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column 
-          prop="creator" 
-          label="创建人" 
+          prop="uuid" 
+          label="UUID" 
           width="120"
           sortable
         >
           <template #default="{ row }">
-            <el-tag v-if="row.creator" type="primary">
-              {{ row.creator }}
+            <el-tag :type="isCloudInitBdev(row) ? 'info' : 'success'" size="small">
+              {{ row.uuid }}
             </el-tag>
+          </template>
+        </el-table-column>
+        
+        <!-- 2. 网关节点列 - 加宽并左对齐 -->
+        <el-table-column 
+          label="网关节点"
+          width="220"
+          align="left"
+        >
+          <template #default="{ row }">
+            <div class="gateway-nodes">
+              <div v-if="isCloudInitBdev(row)" class="cloudinit-info">
+                <el-tag type="info" size="small">cloudinit数据源</el-tag>
+              </div>
+              <div v-else-if="row.backend_specific?.block?.gws?.length" class="gateway-list">
+                <div v-for="(gw, index) in row.backend_specific.block.gws" :key="index" class="gateway-item">
+                  <el-tag size="small" class="gateway-tag">
+                    <el-icon><Monitor /></el-icon>
+                    {{ gw }}
+                  </el-tag>
+                </div>
+              </div>
+              <span v-else class="empty-text">-</span>
+            </div>
+          </template>
+        </el-table-column>
+        
+        <!-- 3. 块设备列 (显示RBD路径) -->
+        <el-table-column 
+          label="块设备"
+          min-width="200"
+          show-overflow-tooltip
+          align="left"
+        >
+          <template #default="{ row }">
+            <div v-if="row.backend_specific?.block?.rbd_path" class="rbd-path-cell">
+              <span class="rbd-path">
+                {{ row.backend_specific.block.rbd_path }}
+              </span>
+            </div>
             <span v-else class="empty-text">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        
+        <!-- 4. 镜像列 -->
+        <el-table-column 
+          label="镜像"
+          min-width="180"
+          show-overflow-tooltip
+          align="left"
+        >
+          <template #default="{ row }">
+            <div v-if="row.backend_specific?.block?.parent" class="image-cell">
+              <el-tag type="warning" size="small" class="parent-tag">
+                {{ getImageName(row.backend_specific.block.parent) }}
+              </el-tag>
+            </div>
+            <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
+        
+        <!-- 5. 大小列 -->
+        <el-table-column 
+          label="大小(GB)"
+          width="120"
+          sortable
+          :sort-method="sizeSortMethod"
+          align="left"
+        >
+          <template #default="{ row }">
+            <div v-if="row.backend_specific?.block?.size" class="size-cell">
+              <span class="size-text">{{ row.backend_specific.block.size }}</span>
+            </div>
+            <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
+        
+        <!-- 操作列 -->
+        <el-table-column 
+          label="操作" 
+          width="100" 
+          fixed="right"
+          align="center"
+        >
           <template #default="{ row }">
             <el-dropdown @command="(command) => handleCommand(command, row)" size="small">
               <el-button type="primary" link>
@@ -108,42 +138,10 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="edit">
-                    <el-icon><Edit /></el-icon>
-                    <span>编辑</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item command="upload" divided>
-                    <el-icon><Upload /></el-icon>
-                    <span>保存为镜像</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item command="rebuild">
-                    <el-icon><Refresh /></el-icon>
-                    <span>重置镜像</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item 
-                    command="flatten" 
-                    :disabled="row.flatten"
-                  >
-                    <el-tooltip 
-                      v-if="row.flatten" 
-                      effect="dark" 
-                      content="当前云硬盘已经flatten" 
-                      placement="top"
-                    >
-                      <div class="dropdown-item-content">
-                        <el-icon><Operation /></el-icon>
-                        <span>Flatten</span>
-                      </div>
-                    </el-tooltip>
-                    <div v-else class="dropdown-item-content">
-                      <el-icon><Operation /></el-icon>
-                      <span>Flatten</span>
-                    </div>
-                  </el-dropdown-item>
-
-                  <el-dropdown-item command="delete" divided class="danger-item">
-                    <el-icon><Delete /></el-icon>
-                    <span>删除</span>
+                  <!-- 详细信息 -->
+                  <el-dropdown-item command="detail" class="dropdown-item">
+                    <el-icon><View /></el-icon>
+                    <span>详情</span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -151,673 +149,327 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 空状态提示 -->
+      <div v-if="systemDisks.length === 0 && !loading" class="empty-state">
+        <el-empty description="暂无云系统盘" />
+      </div>
     </el-card>
 
-    <!-- 保存为镜像对话框 -->
+    <!-- 详细信息对话框 -->
     <el-dialog
-      v-model="uploadDialogVisible"
-      title="保存系统盘为新镜像"
-      width="500px"
+      v-model="detailDialogVisible"
+      title="云系统盘详细信息"
+      width="600px"
     >
-      <el-form :model="uploadForm" label-width="120px">
-        <el-form-item label="名称">
-          <el-input
-            v-model="uploadForm.dest_name"
-            placeholder="请输入新镜像名称（可选）"
-            clearable
-          />
-          <div class="form-tip">如不填写，系统将自动生成镜像名称</div>
-        </el-form-item>
-        <el-form-item label="存储池">
-          <el-input
-            v-model="uploadForm.dest_pool"
-            placeholder="请输入目标存储池（可选）"
-            clearable
-          />
-          <div class="form-tip">如不填写，将保存到镜像默认存储池 images</div>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input
-            v-model="uploadForm.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入镜像描述（可选）"
-            clearable
-          />
-        </el-form-item>
-      </el-form>
-      
-      <div class="warning-message">
-        <el-alert
-          title="重要提示"
-          type="warning"
-          :closable="false"
-          description="请确认该系统盘不在使用中，若系统盘依旧存在IO，保存的新镜像数据可能不完整。"
-          show-icon
-        />
-      </div>
-      
-      <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmUpload" :loading="uploadLoading">
-          确认保存
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 重置镜像对话框 -->
-    <el-dialog
-      v-model="rebuildDialogVisible"
-      title="重置系统盘镜像"
-      width="500px"
-    >
-      <el-form :model="rebuildForm" label-width="120px">
-        <el-form-item label="选择镜像">
-          <el-select
-            v-model="rebuildForm.image_id"
-            placeholder="请选择镜像"
-            style="width: 100%"
-            clearable
+      <el-descriptions :column="1" border v-if="currentDisk">
+        <el-descriptions-item label="UUID">
+          <el-tag :type="isCloudInitBdev(currentDisk) ? 'info' : 'success'">
+            {{ currentDisk.uuid }}
+          </el-tag>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="控制器">
+          {{ currentDisk.ctrlr }}
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="CPU核心掩码">
+          <el-tag size="small">{{ currentDisk.cpumask }}</el-tag>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="虚拟队列">
+          <div>数量: {{ currentDisk.vq_count }}</div>
+          <div>大小: {{ currentDisk.vq_size }}</div>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="块设备名称">
+          <code>{{ currentDisk.backend_specific?.block?.bdev }}</code>
+          <el-tag 
+            v-if="isCloudInitBdev(currentDisk)" 
+            type="info" 
+            size="small" 
+            style="margin-left: 8px;"
           >
-            <el-option
-              v-for="image in images"
-              :key="image.id"
-              :label="`${image.name} (${image.mon_host})`"
-              :value="image.id"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      
-      <div class="warning-message">
-        <el-alert
-          title="重要提示"
-          type="warning"
-          :closable="false"
-          description="重置镜像操作，将会丢失当前系统盘内所有数据。此操作不可逆，请谨慎操作！"
-          show-icon
-        />
-      </div>
-      
-      <template #footer>
-        <el-button @click="rebuildDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmRebuild" :loading="rebuildLoading" style="background-color: #e6a23c; border-color: #e6a23c;">
-          确认重置
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Flatten确认对话框 -->
-    <el-dialog
-      v-model="flattenDialogVisible"
-      title="确认Flatten操作"
-      width="400px"
-    >
-      <div class="warning-message">
-        <el-alert
-          title="重要提示"
-          type="warning"
-          :closable="false"
-          description="Flatten操作完成后将不再依赖镜像，提升系统盘性能。但Flatten过程中磁盘性能可能有所下降"
-          show-icon
-        />
-      </div>
-      <div class="confirm-message">
-        <p>确定要对系统磁盘 <strong>"{{ currentDisk?.id }}"</strong> 执行Flatten操作吗？</p>
-      </div>
+            cloudinit数据源
+          </el-tag>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="RBD路径">
+          <code>{{ currentDisk.backend_specific?.block?.rbd_path || '-' }}</code>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="镜像路径">
+          <code>{{ currentDisk.backend_specific?.block?.parent || '-' }}</code>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="网关节点">
+          <div v-if="currentDisk.backend_specific?.block?.gws?.length" class="gateway-detail">
+            <el-tag
+              v-for="(gw, index) in currentDisk.backend_specific.block.gws"
+              :key="index"
+              size="small"
+              style="margin-right: 8px; margin-bottom: 4px;"
+            >
+              {{ gw }}
+            </el-tag>
+          </div>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="大小">
+          <span v-if="currentDisk.backend_specific?.block?.size" class="size-text">
+            {{ currentDisk.backend_specific.block.size }} GB
+          </span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        
+        <el-descriptions-item label="状态">
+          <el-tag :type="currentDisk.backend_specific?.block?.readonly ? 'warning' : 'success'">
+            {{ currentDisk.backend_specific?.block?.readonly ? '只读' : '读写' }}
+          </el-tag>
+        </el-descriptions-item>
+      </el-descriptions>
       
       <template #footer>
-        <el-button @click="flattenDialogVisible = false">取消</el-button>
-        <el-button 
-          type="primary" 
-          @click="confirmFlatten" 
-          :loading="flattenLoading"
-        >
-          确认Flatten
-        </el-button>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, MoreFilled, Edit, Upload, Refresh, Delete, Operation, Search } from '@element-plus/icons-vue'
-import { systemDisksApi } from '@/api/system-disks'
-import { imagesApi } from '@/api/images'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { 
+  Refresh, 
+  View,
+  Monitor,
+  Link,
+  MoreFilled
+} from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
-import { deviceApi } from '@/api/device'
-import type { SystemDisk, Image, MVServer, ServerDetailResponse, BootEntriesResponse } from '@/types/api'
+import type { ControllerInfo } from '@/types/api'
 
+const route = useRoute()
 const loading = ref(false)
-const disks = ref<SystemDisk[]>([])
-const images = ref<Image[]>([])
-const mv200Servers = ref<MVServer[]>([])
-const allDevices = ref<ServerDetailResponse[]>([])
-const searchKeyword = ref('')
+const systemDisks = ref<ControllerInfo[]>([])
+const currentDisk = ref<ControllerInfo | null>(null)
+const detailDialogVisible = ref(false)
 
-const uploadDialogVisible = ref(false)
-const uploadLoading = ref(false)
-const currentDisk = ref<SystemDisk | null>(null)
-const uploadForm = reactive({
-  dest_name: '',
-  dest_pool: '',
-  description: ''
+// 从路由参数中获取MV200信息
+const mv200Info = ref({
+  id: route.params.mv200Id as string,
+  name: route.query.name as string || '',
+  ip: route.query.ip as string || ''
 })
 
-const rebuildDialogVisible = ref(false)
-const rebuildLoading = ref(false)
-const rebuildForm = reactive({
-  image_id: ''
-})
-
-const flattenDialogVisible = ref(false)
-const flattenLoading = ref(false)
-
-const ipSortMethod = (a: SystemDisk, b: SystemDisk) => {
-  const ipToNumber = (ip: string) => {
-    const parts = ip.split('.').map(part => parseInt(part, 10));
-    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
-  };
-  
-  const ipA = ipToNumber(a.mv200_ip);
-  const ipB = ipToNumber(b.mv200_ip);
-  
-  if (ipA < ipB) return -1;
-  if (ipA > ipB) return 1;
-  return 0;
-};
-
-const hostIpSortMethod = (a: SystemDisk, b: SystemDisk) => {
-  const ipToNumber = (ip: string) => {
-    const parts = ip.split('.').map(part => parseInt(part, 10));
-    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
-  };
-  
-  const hostIP_A = getHostIP(a.mv200_id);
-  const hostIP_B = getHostIP(b.mv200_id);
-  
-  const ipA = ipToNumber(hostIP_A);
-  const ipB = ipToNumber(hostIP_B);
-  
-  if (ipA < ipB) return -1;
-  if (ipA > ipB) return 1;
-  return 0;
-};
-
-const ipSort = (ipA: string, ipB: string) => {
-  const ipToNumber = (ip: string) => {
-    const parts = ip.split('.').map(part => parseInt(part, 10));
-    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
-  };
-  
-  return ipToNumber(ipA) - ipToNumber(ipB);
-};
-
-const imageMap = computed(() => {
-  const map = new Map<string, string>()
-  images.value.forEach(image => {
-    map.set(image.id, image.name)
-  })
-  return map
-})
-
-const mv200Map = computed(() => {
-  const map = new Map<string, MVServer>()
-  mv200Servers.value.forEach(server => {
-    map.set(server.id, server)
-  })
-  return map
-})
-
-// 根据MV200 ID获取关联的裸金属服务器
-const getAssociatedServer = (mv200Id: string): ServerDetailResponse | null => {
-  const mv200 = mv200Map.value.get(mv200Id)
-  if (!mv200 || !mv200.nic_sn) return null
-  
-  // 在所有设备中查找匹配的网卡SN
-  for (const device of allDevices.value) {
-    if (device.nics && device.nics.length > 0) {
-      const matchingNic = device.nics.find(nic => nic.sn === mv200.nic_sn)
-      if (matchingNic) {
-        return device
-      }
-    }
-  }
-  return null
+// 检查是否为cloudinit数据源
+const isCloudInitBdev = (disk: ControllerInfo): boolean => {
+  return disk.backend_specific?.block?.bdev === 'yunsilicon_cloudinit_bdev'
 }
 
-const filteredDisks = computed(() => {
-  let filtered = disks.value
-  
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    filtered = disks.value.filter(disk => {
-      if (disk.id.toLowerCase().includes(keyword)) return true
-      
-      const imageName = getImageName(disk.image_id).toLowerCase()
-      if (imageName.includes(keyword)) return true
-      
-      if (disk.mv200_ip.toLowerCase().includes(keyword)) return true
-      
-      const hostName = getHostName(disk.mv200_id).toLowerCase()
-      const hostIP = getHostIP(disk.mv200_id).toLowerCase()
-      if (hostName.includes(keyword) || hostIP.includes(keyword)) return true
-      
-      if (disk.creator && disk.creator.toLowerCase().includes(keyword)) return true
-      
-      if (disk.description && disk.description.toLowerCase().includes(keyword)) return true
-      
-      return false
-    })
-  }
-  
-  return filtered
-})
-
-const getImageName = (imageId: string) => {
-  return imageMap.value.get(imageId) || "镜像已删除"
+// 从完整的镜像路径中提取镜像名称
+const getImageName = (fullPath: string): string => {
+  if (!fullPath) return '-'
+  const parts = fullPath.split('/')
+  return parts[parts.length - 1] || fullPath
 }
 
-const getMV200Name = (serverId: string) => {
-  const server = mv200Map.value.get(serverId)
-  return server?.name || serverId
+// 大小排序方法
+const sizeSortMethod = (a: ControllerInfo, b: ControllerInfo) => {
+  const sizeA = a.backend_specific?.block?.size || 0
+  const sizeB = b.backend_specific?.block?.size || 0
+  return sizeA - sizeB
 }
 
-const getHostName = (mv200_id: string) => {
-  const server = getAssociatedServer(mv200_id)
-  return server ? server.bmc.hostname : '-'
-}
-
-const getHostIP = (mv200_id: string) => {
-  const server = getAssociatedServer(mv200_id)
-  return server ? server.device.ip : '-'
-}
-
-const loadData = async () => {
+// 加载云系统盘数据
+const loadSystemDisks = async () => {
   loading.value = true
   try {
-    const disksResponse = await systemDisksApi.getAll()
+    console.log('正在加载MV200系统盘，ID:', mv200Info.value.id)
+    const response = await mv200Api.getSystemDisks(mv200Info.value.id)
+    systemDisks.value = response
     
-    if (!disksResponse || disksResponse.length === 0) {
-      disks.value = []
-      images.value = []
-      mv200Servers.value = []
-      allDevices.value = []
-      return
-    }
+    // 按UUID排序
+    systemDisks.value.sort((a, b) => a.uuid - b.uuid)
+    console.log('加载成功，共', systemDisks.value.length, '个系统盘')
     
-    const [imagesResponse, serversResponse, devicesResponse] = await Promise.all([
-      imagesApi.getAll(),
-      mv200Api.getAll(),
-      deviceApi.getAll(),
-    ])
-    
-    disks.value = disksResponse.sort((a, b) => ipSort(a.mv200_ip, b.mv200_ip))
-    images.value = imagesResponse
-    mv200Servers.value = serversResponse
-    allDevices.value = devicesResponse
-
-  } catch (error) {
-    ElMessage.error('加载数据失败')
-    console.error('加载数据失败:', error)
+  } catch (error: any) {
+    ElMessage.error('加载云系统盘失败: ' + (error.message || '未知错误'))
+    console.error('加载云系统盘失败:', error)
   } finally {
     loading.value = false
   }
 }
 
-const handleSearch = () => {
+// 刷新数据
+const refreshData = () => {
+  loadSystemDisks()
 }
 
-const handleCommand = (command: string, disk: SystemDisk) => {
+// 操作命令处理
+const handleCommand = (command: string, disk: ControllerInfo) => {
   switch (command) {
-    case 'edit':
-      handleEdit(disk)
-      break
-    case 'upload':
-      handleUploadToImage(disk)
-      break
-    case 'rebuild':
-      handleRebuildFromImage(disk)
-      break
-    case 'flatten':
-      handleFlatten(disk)
-      break
-    case 'delete':
-      handleDelete(disk)
+    case 'detail':
+      showDiskDetail(disk)
       break
   }
 }
 
-const handleEdit = (disk: SystemDisk) => {
-  window.location.href = `/system-disks/edit/${disk.id}`
-}
-
-const handleDelete = async (disk: SystemDisk) => {
-  try {
-    loading.value = true
-    
-    // 创建带复选框的确认对话框
-    const isForceDelete = await new Promise<boolean>((resolve, reject) => {
-      ElMessageBox.confirm(
-        `
-          <div>
-            <div style="margin-bottom: 16px;">确定要删除系统磁盘 ${disk.id}（关联SOC：${disk.mv200_ip}）吗？</div>
-            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: #fffbf0; border-radius: 4px;">
-              <input type="checkbox" id="forceDeleteCheckbox" style="margin-right: 8px;">
-              <label for="forceDeleteCheckbox" style="color: #b88230; font-weight: 500;">
-                强制删除
-              </label>
-            </div>
-            <div style="color: #e6a23c; font-size: 12px; line-height: 1.4;">
-              注意：勾选强制删除将忽略系统盘使用状态，可能会影响正在运行的系统
-            </div>
-          </div>
-        `,
-        '确认删除',
-        {
-          type: 'warning',
-          dangerouslyUseHTMLString: true,
-          showCancelButton: true,
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
-          beforeClose: (action, instance, done) => {
-            if (action === 'confirm') {
-              const checkbox = document.getElementById('forceDeleteCheckbox') as HTMLInputElement
-              const forceDelete = checkbox?.checked || false
-              instance.confirmButtonLoading = true
-              setTimeout(() => {
-                done()
-                instance.confirmButtonLoading = false
-                resolve(forceDelete) // 确认时解析为勾选状态
-              }, 300)
-            } else {
-              done()
-              reject('cancel') // 取消时拒绝Promise
-            }
-          }
-        }
-      ).catch(() => {
-        reject('cancel') // 捕获取消操作
-      })
-    })
-    
-    console.info("isForceDelete:", isForceDelete)
-    
-    // 如果是强制删除，直接执行删除操作，不检查使用状态
-    if (isForceDelete) {
-      const response = await systemDisksApi.delete(disk.id, isForceDelete)
-      ElMessage.success('强制删除成功')
-      
-      if (response.efi_status === 1 || response.cloudinit_status === 1) {
-        let warningMessage = '强制删除成功，但存在以下相关残留问题：\n'
-        
-        if (response.efi_status === 1) {
-          warningMessage += '• 自动清理EFI启动项失败，需要重启系统完成自动清理\n'
-        }
-        
-        if (response.cloudinit_status === 1) {
-          warningMessage += '• cloud-init数据源清理失败\n'
-        }
-        
-        ElMessage.warning({
-          message: warningMessage,
-          duration: 8000,
-          showClose: true
-        })
-      }
-      
-      await loadData()
-      return
-    }
-    
-    // 如果不是强制删除，检查系统盘是否在使用
-    let isInUse = false
-    
-    try {
-      const associatedServer = getAssociatedServer(disk.mv200_id)
-      if (associatedServer) {
-        // 直接调用deviceApi.getBootEntries，不需要用户名密码
-        const bootEntriesResponse = await deviceApi.getBootEntries(associatedServer.id)
-        
-        const currentBootEntry = bootEntriesResponse.entries[bootEntriesResponse.current]
-        const diskEfiUuid = disk.efi_uuid
-
-        if (currentBootEntry && diskEfiUuid && currentBootEntry.includes(diskEfiUuid)) {
-          isInUse = true
-        }
-      }
-    } catch (error) {
-      console.warn('检查启动项时出错:', error)
-    }
-    
-    // 如果系统盘正在使用且不是强制删除，提示并返回
-    if (isInUse) {
-      ElMessage.error('当前云系统盘正在使用中，请切换操作系统后重试，或使用强制删除')
-      loading.value = false
-      return
-    }
-    
-    // 执行删除操作（非强制删除）
-    const response = await systemDisksApi.delete(disk.id, isForceDelete)
-    
-    ElMessage.success('删除成功')
-    
-    if (response.efi_status === 1 || response.cloudinit_status === 1) {
-      let warningMessage = '删除成功，但存在以下相关残留问题：\n'
-      
-      if (response.efi_status === 1) {
-        warningMessage += '• 自动清理EFI启动项失败，需要重启系统完成自动清理\n'
-      }
-      
-      if (response.cloudinit_status === 1) {
-        warningMessage += '• cloud-init数据源清理失败\n'
-      }
-      
-      ElMessage.warning({
-        message: warningMessage,
-        duration: 8000,
-        showClose: true
-      })
-    }
-    
-    await loadData()
-    
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleUploadToImage = (disk: SystemDisk) => {
+// 显示详细信息
+const showDiskDetail = (disk: ControllerInfo) => {
   currentDisk.value = disk
-  uploadForm.dest_name = ''
-  uploadDialogVisible.value = true
-}
-
-const confirmUpload = async () => {
-  if (!currentDisk.value) return
-  
-  try {
-    uploadLoading.value = true
-    
-    await systemDisksApi.uploadToImage(currentDisk.value.id, {
-      dest_name: uploadForm.dest_name || undefined,
-      dest_pool: uploadForm.dest_pool || undefined,
-      description: uploadForm.description || undefined
-    })
-    
-    ElMessage.success('保存为镜像操作已提交，请稍后查看镜像列表')
-    uploadDialogVisible.value = false
-    
-  } catch (error) {
-    ElMessage.error('保存为镜像失败')
-    console.error('保存为镜像失败:', error)
-  } finally {
-    uploadLoading.value = false
-  }
-}
-
-const handleRebuildFromImage = (disk: SystemDisk) => {
-  currentDisk.value = disk
-  rebuildForm.image_id = ''
-  rebuildDialogVisible.value = true
-}
-
-const confirmRebuild = async () => {
-  if (!currentDisk.value) return
-  
-  if (!rebuildForm.image_id) {
-    ElMessage.warning('请选择镜像')
-    return
-  }
-  
-  try {
-    rebuildLoading.value = true
-
-    const response = await systemDisksApi.rebuildFromImage(currentDisk.value.id, rebuildForm.image_id)
-    
-    ElMessage.success('重置镜像操作已提交，系统盘将使用新镜像重建')
-    if (response.efi_status === 1 || response.cloudinit_status === 1) {
-      let warningMessage = '刷新成功，但存在以下相关残留问题：\n'
-      
-      if (response.efi_status === 1) {
-        warningMessage += '• 自动刷新EFI启动项失败，需要重启系统完成自动刷新\n'
-      }
-      
-      if (response.cloudinit_status === 1) {
-        warningMessage += '• cloud-init数据源刷新失败\n'
-      }
-      
-      ElMessage.warning({
-        message: warningMessage,
-        duration: 8000,
-        showClose: true
-      })
-    }
-    rebuildDialogVisible.value = false
-    
-    await loadData()
-    
-  } catch (error) {
-    ElMessage.error('重置镜像失败')
-    console.error('重置镜像失败:', error)
-  } finally {
-    rebuildLoading.value = false
-  }
-}
-
-const handleFlatten = (disk: SystemDisk) => {
-  currentDisk.value = disk
-  flattenDialogVisible.value = true
-}
-
-const confirmFlatten = async () => {
-  if (!currentDisk.value) return
-  
-  try {
-    flattenLoading.value = true
-    
-    await systemDisksApi.flatten(currentDisk.value.id)
-    
-    ElMessage.success('Flatten操作已提交')
-    flattenDialogVisible.value = false
-    
-    await loadData()
-    
-  } catch (error) {
-    ElMessage.error('Flatten操作失败')
-    console.error('Flatten操作失败:', error)
-  } finally {
-    flattenLoading.value = false
-  }
+  detailDialogVisible.value = true
 }
 
 onMounted(() => {
-  loadData()
+  console.log('页面挂载，MV200信息:', mv200Info.value)
+  loadSystemDisks()
 })
 </script>
 
 <style scoped>
 .card-header {
+  margin-bottom: 0;
+}
+
+.header-info {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  width: 100%;
 }
 
-.header-actions {
+.title-section {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title-section h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #303133;
+}
+
+.mv200-info {
+  display: flex;
+  gap: 8px;
   align-items: center;
 }
 
-.warning-message {
-  margin-top: 16px;
+.name-tag {
+  font-weight: 500;
 }
 
-.form-tip {
+.name-tag .el-icon,
+.ip-tag .el-icon {
+  margin-right: 4px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+/* 表格样式 - 确保左对齐 */
+.gateway-nodes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.gateway-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.gateway-item {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.gateway-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* 强制表格单元格左对齐 */
+:deep(.el-table__cell) {
+  text-align: left !important;
+}
+
+/* 特别为每个单元格设置左对齐 */
+:deep(.el-table__cell .cell) {
+  display: flex;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  align-items: center;
+}
+
+/* 网关节点列特别处理 */
+:deep(.el-table__cell:nth-child(2) .cell) {
+  justify-content: flex-start !important;
+  padding-left: 0 !important;
+}
+
+.cloudinit-info {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+/* 其他单元格样式 */
+.rbd-path-cell, .image-cell, .size-cell {
+  display: flex;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.rbd-path {
+  font-family: 'Monaco', 'Consolas', monospace;
   font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.confirm-message {
-  text-align: center;
-  margin: 20px 0;
-}
-
-.confirm-message p {
-  font-size: 16px;
-  line-height: 1.5;
-}
-
-.confirm-message strong {
-  color: #67c23a;
-}
-
-.highlight-name {
-  color: #67c23a;
-  font-weight: 600;
-}
-
-.highlight-ip {
   color: #409eff;
-  font-weight: 500;
-  font-family: 'Courier New', monospace;
+  text-align: left;
+  word-break: break-all;
 }
 
-.highlight-deleted {
-  color: #c0c4cc;
+.parent-tag {
+  font-family: 'Monaco', 'Consolas', monospace;
+  text-align: left;
+}
+
+.size-text {
+  color: #67c23a;
   font-weight: 500;
-  font-style: italic;
+  text-align: left;
 }
 
 .empty-text {
   color: #c0c4cc;
   font-style: italic;
+  text-align: left;
 }
 
-.highlight-size {
-  color: #e6a23c;
-  font-weight: 600;
+/* 空状态样式 */
+.empty-state {
+  padding: 60px 0;
 }
 
-.highlight-true {
-  color: #67c23a;
-  font-weight: 600;
-}
-
-.highlight-creator {
-  color: #13c2c2;
-  font-weight: 500;
-}
-
-.highlight-false {
-  color: #f56c6c;
-  font-weight: 600;
+/* 操作下拉菜单样式 */
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 :deep(.danger-item) {
@@ -829,34 +481,28 @@ onMounted(() => {
   background-color: #fef0f0;
 }
 
-:deep(.el-dropdown-menu__item) {
+/* 描述列表样式 */
+:deep(.el-descriptions__label) {
+  font-weight: 600;
+  width: 120px;
+}
+
+:deep(.el-descriptions__content) {
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+:deep(code) {
+  background-color: #f6f8fa;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* 详情对话框中的网关节点样式 */
+.gateway-detail {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-:deep(.el-dropdown-menu__item.is-disabled) {
-  color: #c0c4cc;
-  cursor: not-allowed;
-}
-
-:deep(.el-dropdown-menu__item.is-disabled:hover) {
-  background-color: transparent;
-}
-
-.dropdown-item-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-:deep(.el-dropdown-menu__item.is-disabled) {
-  color: #c0c4cc;
-  cursor: not-allowed;
-}
-
-:deep(.el-dropdown-menu__item.is-disabled:hover) {
-  background-color: transparent;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
 }
 </style>

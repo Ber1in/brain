@@ -505,3 +505,25 @@ export interface XscnetInfo {
   ifname?: string
   dns: string[]
 }
+
+export interface BdevInfo {
+  readonly: boolean;
+  bdev: string;
+  gws?: string[] | null;
+  rbd_path?: string | null;
+  parent?: string | null;
+  size?: number | null;
+}
+
+export interface BackendSpecific {
+  block: BdevInfo;
+}
+
+export interface ControllerInfo {
+  ctrlr: string;
+  cpumask: string;
+  uuid: number;
+  vq_count: number;
+  vq_size: number;
+  backend_specific: BackendSpecific;
+}
