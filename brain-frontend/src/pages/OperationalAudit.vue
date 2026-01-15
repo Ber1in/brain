@@ -202,7 +202,7 @@ enum ResourceType {
   MV200 = 'mv200',            // MV200服务器
   SYSTEM_SETTINGS = 'settings', // 系统设置
   XSC_NETWORK = 'network',     // XSC网口
-  CLOUD_DISK = 'cloud-disk',  // 云系统盘
+  CLOUD_DISK = 'cloud-disk',  // 云硬盘
   CLOUD_IMAGE = 'cloud-image' // 云镜像
 }
 
@@ -536,18 +536,18 @@ const getOperationText = (audit: OperationResponse): string => {
     }
   }
   
-  // 云系统盘相关
+  // 云硬盘相关
   if (path.endsWith('/system-disks') && method === 'POST') {
-    return '创建云系统盘'
+    return '创建云硬盘'
   }
   if (path.includes('/system-disks/')) {
     const resourceId = extractResourceId(path, ResourceType.CLOUD_DISK)
     if (resourceId) {
-      if (method === 'PUT') return '更新云系统盘信息'
-      if (method === 'DELETE') return '删除云系统盘'
-      if (path.endsWith('/flatten')) return '云系统盘做Flatten'
-      if (path.endsWith('/upload')) return '将云系统盘保存为新云镜像'
-      if (path.endsWith('/rebuild')) return '重置云系统盘'
+      if (method === 'PUT') return '更新云硬盘信息'
+      if (method === 'DELETE') return '删除云硬盘'
+      if (path.endsWith('/flatten')) return '云硬盘做Flatten'
+      if (path.endsWith('/upload')) return '将云硬盘保存为新云镜像'
+      if (path.endsWith('/rebuild')) return '重置云硬盘'
     }
   }
   
@@ -969,7 +969,7 @@ const handleCurrentChange = (page: number) => {
   box-shadow: 0 1px 2px rgba(124, 58, 237, 0.1);
 }
 
-/* 云系统盘 - 橙色主题 */
+/* 云硬盘 - 橙色主题 */
 .resource-name--cloud-disk {
   color: #ea580c;
   background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);

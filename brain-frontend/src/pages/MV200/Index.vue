@@ -330,7 +330,7 @@
                     <span>XSC网口管理</span>
                   </el-dropdown-item>   
                   <el-dropdown-item command="systemDisks" class="dropdown-item">
-                    <el-icon><DataBoard /></el-icon>
+                    <el-icon><Cpu /></el-icon>
                     <span>云系统盘管理</span>
                   </el-dropdown-item>               
                   <!-- 新增：更新MCR包 -->
@@ -515,7 +515,7 @@ import {
   ArrowRight,
   QuestionFilled,
   Monitor,
-  DataBoard,
+  Cpu,
   Plus,
   Link
 } from '@element-plus/icons-vue'

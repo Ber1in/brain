@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest, XscnetInfo, ControllerInfo } from '@/types/api'
+import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest, XscnetInfo, ControllerInfo, DeleteDiskResponse } from '@/types/api'
 
 export const mv200Api = {
   getAll(): Promise<MVServer[]> {
@@ -56,5 +56,9 @@ export const mv200Api = {
 
   getSystemDisks(mv200Id:string):  Promise<ControllerInfo[]> {
     return apiClient.get(`/mv-servers/${mv200Id}/systemdisks`)
-  }
+  },
+
+  createSystemDisk: (mv200Id: string, data: any): Promise<DeleteDiskResponse> => {
+    return apiClient.post(`/mv-servers/${mv200Id}/system-disks`, data)
+  },
 }

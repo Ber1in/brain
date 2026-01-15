@@ -282,8 +282,8 @@
                         <el-icon><DataBoard /></el-icon>
                     </div>
                     <div class="operation-info">
-                        <h4>云系统盘管理</h4>
-                        <p>创建/删除云系统盘</p>
+                        <h4>云硬盘管理</h4>
+                        <p>创建/删除云硬盘</p>
                     </div>
                     </div>
                     <div class="operation-item">
@@ -508,7 +508,7 @@
                         <li>支持执行用例时自动添加网口上行信息</li>
                         <li>支持解析测试任务的执行结果并展示</li>
                         <li>支持查询服务器上网卡设备的pcie宽度及网口的ipv4/ipv6地址</li>
-                        <li>支持服务器、mv200、云系统盘、xsc网口等资源的操作审计，参见【更多】-【操作日志】页面</li>
+                        <li>支持服务器、mv200、云硬盘、xsc网口等资源的操作审计，参见【更多】-【操作日志】页面</li>
                       </ul>
                       <div class="update-type">
                         <el-tag type="warning" size="small">功能优化</el-tag>

@@ -4,6 +4,7 @@
 import asyncio
 import copy
 import random
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 import logging
@@ -28,8 +29,386 @@ db = SQLiteDocumentDB()
 
 # Collection name
 MV_SERVER_COLLECTION = "mv_servers"
+IMAGE_COLLECTION = "images"
+SERVER_COLLECTION = "servers"
+
 MV200_OS_USER = "root"
 MV200_OS_PASSWORD = "yunsilicon"
+IMAGE_POOL = "images"
+SNAP_NAME = "brain_snap"
+
+
+async def _create_system_disk(mv200_id, data: mv200_schemas.CloudDiskCreateRequest, creator: str, rebuild=False):
+    disk_data = data.system_disk
+    LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
+             f"on MV200 server {mv200_id}, creator: {creator}")
+
+    # Check if image exists
+    try:
+        image = db.find_one(IMAGE_COLLECTION, {"id": disk_data.image_id})
+    except Exception:
+        LOG.warning(f"Image '{disk_data.image_id}' not found when creating system disk")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Image '{disk_data.image_id}' not found"
+        )
+
+    # Check if MV200 server exists
+    mv_server = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    if not mv_server:
+        LOG.warning(f"MV200 server '{mv200_id}' not found when creating system disk")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MV200 server '{mv200_id}' not found"
+        )
+
+    soc_ip = mv_server.get("ip_address")
+    target_server = None
+
+    servers = db.find(SERVER_COLLECTION)
+    for server in servers:
+        for nic in server.get("nics", []):
+            if nic.get("sn") == mv_server["nic_sn"]:
+                target_server = server
+                break
+        if target_server:
+            break
+
+    if not target_server:
+        LOG.warning(
+            f"Bare Metal server not found for MV200 {soc_ip}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Bare Metal server not found for MV200 {soc_ip}"
+        )
+
+    # Generate unique ID and RBD path
+    host_ip = target_server["device"]["ip"]
+    gateway = target_server["device"]["gateway"]
+    mac = target_server["device"]["mac"]
+    disk_id = data.system_disk.disk_id or str(uuid.uuid4())
+    rbd_path = f"{data.system_disk.pool}/{disk_id}"
+
+    for mon_host in data.system_disk.mon_hosts:
+        try:
+
+            LOG.info(
+                f"Starting RBD clone process for disk {disk_id} from image {image['ceph_location']}")
+            cephclient = get_cephclient(mon_host)
+            ceph_api.RbdSnapshotApi(
+                cephclient).api_block_image_image_spec_snap_snapshot_name_clone_post(
+                image_spec=quote(image["ceph_location"], safe=""),
+                snapshot_name=SNAP_NAME,
+                api_block_image_image_spec_snap_snapshot_name_clone_post_request={
+                    "child_pool_name": data.system_disk.pool,
+                    "child_image_name": disk_id
+                }
+            )
+            LOG.info(f"Successfully cloned RBD image for disk {disk_id}")
+
+            rbd_api = ceph_api.RbdApi(cephclient)
+            if disk_data.flatten:
+                LOG.info(f"Flattening RBD image for disk {disk_id}")
+                rbd_api.api_block_image_image_spec_flatten_post(
+                    image_spec=quote(rbd_path, safe=""))
+                LOG.info(f"Successfully flattened RBD image for disk {disk_id}")
+
+            LOG.info(f"Resizing RBD image for disk {disk_id} to {disk_data.size_gb}GB")
+            rbd_api.api_block_image_image_spec_put(
+                image_spec=quote(rbd_path, safe=""),
+                api_block_image_image_spec_put_request={"size": disk_data.size_gb * 1024 * 1024 * 1024}
+            )
+            LOG.info(f"Successfully resized RBD image for disk {disk_id}")
+            break
+
+        except Exception as e:
+            LOG.warning(f"Failed to clone system disk {disk_id} on mon_host {mon_host}, error: {e}")
+            
+    else:
+        msg = f"Failed to clone system disk {disk_id}"
+        LOG.error(msg)
+        raise exceptions.CloneSystemdiskException(msg)
+
+    # Create virtual block device
+    LOG.info(f"Creating virtual block device for disk {disk_id} on SOC {soc_ip}")
+    dpuagentclient = get_dpuagentclient(soc_ip)
+    blk_api = dpuagentApi.VblkApi(dpuagentclient)
+    try:
+        res = blk_api.create_vblk_dpu_agent_v1_vblk_add_post(
+            dpuagent_api_v1_schemas_vblk_schemas_create_request={
+                "rbd_path": rbd_path,
+                "gw_pwd": "yunsilicon",
+                "gws": data.system_disk.mon_hosts,
+                "vq_count": data.system_disk.vq_count,
+                "vq_size": data.system_disk.vq_size,
+                "bootable": True,
+                "gw_user": "admin"
+            })
+        LOG.info(f"Virtual block device creation response for disk {disk_id}:"
+                 f" code={res.code}, message={res.message}")
+    except Exception as e:
+        LOG.error(f"Failed to create virtblk for disk {disk_id} in {soc_ip}, error: {e}")
+        raise exceptions.VblkCreateException(str(e))
+
+    if res.code != 0:
+        LOG.error(
+            f"Failed to create virtblk for disk {disk_id} in {soc_ip}, message: {res.message}")
+        raise exceptions.VblkCreateException(res.message)
+
+    LOG.info(f"Successfully created virtual block device for disk {disk_id} with UUID: {res.uuid}")
+
+    cloudinit_status = 0
+    # Set system user and cloudinit configuration
+    if not rebuild:
+        LOG.info(f"Configuring cloudinit for disk {disk_id}")
+        system_user = data.system_user
+        user_data = {"users": [{"name": system_user.name,
+                                "password": system_user.password}]}
+        if target_server["bmc"].get("hostname"):
+            user_data["hostname"] = re.sub(
+                r'[^A-Za-z0-9-]', '', target_server["bmc"].get("hostname")) or "default-host"
+
+        network_config = {
+            "version": 1,
+            "ethernets": 
+            [
+                {
+                    "name": "eth0",
+                    "mac": mac,
+                    "dhcp4": False,
+                    "dhcp6": False,
+                    "addresses": [
+                        f"{host_ip}/24"
+                    ],
+                    "gateway4": gateway,
+                    # "nameservers": [
+                    #     "10.0.0.50",
+                    #     "10.0.0.51"
+                    # ],
+                }
+            ]
+        }
+        try:
+            cloudinit_api = dpuagentApi.CloudinitApi(dpuagentclient)
+            res = cloudinit_api.create_cloudinit_dpu_agent_v1_cloudinit_create_post(
+                {"user_data": user_data, "network_config": network_config})
+            if res.code != 0:
+                LOG.warning(f"Failed to create cloudinit datasource for SOC {soc_ip} and"
+                            f" disk {disk_id}, message: {res.message}")
+                cloudinit_status = 1
+            else:
+                LOG.info(f"Successfully configured cloudinit for disk {disk_id}")
+        except Exception as e:
+            LOG.error("Failed to create cloudinit datasource for SOC"
+                      f" {soc_ip} and disk {disk_id}, error: {e}")
+            cloudinit_status = 1
+    else:
+        LOG.info(f"Skipping cloudinit configuration for disk {disk_id}")
+
+    # Save checkpoint
+    LOG.info(f"Saving checkpoint for disk {disk_id}")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint for disk {disk_id}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint for disk {disk_id}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after creating block {disk_id}: {e}")
+        raise
+
+    efi_status = 0
+    if target_server["device"].get("username") and target_server["device"].get("password"):
+        try:
+            efi_uuid = await create_efi_boot_entry(
+                host_ip, target_server["device"].get("username"),
+                target_server["device"].get("password"), 40, disk_id, image["name"])
+            if not efi_uuid:
+                efi_status = 1
+            else:
+                LOG.info(
+                    f"EFI create succeeded for server {target_server['id']}, entry: {efi_uuid}")
+        except Exception as e:
+            LOG.warning(
+                f"EFI create failed for server {target_server['id']}: {e}. "
+                "Frontend will be notified with special code."
+            )
+            efi_status = 1
+    else:
+        LOG.warning(
+            f"Skipping EFI creating for server {target_server['id']} due to missing credentials"
+        )
+        efi_status = 1
+
+    LOG.info(f"Successfully created system disk {disk_id}")
+
+    return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
+
+
+async def create_efi_boot_entry(host_ip: str, username: str, password: str, 
+                                expected_size_gb: int, disk_id: str, image_name: str) -> str | None:
+    """
+    Create an EFI boot entry for a cloud system disk. Returns PARTUUID if successful.
+
+    Args:
+        host_ip: IP address of the physical host
+        username: SSH username
+        password: SSH password
+        expected_size_gb: Expected disk size in GB
+        disk_id: Disk ID used to generate the boot entry name
+
+    Returns:
+        str or None: PARTUUID if EFI boot entry is created or exists, None otherwise
+    """
+    LOG.info(f"Creating EFI boot entry for disk {disk_id} on host {host_ip}")
+
+    try:
+        # Wait for the device to be recognized
+        await ssh_execute_async(host_ip, "sleep 3", username, password)
+
+        # Rescan PCIe devices
+        await ssh_execute_async(host_ip, "echo 1 > /sys/bus/pci/rescan", username, password)
+        await ssh_execute_async(host_ip, "sleep 2", username, password)
+
+        # Get virtio disk information
+        disk_info_cmd = (
+            "for dev in /sys/block/vd*; do "
+            "if [ -d \"$dev\" ]; then "
+            "dev_name=$(basename \"$dev\"); "
+            "size=$(cat \"$dev/size\" 2>/dev/null || echo 0); "
+            "size_gb=$((size * 512 / 1024 / 1024 / 1024)); "
+            "add_time=$(stat -c %Y \"$dev\" 2>/dev/null || echo 0); "
+            "echo \"$dev_name $size_gb $add_time\"; "
+            "fi; done"
+        )
+        disk_info_output = await ssh_execute_async(host_ip, disk_info_cmd, username, password)
+
+        # Parse disks and find candidates matching expected size
+        disks = []
+        for line in disk_info_output.splitlines():
+            parts = line.split()
+            if len(parts) >= 3:
+                disk_name, size_gb, add_time = parts[0], int(parts[1]), int(parts[2])
+                if abs(size_gb - expected_size_gb) <= 1:
+                    disks.append({'name': disk_name, 'add_time': add_time})
+
+        if not disks:
+            LOG.warning(f"No disks found matching expected size {expected_size_gb}GB")
+            return None
+
+        # Select the most recently added disk
+        target_device = sorted(disks, key=lambda x: x['add_time'])[-1]['name']
+
+        # Get the first partition of the target disk
+        partitions_output = await ssh_execute_async(
+            host_ip,
+            f"lsblk -nlo NAME /dev/{target_device} | grep -E '{target_device}[0-9]+'",
+            username, password
+        )
+        if not partitions_output:
+            LOG.warning(f"No partitions found on /dev/{target_device}")
+            return None
+        target_partition = partitions_output.splitlines()[0].strip()
+
+        # Get PARTUUID of the partition
+        partuuid_output = await ssh_execute_async(
+            host_ip, f"lsblk -no PARTUUID /dev/{target_partition}", username, password
+        )
+        if not partuuid_output or not partuuid_output.strip():
+            LOG.warning(f"No PARTUUID found for /dev/{target_partition}")
+            return None
+        partuuid = partuuid_output.strip()
+
+        # Check if a boot entry already exists
+        existing_entries = await ssh_execute_async(host_ip, "efibootmgr -v", username, password)
+        for line in existing_entries.splitlines():
+            if partuuid in line:
+                LOG.info(f"Boot entry already exists for PARTUUID {partuuid}")
+                return partuuid
+
+        partition_number = target_partition[len(target_device):]  
+
+        try:
+            # Create temporary mount point
+            mount_point_cmd = "mktemp -d"
+            mount_point = await ssh_execute_async(host_ip, mount_point_cmd, username, password).strip()
+
+            # Mount the EFI partition of the target device
+            mount_cmd = f"mount /dev/{target_partition} {mount_point}"
+            await ssh_execute_async(host_ip, mount_cmd, username, password)
+
+            try:
+                # Preferentially search for shimx64.efi (Secure Boot compatible)
+                efi_files = await ssh_execute_async(
+                    host_ip,
+                    f"find {mount_point} -name shimx64.efi -type f", username, password)
+                shim_efis = efi_files.strip().split('\n')
+                shim_efis = [efi for efi in shim_efis if efi]
+
+                if shim_efis:
+                    # Prefer using shimx64.efi
+                    selected_efi = shim_efis[0]
+                    LOG.info("Using shimx64.efi for Secure Boot compatibility")
+                else:
+                    # Fall back to grubx64.efi if shim is not found
+                    efi_files = await ssh_execute_async(
+                        host_ip,
+                        f"find {mount_point} -name grubx64.efi -type f", username, password)
+                    grub_efis = efi_files.strip().split('\n')
+                    grub_efis = [efi for efi in grub_efis if efi]
+
+                    if grub_efis:
+                        selected_efi = grub_efis[0]
+                        LOG.info("Using grubx64.efi (Secure Boot may be disabled)")
+                    else:
+                        LOG.error(f"No suitable EFI files found on /dev/{target_partition}")
+                        return None
+
+                # Convert absolute path to relative path within the EFI partition
+                relative_efi_path = selected_efi.replace(mount_point, "").replace("/", "\\")
+                LOG.info(f"Selected EFI file: {selected_efi}, UEFI path: {relative_efi_path}")
+
+                # Determine boot entry name based on EFI path
+                if "centos" in relative_efi_path.lower():
+                    boot_entry_name = "CentOS Boot Manager"
+                elif "ubuntu" in relative_efi_path.lower():
+                    boot_entry_name = "Ubuntu"
+                elif "redhat" in relative_efi_path.lower():
+                    boot_entry_name = "Red Hat Enterprise Linux"
+                elif "rocky" in relative_efi_path.lower():
+                    boot_entry_name = "Rocky Linux"
+                elif "alma" in relative_efi_path.lower():
+                    boot_entry_name = "AlmaLinux"
+                elif "debian" in relative_efi_path.lower():
+                    boot_entry_name = "Debian"
+                else:
+                    safe_image_name = re.sub(r'[^A-Za-z0-9-]', '', image_name)
+                    boot_entry_name = f"{safe_image_name}"
+
+                # Create EFI boot entry
+                efi_cmd = (
+                    f"efibootmgr -c -d /dev/{target_device} -p {partition_number} "
+                    f"-L \"{boot_entry_name}\" -l \"{relative_efi_path}\""
+                )
+                result = await ssh_execute_async(host_ip, efi_cmd, username, password)
+                LOG.info(f"EFI boot entry creation result: {result}")
+
+            finally:
+                # Cleanup: unmount partition and remove temporary directory
+                await ssh_execute_async(host_ip, f"umount {mount_point}", username, password)
+                await ssh_execute_async(host_ip, f"rmdir {mount_point}", username, password)
+
+        except Exception as e:
+            LOG.error(f"An exception occurred while creating EFI boot entry: {e}")
+            return None
+
+        LOG.info("Created EFI boot entry successfully")
+        return partuuid
+
+    except Exception as e:
+        LOG.error(f"Failed to create EFI boot entry for disk {disk_id}: {e}")
+        return None
 
 
 @router.post("/mv-servers", response_model=mv200_schemas.MVServer,
@@ -718,7 +1097,7 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
                 )
 
                 backend_block["parent"] = f"{rbd.parent['pool_name']}/{rbd.parent['image_name']}"
-                backend_block["size"] = rbd.size / 1024 /1024 /1024
+                backend_block["size"] = rbd.size / 1024 / 1024 / 1024
 
     except Exception as e:
         LOG.warning(f"Failed to obtain the network port name, error: {e}")
@@ -726,3 +1105,25 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
 
     LOG.info(f"Interface for {mv200_ip} fetched successfully")
     return blocks
+
+
+@router.post("/mv-servers/{server_id}/system-disks", status_code=status.HTTP_201_CREATED,
+        response_model=mv200_schemas.SystemDiskCreateResponse)
+async def create_system_disk(
+    server_id: str,
+    data: mv200_schemas.CloudDiskCreateRequest, 
+    user=Depends(authenticate_user)
+):
+    """
+    Create a new system disk RBD from image for specific MV200 server
+    """
+    LOG.info(f"Received request to create system disk for MV200 {server_id} "
+             f"with image {data.system_disk.image_id}, creator: {user}")
+    try:
+        result = await _create_system_disk(server_id, data, user)
+        LOG.info(f"Successfully completed system disk creation request "
+                 f"with image {data.system_disk.image_id}")
+        return result
+    except Exception as e:
+        LOG.error(f"Failed to complete system disk creation request: {e}")
+        raise
