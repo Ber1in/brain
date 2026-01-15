@@ -183,7 +183,7 @@ const router = createRouter({
     },
     {
       path: '/system-disks/mv200/:mv200Id',
-      name: '云硬盘管理',
+      name: '云系统盘管理',
       component: () => import('@/pages/SystemDisks/Index.vue')
     }
   ],

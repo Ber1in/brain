@@ -66,7 +66,7 @@
                     <el-tooltip
                       v-if="!row.canDelete"
                       effect="dark"
-                      content="仍有未flatten的云硬盘依赖此镜像，暂不允许删除"
+                      content="仍有未flatten的云系统盘依赖此镜像，暂不允许删除"
                       placement="left"
                     >
                       <div class="dropdown-item-content">
@@ -191,7 +191,7 @@ const handleDelete = async (image: Image & { canDelete?: boolean }) => {
   // 再次检查是否可以删除（防止状态变化）
   if (!image.canDelete) {
     const dependentDisks = getDependentDisks(image.id)
-    ElMessage.warning(`仍有 ${dependentDisks.length} 个未flatten的云硬盘依赖此镜像，暂不允许删除`)
+    ElMessage.warning(`仍有 ${dependentDisks.length} 个未flatten的云系统盘依赖此镜像，暂不允许删除`)
     return
   }
 

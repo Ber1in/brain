@@ -5,16 +5,18 @@
         <div class="card-header">
           <div class="header-info">
             <div class="title-section">
-              <h3>云系统盘管理</h3>
-              <div class="mv200-info">
-                <el-tag type="primary" size="large" class="name-tag">
-                  <el-icon><Cpu /></el-icon>
-                  {{ mv200Info.name }}
-                </el-tag>
-                <el-tag type="info" size="large">
-                  <el-icon><Link /></el-icon>
-                  {{ mv200Info.ip }}
-                </el-tag>
+              <div class="title-row">
+                <span >云系统盘管理</span>
+                <div class="mv200-info">
+                  <el-tag type="primary" size="large" class="name-tag">
+                    <el-icon><Cpu /></el-icon>
+                    {{ mv200Info.name }}
+                  </el-tag>
+                  <el-tag type="info" size="large">
+                    <el-icon><Link /></el-icon>
+                    {{ mv200Info.ip }}
+                  </el-tag>
+                </div>
               </div>
             </div>
             <div class="action-buttons">
@@ -836,7 +838,7 @@ onMounted(() => {
 .header-info {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
 }
 
@@ -846,10 +848,17 @@ onMounted(() => {
   gap: 8px;
 }
 
-.title-section h3 {
-  margin: 0;
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-title {
   font-size: 18px;
+  font-weight: 600;
   color: #303133;
+  margin: 0;
 }
 
 .mv200-info {

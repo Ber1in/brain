@@ -38,7 +38,8 @@ IMAGE_POOL = "images"
 SNAP_NAME = "brain_snap"
 
 
-async def _create_system_disk(mv200_id, data: mv200_schemas.CloudDiskCreateRequest, creator: str, rebuild=False):
+async def _create_system_disk(
+        mv200_id, data: mv200_schemas.CloudDiskCreateRequest, creator: str, rebuild=False):
     disk_data = data.system_disk
     LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
              f"on MV200 server {mv200_id}, creator: {creator}")
@@ -93,7 +94,7 @@ async def _create_system_disk(mv200_id, data: mv200_schemas.CloudDiskCreateReque
         try:
 
             LOG.info(
-                f"Starting RBD clone process for disk {disk_id} from image {image['ceph_location']}")
+                f"Starting RBD clone process for disk {disk_id} from {image['ceph_location']}")
             cephclient = get_cephclient(mon_host)
             ceph_api.RbdSnapshotApi(
                 cephclient).api_block_image_image_spec_snap_snapshot_name_clone_post(
@@ -116,14 +117,15 @@ async def _create_system_disk(mv200_id, data: mv200_schemas.CloudDiskCreateReque
             LOG.info(f"Resizing RBD image for disk {disk_id} to {disk_data.size_gb}GB")
             rbd_api.api_block_image_image_spec_put(
                 image_spec=quote(rbd_path, safe=""),
-                api_block_image_image_spec_put_request={"size": disk_data.size_gb * 1024 * 1024 * 1024}
+                api_block_image_image_spec_put_request={
+                    "size": disk_data.size_gb * 1024 * 1024 * 1024}
             )
             LOG.info(f"Successfully resized RBD image for disk {disk_id}")
             break
 
         except Exception as e:
             LOG.warning(f"Failed to clone system disk {disk_id} on mon_host {mon_host}, error: {e}")
-            
+
     else:
         msg = f"Failed to clone system disk {disk_id}"
         LOG.error(msg)
@@ -332,7 +334,8 @@ async def create_efi_boot_entry(host_ip: str, username: str, password: str,
         try:
             # Create temporary mount point
             mount_point_cmd = "mktemp -d"
-            mount_point = await ssh_execute_async(host_ip, mount_point_cmd, username, password).strip()
+            mount_point = await ssh_execute_async(
+                host_ip, mount_point_cmd, username, password).strip()
 
             # Mount the EFI partition of the target device
             mount_cmd = f"mount /dev/{target_partition} {mount_point}"
@@ -1108,7 +1111,7 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
 
 
 @router.post("/mv-servers/{server_id}/system-disks", status_code=status.HTTP_201_CREATED,
-        response_model=mv200_schemas.SystemDiskCreateResponse)
+             response_model=mv200_schemas.SystemDiskCreateResponse)
 async def create_system_disk(
     server_id: str,
     data: mv200_schemas.CloudDiskCreateRequest, 

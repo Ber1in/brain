@@ -8,7 +8,7 @@ import logging
 import uuid
 from urllib.parse import quote
 
-from brain.api.v1.schemas import block_schemas, mv200_schemas
+from brain.api.v1.schemas import block_schemas
 from brain.auth import authenticate_user
 from brain import exceptions
 from brain.json_db import SQLiteDocumentDB
@@ -33,7 +33,8 @@ IMAGE_POOL = "images"
 SNAP_NAME = "brain_snap"
 
 
-async def _create_system_disk(mv200_id, data: block_schemas.BareMetalCreate, creator: str, rebuild=False):
+async def _create_system_disk(
+        mv200_id, data: block_schemas.BareMetalCreate, creator: str, rebuild=False):
     disk_data = data.system_disk
     LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
              f"on MV200 server {mv200_id}, creator: {creator}")

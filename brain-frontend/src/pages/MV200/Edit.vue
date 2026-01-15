@@ -82,7 +82,7 @@
             <span>支持云盘启动</span>
             <el-tooltip 
               effect="dark" 
-              content="当支持云盘启动时，在主机启动阶段会一直等待dpu ready，直到准备好云硬盘"
+              content="当支持云盘启动时，在主机启动阶段会一直等待dpu ready，直到准备好云系统盘"
               placement="top"
             >
               <el-icon style="margin-left: 4px; cursor: help;">

@@ -48,7 +48,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ diskCount }}</div>
-              <div class="stat-label">云硬盘数量</div>
+              <div class="stat-label">云系统盘数量</div>
             </div>
           </div>
         </el-card>
