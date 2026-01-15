@@ -208,6 +208,11 @@ const router = createRouter({
       path: '/xsc-interface/mv200/:mv200_id',
       name: 'XSC网口管理',
       component: () => import('@/pages/XSC/Index.vue')
+    },
+    {
+      path: '/system-disks/mv200/:mv200Id',
+      name: '云系统盘管理',
+      component: () => import('@/pages/SystemDisks/Index.vue')
     }
   ],
 })

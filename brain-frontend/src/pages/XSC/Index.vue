@@ -997,7 +997,7 @@ const loadXscInterfaces = async () => {
       return
     }
 
-    xscInterfaces.value = await networkApi.getAll(mv200Id.value)
+    xscInterfaces.value = await mv200Api.getAllXsc(mv200Id.value)
     
     // 如果有数据，按UUID排序
     if (xscInterfaces.value.length > 0) {

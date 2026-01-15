@@ -1,7 +1,7 @@
 # Copyright (C) 2021 - 2025, Shanghai Yunsilicon Technology Co., Ltd.
 # All rights reserved.
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,Extra
 from typing import List, Optional
 from ipaddress import IPv4Address
 
@@ -77,3 +77,27 @@ class OvsflowRequest(BaseModel):
     gateway: str = Field(None, description="Gateway address for the interface")
     dns: Optional[List[str]] = Field(None, description="List of DNS server addresses (optional)")
     dhcp_server: str = Field(None, description="Dhcp server address for the interface")
+
+
+
+
+class BdevInfo(BaseModel):
+    readonly: bool = Field(...,
+                           description="Indicates if the block device is read-only", example=False)
+    bdev: str = Field(..., description="Name of the block device")
+
+    class Config:
+        extra = Extra.allow
+
+
+class BackendSpecific(BaseModel):
+    block: BdevInfo
+
+
+class ControllerInfo(BaseModel):
+    ctrlr: str = Field(..., description="Name of the virtual block controller")
+    cpumask: str = Field(..., description="CPU core mask assigned to the controller", example="0x8")
+    uuid: int = Field(..., description="Unique identifier for the controller")
+    vq_count: int = Field(..., description="Number of virtual queues", example=2)
+    vq_size: int = Field(..., description="Size of each virtual queue", example=512)
+    backend_specific: BackendSpecific

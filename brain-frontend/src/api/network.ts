@@ -21,16 +21,4 @@ export const networkApi = {
   delete(id: string): Promise<void> {
     return apiClient.delete(`/networks/${id}`, )
   },
-
-  getAll(mv200Id: string, uuid?: number): Promise<XscnetInfo[]> {
-    const params: Record<string, any> = {}
-    if (uuid !== undefined && uuid !== null) {
-      params.uuid = uuid
-    }
-    return apiClient.get(`/xsc/${mv200Id}`, { params })
-  },
-
-  getById(mv200Id: string, uuid: number): Promise<XscnetInfo> {
-    return apiClient.get(`/xsc/${mv200Id}/${uuid}`)
-  }
 }

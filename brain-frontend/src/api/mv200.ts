@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest } from '@/types/api'
+import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest, XscnetInfo } from '@/types/api'
 
 export const mv200Api = {
   getAll(): Promise<MVServer[]> {
@@ -31,18 +31,26 @@ export const mv200Api = {
   },
 
   createXsc(mv200_id: string, data: InterfaceCreate): Promise<InterfaceInfo> {
-    return apiClient.post(`/xsc/${mv200_id}`, data)
+    return apiClient.post(`/mv-servers/${mv200_id}/xsc`, data)
   },
 
   addXscOvsFlow(mv200_id: string, uuid: number, data: OvsflowRequest): Promise<void> {
-    return apiClient.post(`/xsc/${mv200_id}/${uuid}/flowtables`, data)
+    return apiClient.post(`/mv-servers/${mv200_id}/xsc/${uuid}/flowtables`, data)
   },
 
   removeXscOvsFlow(mv200_id: string, uuid: number): Promise<void> {
-    return apiClient.delete(`/xsc/${mv200_id}/${uuid}/flowtables`)
+    return apiClient.delete(`/mv-servers/${mv200_id}/xsc/${uuid}/flowtables`)
   },
 
   deleteXsc(mv200_id: string, uuid: number): Promise<void> {
-    return apiClient.delete(`/xsc/${mv200_id}/${uuid}`)
+    return apiClient.delete(`/mv-servers/${mv200_id}/xsc/${uuid}`)
+  },
+
+  getAllXsc(mv200Id: string, uuid?: number): Promise<XscnetInfo[]> {
+    const params: Record<string, any> = {}
+    if (uuid !== undefined && uuid !== null) {
+      params.uuid = uuid
+    }
+    return apiClient.get(`/mv-servers/${mv200Id}/xsc`, { params })
   },
 }

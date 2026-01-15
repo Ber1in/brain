@@ -388,13 +388,13 @@ async def update_mcr(server_id: str, data: common_schemas.MCRRequest):
     return {"message": "MCR update task accepted", "task_id": task_id}
 
 
-@router.get("/xsc/{mv200_id}", response_model=List[mv200_schemas.XscnetInfoResponse])
-async def get_interface(mv200_id: str, uuid: Optional[int] = Query(None, ge=1, le=100)):
+@router.get("/mv-servers/{server_id}/xsc", response_model=List[mv200_schemas.XscnetInfoResponse])
+async def get_interface(server_id: str, uuid: Optional[int] = Query(None, ge=1, le=100)):
     """Get network interface(s) info"""
     try:
-        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
     except Exception:
-        LOG.warning(f"mv200 {mv200_id} not found")
+        LOG.warning(f"mv200 {server_id} not found")
         raise HTTPException(status_code=404, detail="mv200 not found")
 
     mv200_ip = mv200["ip_address"]
@@ -455,15 +455,15 @@ async def get_interface(mv200_id: str, uuid: Optional[int] = Query(None, ge=1, l
     return xscs
 
 
-@router.post("/xsc/{mv200_id}", response_model=mv200_schemas.XscnetInfoResponse)
-async def create_interface(mv200_id: str, data: mv200_schemas.InterfaceCreate):
+@router.post("/mv-servers/{server_id}/xsc", response_model=mv200_schemas.XscnetInfoResponse)
+async def create_interface(server_id: str, data: mv200_schemas.InterfaceCreate):
     """Create a new network interface"""
-    LOG.info(f"Creating interface on SoC {mv200_id}")
+    LOG.info(f"Creating interface on SoC {server_id}")
 
     try:
-        server = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
     except Exception:
-        LOG.warning(f"MV server {mv200_id} not found")
+        LOG.warning(f"MV server {server_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="MV server not found"
         )
@@ -522,14 +522,14 @@ async def create_interface(mv200_id: str, data: mv200_schemas.InterfaceCreate):
     return {"uuid": iface_data.get('xsc_id'), "mtu": data.mtu, "mac": iface_data["mac"]}
 
 
-@router.post("/xsc/{mv200_id}/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/mv-servers/{server_id}/xsc/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
 async def configure_interface_flow_tables(
-        mv200_id: str, uuid: int, data: mv200_schemas.OvsflowRequest):
+        server_id: str, uuid: int, data: mv200_schemas.OvsflowRequest):
     # Fetch server information
     try:
-        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
     except Exception as e:
-        LOG.error(f"Failed to fetch server {mv200_id}: {e}")
+        LOG.error(f"Failed to fetch server {server_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch server info")
 
     dpuagentclient = get_dpuagentclient(mv200["ip_address"])
@@ -573,14 +573,14 @@ async def configure_interface_flow_tables(
         raise
 
 
-@router.delete("/xsc/{mv200_id}/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/mv-servers/{server_id}/xsc/{uuid}/flowtables", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_interface_flow_tables(
-        mv200_id: str, uuid: int):
+        server_id: str, uuid: int):
     # Fetch server information
     try:
-        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
     except Exception as e:
-        LOG.error(f"Failed to fetch server {mv200_id}: {e}")
+        LOG.error(f"Failed to fetch server {server_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch server info")
 
     dpuagentclient = get_dpuagentclient(mv200["ip_address"])
@@ -615,13 +615,13 @@ async def delete_interface_flow_tables(
         raise
 
 
-@router.delete("/xsc/{mv200_id}/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_interface(mv200_id: str, uuid: int):
+@router.delete("/mv-servers/{server_id}/xsc/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_interface(server_id: str, uuid: int):
     """Delete an existing network interface"""
     try:
-        server = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+        server = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
     except Exception:
-        LOG.warning(f"MV server {mv200_id} not found")
+        LOG.warning(f"MV server {server_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="MV server not found"
         )
@@ -657,3 +657,37 @@ async def delete_interface(mv200_id: str, uuid: int):
         raise
     LOG.info(f"Interface {uuid} deleted successfully")
     return
+
+@router.get("/mv-servers/{server_id}/systemdisks", response_model=List[mv200_schemas.ControllerInfo])
+async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1, le=100)):
+    """Get network interface(s) info"""
+    try:
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.warning(f"mv200 {server_id} not found")
+        raise HTTPException(status_code=404, detail="mv200 not found")
+
+    mv200_ip = mv200["ip_address"]
+    LOG.info(f"Fetching interface for {mv200_ip}")
+
+    try:
+        dpuagentclient = get_dpuagentclient(mv200_ip)
+
+        if uuid is None:
+            res = dpuagentApi.VblkApi(
+                dpuagentclient).list_vblk_controllers_dpu_agent_v1_vblk_list_get()
+        else:
+            res = dpuagentApi.VblkApi(
+                dpuagentclient).list_vblk_controllers_dpu_agent_v1_vblk_list_get(uuid)
+
+        if res.code != 0:
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail=f"Failed to list xscnet at {mv200_ip}"
+            )
+    except Exception as e:
+        LOG.warning(f"Failed to obtain the network port name, error: {e}")
+        return []
+
+    LOG.info(f"Interface for {mv200_ip} fetched successfully")
+    return res.vblks
