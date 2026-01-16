@@ -15,7 +15,7 @@ from brain.api.v2.schemas import common_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils import common_utils
 from brain.utils.ssh_client import AsyncRemoteFS
-from brain.config import AppConfig, CONFIG_FILE, reload_settings, settings
+from brain.config import AppConfig, CONFIG_FILE, reload_settings, settings, AppConfigResponse
 
 LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -87,10 +87,13 @@ async def query_task_status(task_id: str):
     return task
 
 
-@router.get("/settings", response_model=AppConfig)
+@router.get("/settings", response_model=AppConfigResponse)
 async def get_settings():
     """Return current global configuration."""
-    return settings.dict()
+    settings_response = settings.dict()
+    settings_response.pop("admin_password")
+    settings_response["smtp"].pop("password")
+    return settings_response
 
 
 @router.patch("/settings")

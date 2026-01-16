@@ -15,26 +15,35 @@ class SMTPConfig(BaseModel):
     password: str = "VIgB7YFDX9Y3g7Dw"
 
 
+class SMTPConfigResponse(BaseModel):
+    host: str = "smtp.feishu.cn"
+    port: int = 465
+    user: str = "yuntester@yunsilicon.com"
+
+
 class ReleaseNotice(BaseModel):
     tag: str
     webhook: str
 
 
-class AppConfig(BaseModel):
+class AppConfigResponse(BaseModel):
     default_webhook: str = (
         "https://webhook.yunsilicon.com/open-apis/bot/v2/hook/51053ced-7d61-4645-95df-f0c6ac3f67a7")
-    smtp: SMTPConfig = SMTPConfig()
+    smtp: SMTPConfigResponse = SMTPConfigResponse()
     yuntester_platform: str = "https://yuntester.yunsilicon.com"
     file_server: str = "https://yuntester-api.yunsilicon.com"
     platform_port: int = 8088
     debug: bool = False
     ldap_server: str = "ldaps://it-srv-idc001.yunsilicon.com:636"
-    admin_password: str = "yuntester@admin2021"
     release_notices: Optional[List[ReleaseNotice]] = None
     admin_list: List[str] = Field(default_factory=lambda: [
         "mengxh", "gongyh", "nana", "chenx", "jacky", "zhangx", "weihg"])
     check_heartbeat: bool = True
     heartbeat_interval = 60
+
+class AppConfig(AppConfigResponse):
+    smtp: SMTPConfig = SMTPConfig()
+    admin_password: str = "yuntester@admin2021"
 
 
 def load_config() -> AppConfig:
