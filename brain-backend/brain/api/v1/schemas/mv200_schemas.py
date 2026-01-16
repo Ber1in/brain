@@ -196,3 +196,11 @@ class CloudDiskCreateRequest(BaseModel):
 class SystemDiskCreateResponse(BaseModel):
     efi_status: int = None
     cloudinit_status: int = None
+
+
+class SystemDiskDeleteRequest(BaseModel):
+    uuid: int
+    rbd_path: str
+    mon_hosts: str
+    bare_id: str
+    last_disk: bool

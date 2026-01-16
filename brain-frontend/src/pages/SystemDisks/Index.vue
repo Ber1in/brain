@@ -6,7 +6,7 @@
           <div class="header-info">
             <div class="title-section">
               <div class="title-row">
-                <span >云系统盘管理</span>
+                <span>云系统盘管理</span>
                 <div class="mv200-info">
                   <el-tag type="primary" size="large" class="name-tag">
                     <el-icon><Cpu /></el-icon>
@@ -32,6 +32,18 @@
                   <el-icon><Search /></el-icon>
                 </template>
               </el-input>
+              
+              <!-- 批量删除按钮 -->
+              <el-button 
+                type="danger" 
+                @click="handleBatchDelete" 
+                :disabled="selectedDisks.length === 0"
+                style="margin-right: 12px;"
+                :loading="batchDeleting"
+              >
+                批量删除
+              </el-button>
+              
               <el-button 
                 type="primary" 
                 @click="showCreateDialog"
@@ -49,7 +61,11 @@
         :data="filteredDisks" 
         v-loading="loading"
         style="width: 100%"
+        @selection-change="handleSelectionChange"
       >
+        <!-- 多选列 -->
+        <el-table-column type="selection" width="35" />
+        
         <!-- 1. UUID列 -->
         <el-table-column 
           prop="uuid" 
@@ -141,7 +157,7 @@
         <!-- 操作列 -->
         <el-table-column 
           label="操作" 
-          width="100" 
+          width="120" 
           fixed="right"
           align="center"
         >
@@ -157,6 +173,15 @@
                     <el-icon><View /></el-icon>
                     <span>详情</span>
                   </el-dropdown-item>
+                  <!-- 单个删除 -->
+                  <el-dropdown-item 
+                    command="delete" 
+                    class="danger-item dropdown-item"
+                    :disabled="isCloudInitBdev(row) && !isLastRealDisk(row)"
+                  >
+                    <el-icon><Delete /></el-icon>
+                    <span>删除</span>
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -164,14 +189,6 @@
         </el-table-column>
       </el-table>
 
-      <!-- 空状态提示 -->
-      <div v-if="filteredDisks.length === 0 && !loading" class="empty-state">
-        <el-empty description="暂无云系统盘">
-          <el-button type="primary" @click="showCreateDialog">
-            创建云系统盘
-          </el-button>
-        </el-empty>
-      </div>
     </el-card>
 
     <!-- 详细信息对话框 -->
@@ -448,7 +465,6 @@ import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { 
-  Refresh, 
   View,
   Monitor,
   Cpu,
@@ -458,7 +474,8 @@ import {
   QuestionFilled,
   User,
   Hide,
-  Search
+  Search,
+  Delete
 } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { imagesApi } from '@/api/images'
@@ -467,10 +484,12 @@ import type { Image } from '@/types/api'
 
 const route = useRoute()
 const loading = ref(false)
+const batchDeleting = ref(false)
 const imagesLoading = ref(false)
 const creating = ref(false)
 const systemDisks = ref<ControllerInfo[]>([])
 const currentDisk = ref<ControllerInfo | null>(null)
+const selectedDisks = ref<ControllerInfo[]>([])
 const detailDialogVisible = ref(false)
 const createDialogVisible = ref(false)
 const showPassword = ref(false)
@@ -587,6 +606,17 @@ const isCloudInitBdev = (disk: ControllerInfo): boolean => {
   return disk.backend_specific?.block?.bdev === 'yunsilicon_cloudinit_bdev'
 }
 
+// 计算真实磁盘数量（排除cloudinit数据源）
+const getRealDiskCount = computed(() => {
+  return systemDisks.value.filter(disk => !isCloudInitBdev(disk)).length
+})
+
+// 检查是否为最后一个真实磁盘
+const isLastRealDisk = (disk: ControllerInfo): boolean => {
+  if (isCloudInitBdev(disk)) return false
+  return getRealDiskCount.value === 1
+}
+
 // 从完整的镜像路径中提取镜像名称
 const getImageName = (fullPath: string): string => {
   if (!fullPath) return '-'
@@ -601,6 +631,125 @@ const sizeSortMethod = (a: ControllerInfo, b: ControllerInfo) => {
   return sizeA - sizeB
 }
 
+// 处理选择变化
+const handleSelectionChange = (selection: ControllerInfo[]) => {
+  selectedDisks.value = selection
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedDisks.value.length === 0) return
+
+  try {
+    // 检查是否包含cloudinit数据源
+    const hasCloudInit = selectedDisks.value.some(disk => isCloudInitBdev(disk))
+    const realDisksCount = selectedDisks.value.filter(disk => !isCloudInitBdev(disk)).length
+    const totalRealDisks = getRealDiskCount.value
+    
+    // 确认删除
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedDisks.value.length} 个云系统盘吗？此操作不可恢复！`,
+      '确认批量删除',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    batchDeleting.value = true
+    
+    // 准备删除请求
+    const deletePromises = selectedDisks.value.map(disk => {
+      // 检查是否为最后一个真实磁盘
+      const isLast = !isCloudInitBdev(disk) && realDisksCount === totalRealDisks
+      
+      // 获取裸金属服务器ID（从MV200信息中获取）
+      const bareId = route.query.bareId as string || ''
+      
+      // 准备请求数据
+      const requestData = {
+        uuid: disk.uuid,
+        rbd_path: disk.backend_specific?.block?.rbd_path || '',
+        mon_hosts: disk.backend_specific?.block?.gws?.join(',') || '',
+        bare_id: bareId,
+        last_disk: isLast
+      }
+      
+      console.log('删除请求数据:', requestData)
+      
+      return mv200Api.deleteSystemDisk(mv200Info.value.id, requestData)
+    })
+
+    // 批量删除
+    await Promise.all(deletePromises)
+    
+    ElMessage.success(`成功删除 ${selectedDisks.value.length} 个云系统盘`)
+    selectedDisks.value = []
+    loadSystemDisks()
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消删除
+      return
+    }
+    ElMessage.error('删除失败: ' + (error.response?.data?.detail || error.message || '未知错误'))
+    console.error('批量删除失败:', error)
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
+// 单个删除
+const handleDeleteDisk = async (disk: ControllerInfo) => {
+  try {
+    // 检查是否为cloudinit数据源且不是最后一个真实磁盘
+    if (isCloudInitBdev(disk) && !isLastRealDisk(disk)) {
+      ElMessage.warning('cloudinit数据源只能在删除最后一个真实磁盘时一并删除')
+      return
+    }
+
+    // 确认删除
+    await ElMessageBox.confirm(
+      `确定要删除云系统盘 "${disk.uuid}" 吗？此操作不可恢复！`,
+      '确认删除',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    // 检查是否为最后一个真实磁盘
+    const isLast = !isCloudInitBdev(disk) && getRealDiskCount.value === 1
+    
+    // 获取裸金属服务器ID（从MV200信息中获取）
+    const bareId = route.query.bareId as string || ''
+    
+    // 准备请求数据
+    const requestData = {
+      uuid: disk.uuid,
+      rbd_path: disk.backend_specific?.block?.rbd_path || '',
+      mon_hosts: disk.backend_specific?.block?.gws?.join(',') || '',
+      bare_id: bareId,
+      last_disk: isLast
+    }
+    
+    console.log('删除请求数据:', requestData)
+    
+    await mv200Api.deleteSystemDisk(mv200Info.value.id, requestData)
+    
+    ElMessage.success('删除成功')
+    loadSystemDisks()
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') {
+      // 用户取消删除
+      return
+    }
+    ElMessage.error('删除失败: ' + (error.response?.data?.detail || error.message || '未知错误'))
+    console.error('删除失败:', error)
+  }
+}
+
 // 加载云系统盘数据
 const loadSystemDisks = async () => {
   loading.value = true
@@ -610,7 +759,12 @@ const loadSystemDisks = async () => {
     systemDisks.value = response
     
     // 按UUID排序
-    systemDisks.value.sort((a, b) => a.uuid - b.uuid)
+    systemDisks.value.sort((a, b) => {
+      // 将UUID转换为字符串再进行比较
+      const uuidA = String(a.uuid || '')
+      const uuidB = String(b.uuid || '')
+      return uuidA.localeCompare(uuidB)
+    })
     console.log('加载成功，共', systemDisks.value.length, '个系统盘')
     
   } catch (error: any) {
@@ -668,11 +822,6 @@ const filteredDisks = computed(() => {
 // 处理搜索
 const handleSearch = () => {
   // 搜索逻辑在computed属性中处理
-}
-
-// 刷新数据
-const refreshData = () => {
-  loadSystemDisks()
 }
 
 // 显示创建对话框
@@ -815,6 +964,9 @@ const handleCommand = (command: string, disk: ControllerInfo) => {
     case 'detail':
       showDiskDetail(disk)
       break
+    case 'delete':
+      handleDeleteDisk(disk)
+      break
   }
 }
 
@@ -926,7 +1078,7 @@ onMounted(() => {
 }
 
 /* 网关节点列特别处理 */
-:deep(.el-table__cell:nth-child(2) .cell) {
+:deep(.el-table__cell:nth-child(3) .cell) {
   justify-content: flex-start !important;
   padding-left: 0 !important;
 }
@@ -982,12 +1134,22 @@ onMounted(() => {
 }
 
 :deep(.danger-item) {
-  color: #f56c6c;
+  color: #f56c6c !important;
 }
 
-:deep(.danger-item:hover) {
-  color: #f56c6c;
-  background-color: #fef0f0;
+:deep(.danger-item:not(.is-disabled):hover) {
+  color: #dd6161 !important;
+  background-color: #fef0f0 !important;
+}
+
+:deep(.danger-item.is-disabled) {
+  color: #c0c4cc !important;
+  cursor: not-allowed !important;
+}
+
+:deep(.danger-item.is-disabled:hover) {
+  background-color: transparent !important;
+  color: #c0c4cc !important;
 }
 
 /* 描述列表样式 */

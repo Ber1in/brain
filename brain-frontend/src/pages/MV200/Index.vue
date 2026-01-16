@@ -1377,11 +1377,14 @@ const handleCommand = (command: string, server: MVServer & {
 
 // 新增：跳转到云系统盘页面
 const handleSystemDisks = (server: MVServer) => {
+  const bareId = server.associatedServer.data.deviceId || ''
+  
   router.push({
     path: `/system-disks/mv200/${server.id}`,
     query: {
       name: server.name,
-      ip: server.ip_address
+      ip: server.ip_address,
+      bareId: bareId
     }
   })
 }

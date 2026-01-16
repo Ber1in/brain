@@ -334,8 +334,8 @@ async def create_efi_boot_entry(host_ip: str, username: str, password: str,
         try:
             # Create temporary mount point
             mount_point_cmd = "mktemp -d"
-            mount_point = await ssh_execute_async(
-                host_ip, mount_point_cmd, username, password).strip()
+            mount_point = (await ssh_execute_async(
+                host_ip, mount_point_cmd, username, password)).strip()
 
             # Mount the EFI partition of the target device
             mount_cmd = f"mount /dev/{target_partition} {mount_point}"
@@ -1110,7 +1110,7 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
     return blocks
 
 
-@router.post("/mv-servers/{server_id}/system-disks", status_code=status.HTTP_201_CREATED,
+@router.post("/mv-servers/{server_id}/system-disks/create", status_code=status.HTTP_201_CREATED,
              response_model=mv200_schemas.SystemDiskCreateResponse)
 async def create_system_disk(
     server_id: str,
@@ -1130,3 +1130,192 @@ async def create_system_disk(
     except Exception as e:
         LOG.error(f"Failed to complete system disk creation request: {e}")
         raise
+
+
+async def _delete_system_disk(mv200_id, data: mv200_schemas.SystemDiskDeleteRequest, rebuild=False):
+    mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
+    soc_ip: str = mv200["ip_address"]
+    pool, disk_id = data.rbd_path.split("/")
+    is_last_disk: bool = data.last_disk
+    LOG.info(f"Starting deletion process for system disk {disk_id}")
+
+    # Check if disk exists
+
+    LOG.info(f"Found disk {disk_id} with SOC IP: {soc_ip}, mon_hosts: {data.mon_hosts}")
+
+    dpuagentclient = get_dpuagentclient(soc_ip)
+
+    # Check if this is the last disk on the SOC
+    LOG.info(f"Disk {disk_id} is {'last' if is_last_disk else 'not last'} disk on SOC {soc_ip}")
+
+    efi_status = 0
+    cloudinit_status = 0
+    if is_last_disk and not rebuild:
+        LOG.info(f"Deleting cloudinit datasource for SOC {soc_ip} (last disk)")
+        cloudinit_api = dpuagentApi.CloudinitApi(dpuagentclient)
+        try:
+            res = cloudinit_api.delete_cloudinit_dpu_agent_v1_cloudinit_delete_post()
+            if res.code != 0:
+                LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, "
+                            f"message: {res.message}")
+            else:
+                LOG.info(f"Successfully deleted cloudinit datasource for SOC {soc_ip}")
+        except Exception as e:
+            LOG.warning(f"Failed to delete cloudinit datasource for SOC {soc_ip}, error: {e}")
+            cloudinit_status = 1
+
+    # Delete virtual block device
+    LOG.info(f"Deleting virtual block device for disk {disk_id}")
+    blk_api = dpuagentApi.VblkApi(dpuagentclient)
+    try:
+        res = blk_api.delete_vblk_dpu_agent_v1_vblk_del_post(
+            dpuagent_api_v1_schemas_vblk_schemas_delete_request={
+                "rbd_path": data.rbd_path,
+                "gw_pwd": "yunsilicon",
+                "gw_ip": data.mon_hosts,
+                "force": True,
+                "bootable": True,
+                "gw_user": "admin",
+                "uuid": data.uuid})
+        LOG.info("Virtual block device deletion response for disk "
+                 f"{disk_id}: code={res.code}, message={res.message}")
+    except Exception as e:
+        LOG.error(f"Failed to delete virtblk for disk {disk_id} in {soc_ip}, error: {e}")
+        raise exceptions.VblkDeleteException(str(e))
+
+    if res.code != 0:
+        LOG.error(
+            f"Failed to delete virtblk for disk {disk_id} in {soc_ip}, message: {res.message}")
+        raise exceptions.VblkDeleteException(res.message)
+
+    LOG.info(f"Successfully deleted virtual block device for disk {disk_id}")
+
+    # Save checkpoint after deletion
+    LOG.info(f"Saving checkpoint after deleting disk {disk_id}")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(f"Failed to save checkpoint after deleting disk {disk_id}: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info(f"Successfully saved checkpoint after deleting disk {disk_id}")
+    except Exception as e:
+        LOG.error(f"Failed to save checkpoint after deleting block {disk_id}: {e}")
+        raise
+
+    # Delete RBD image
+    LOG.info(f"Deleting RBD image for disk {disk_id}")
+    for mon_host in data.mon_hosts.split(","):
+        try:
+            cephclient = get_cephclient(mon_host)
+            ceph_api.RbdApi(cephclient).api_block_image_image_spec_delete(
+                image_spec=quote(data.rbd_path, safe=""))
+            LOG.info(f"Successfully deleted RBD image for disk {disk_id}")
+            break
+        except Exception as e:
+            LOG.error(f"Failed to delete RBD image for system disk {disk_id} on mon_host {mon_host}"
+                      f", error: {e}")
+
+    else:
+        msg = f"Failed to delete rbd for system disk {disk_id}"
+        LOG.error(msg)
+        raise exceptions.DeleteSystemdiskException(msg)
+
+    LOG.info(f"Successfully completed deletion of system disk {disk_id}")
+
+    server = db.find_one(SERVER_COLLECTION, {"id": data.bare_id})
+    if not server:
+        LOG.warning(f"Server {data.bare_id} not found for boot entries query")
+        raise HTTPException(status_code=404, detail="bare metal not found")
+
+    # Try to cleanup orphaned EFI entries, but capture errors
+    if server["device"].get("username") and server["device"].get("password"):
+        try:
+            cleanup_orphaned_efi_entries(
+                server["device"].get("ip"), server["device"].get("username"),
+                server["device"].get("password")
+            )
+            LOG.info(f"EFI cleanup succeeded for server {server['id']}")
+        except Exception as e:
+            LOG.warning(
+                f"EFI cleanup failed for server {server['id']}: {e}. "
+                "Frontend will be notified with special code."
+            )
+            efi_status = 1
+    else:
+        LOG.warning(
+            f"Skipping EFI cleanup for server {server['id']} due to missing credentials"
+        )
+        efi_status = 1
+
+    # Return final result to frontend
+    return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
+
+
+@router.post("/mv-servers/{server_id}/system-disks/delete", status_code=status.HTTP_202_ACCEPTED,
+             response_model=mv200_schemas.SystemDiskCreateResponse)
+async def delete_system_disk(server_id: str, data: mv200_schemas.SystemDiskDeleteRequest):
+    """
+    Delete system disk by ID
+    """
+    LOG.info(f"Received request to delete system disk on mv200 {server_id}")
+    try:
+        result = await _delete_system_disk(server_id, data)
+        LOG.info(f"Successfully completed deletion request on mv200 {server_id}")
+        return result
+    except Exception as e:
+        LOG.error(f"Failed to complete deletion request on mv200 {server_id}: {e}")
+        raise
+
+
+async def cleanup_orphaned_efi_entries(host_ip: str, username: str, password: str) -> list:
+    """
+    Cleanup orphaned EFI boot entries. These are entries whose GPT UUID does not exist.
+
+    Args:
+        host_ip: Physical host IP
+        username: SSH username
+        password: SSH password
+
+    Returns:
+        list: Deleted boot entries with boot number and GPT UUID
+    """
+    LOG.info(f"Cleaning up orphaned EFI boot entries on host {host_ip}")
+    deleted_entries = []
+
+    try:
+        # Get existing GPT UUIDs from the system
+        existing_uuids_output = await ssh_execute_async(host_ip, 
+                                                        "lsblk -no PARTUUID | grep -v '^$'", 
+                                                        username, password)
+        existing_uuids = set(existing_uuids_output.splitlines())
+        LOG.info(f"Existing PARTUUIDs: {existing_uuids}")
+
+        # Get all EFI boot entries
+        efi_entries_output = await ssh_execute_async(host_ip, "efibootmgr -v", username, password)
+
+        for line in efi_entries_output.splitlines():
+            if line.startswith("Boot") and "*" in line:
+                boot_num = line.split()[0].replace("Boot", "").replace("*", "")
+                # Extract GPT UUID from HD(...,GPT,<UUID>,...) format
+                gpt_match = re.search(r'GPT,([a-f0-9-]+)', line)
+                if gpt_match:
+                    gpt_uuid = gpt_match.group(1)
+                    # If GPT UUID is not present on the system, delete the entry
+                    if gpt_uuid not in existing_uuids:
+                        LOG.info(f"Found orphaned boot entry {boot_num} with GPT UUID {gpt_uuid}")
+                        try:
+                            await ssh_execute_async(
+                                host_ip, f"efibootmgr -b {boot_num} -B", username, password)
+                            deleted_entries.append({"boot_num": boot_num, "gpt_uuid": gpt_uuid})
+                            LOG.info(f"Deleted orphaned EFI boot entry {boot_num}")
+                        except Exception as e:
+                            LOG.error(f"Failed to delete boot entry {boot_num}: {e}")
+
+        LOG.info(f"Cleaned up {len(deleted_entries)} orphaned EFI entries")
+
+    except Exception as e:
+        LOG.error(f"Failed to cleanup orphaned EFI entries on {host_ip}: {e}")
+        raise
+
+    return deleted_entries

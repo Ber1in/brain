@@ -58,7 +58,17 @@ export const mv200Api = {
     return apiClient.get(`/mv-servers/${mv200Id}/systemdisks`)
   },
 
-  createSystemDisk: (mv200Id: string, data: any): Promise<DeleteDiskResponse> => {
-    return apiClient.post(`/mv-servers/${mv200Id}/system-disks`, data)
+  createSystemDisk(mv200Id: string, data: any): Promise<DeleteDiskResponse> {
+    return apiClient.post(`/mv-servers/${mv200Id}/system-disks/create`, data)
   },
+
+  deleteSystemDisk(serverId: string, data: {
+    uuid: string;
+    rbd_path: string;
+    mon_hosts: string;
+    bare_id: string;
+    last_disk: boolean;
+  }): Promise<DeleteDiskResponse>{
+    return apiClient.post(`/mv-servers/${serverId}/system-disks/delete`, data)
+  }
 }
