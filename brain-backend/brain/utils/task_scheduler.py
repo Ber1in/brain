@@ -96,6 +96,7 @@ class GenericTaskScheduler:
             except Exception as e:
                 LOG.error(f"Error cancelling task '{task_id}': {str(e)}")
                 return False
+        LOG.error(f"task {task_id} not found.")
         return False
 
     async def update_task(
