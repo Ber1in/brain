@@ -178,7 +178,7 @@ async def get_mv_server(server_id: str):
         server_original = copy.deepcopy(server)
         versionapi = dpuagentApi.VersionApi(dpuagentclient)
         res = versionapi.get_version_dpu_agent_v1_version_get()
-        if res.code != 200:
+        if res.code != 0:
             LOG.error("Failed to retrieve version information for each service on mv200.")
         else:
             versions = {
