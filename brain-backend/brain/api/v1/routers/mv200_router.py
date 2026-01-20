@@ -225,7 +225,8 @@ async def _create_system_disk(
         try:
             efi_uuid = await create_efi_boot_entry(
                 host_ip, target_server["device"].get("username"),
-                target_server["device"].get("password"), 40, disk_id, image["name"])
+                target_server["device"].get("password"), data.system_disk.size_gb,
+                disk_id, image["name"])
             if not efi_uuid:
                 efi_status = 1
             else:
@@ -1048,7 +1049,7 @@ async def delete_interface(server_id: str, uuid: int):
 @router.get("/mv-servers/{server_id}/systemdisks", 
             response_model=List[mv200_schemas.ControllerInfo])
 async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1, le=100)):
-    """Get network interface(s) info"""
+    """Get cloud disk(s) info"""
 
     try:
         mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
@@ -1057,7 +1058,7 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
         raise HTTPException(status_code=404, detail="mv200 not found")
 
     mv200_ip = mv200["ip_address"]
-    LOG.info(f"Fetching interface for {mv200_ip}")
+    LOG.info(f"Fetching cloud disk for {mv200_ip}")
 
     blocks = []
     try:
@@ -1073,15 +1074,19 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
         if res.code != 0:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail=f"Failed to list xscnet at {mv200_ip}"
+                detail=f"Failed to list cloud-disk at {mv200_ip}"
             )
         blocks = res.dict()["vblks"]
-        ceph_clients = {}
-        for block in blocks:
-            backend_block = block.get("backend_specific", {}).get("block", {})
-            gws = backend_block.get("gws") or []
+    except Exception as e:
+        LOG.warning(f"Failed to list the cloud disk, error: {e}")
 
-            for gw in gws:
+    ceph_clients = {}
+    for block in blocks:
+        backend_block = block.get("backend_specific", {}).get("block", {})
+        gws = backend_block.get("gws") or []
+
+        for gw in gws:
+            try:
                 if gw not in ceph_clients:
                     ceph_clients[gw] = get_cephclient(mon_host=gw)
 
@@ -1101,12 +1106,12 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
 
                 backend_block["parent"] = f"{rbd.parent['pool_name']}/{rbd.parent['image_name']}"
                 backend_block["size"] = rbd.size / 1024 / 1024 / 1024
+                break
 
-    except Exception as e:
-        LOG.warning(f"Failed to obtain the network port name, error: {e}")
-        return []
+            except Exception as e:
+                LOG.warning(f"Failed to obtain the disk disk info from gws {gw}, error: {e}")
 
-    LOG.info(f"Interface for {mv200_ip} fetched successfully")
+    LOG.info(f"system disk for {mv200_ip} fetched successfully")
     return blocks
 
 
@@ -1319,3 +1324,40 @@ async def cleanup_orphaned_efi_entries(host_ip: str, username: str, password: st
         raise
 
     return deleted_entries
+
+
+@router.delete("/mv-servers/{server_id}/cloud-init", status_code=status.HTTP_202_ACCEPTED)
+async def delete_cloud_init_datasource(server_id: str):
+
+    try:
+        mv200 = db.find_one(MV_SERVER_COLLECTION, {"id": server_id})
+    except Exception:
+        LOG.warning(f"mv200 {server_id} not found")
+        raise HTTPException(status_code=404, detail="mv200 not found")
+
+    mv200_ip = mv200["ip_address"]
+    LOG.info(f"Fetching cloud disk for {mv200_ip}")
+
+    try:
+        dpuagentclient = get_dpuagentclient(mv200_ip)
+        res = dpuagentApi.CloudinitApi(
+            dpuagentclient).delete_cloudinit_dpu_agent_v1_cloudinit_delete_post()
+        if res.code != 0:
+            LOG.error("Failed to delete cloudinit datasource")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info("Successfully deleted cloudinit datasource")
+
+    except Exception as e:
+        LOG.error(f"Failed to delete cloud init datasource , error: {e}")
+
+    LOG.info("Saving checkpoint after deleting cloudinit datasource")
+    try:
+        recoverapi = dpuagentApi.RecoveryApi(dpuagentclient)
+        res = recoverapi.save_checkpoint_dpu_agent_v1_checkpoint_save_post()
+        if res.code != 0:
+            LOG.error(
+                f"Failed to save checkpoint after deleting cloudinit datasource: {res.message}")
+            raise exceptions.CheckPointSaveException(res.message)
+        LOG.info("Successfully saved checkpoint after deleting cloudinit datasource")
+    except Exception as e:
+        LOG.warning(f"Failed to save checkpoint after deleting cloudinit datasource, error: {e}")

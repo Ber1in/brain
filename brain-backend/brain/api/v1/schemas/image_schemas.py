@@ -13,10 +13,10 @@ class ImageCreate(BaseModel):
     description: Optional[str] = Field(None, description="Image description")
 
     @validator('ceph_location')
-    def validate_ceph_location(cls, v):
-        """Validate ceph location format: pool/rbd"""
-        if not re.match(r'^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$', v):
-            raise ValueError('Ceph location must be in format: pool/rbd')
+    def validate_storage_path(cls, v):
+        """验证存储路径格式，如：pool/image 或 pool/folder/image"""
+        if v is not None and not re.match(r'^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_./-]+$', v):
+            raise ValueError('Storage path must be in format: pool/name 或 pool/folder/name')
         return v
 
 

@@ -70,5 +70,9 @@ export const mv200Api = {
     last_disk: boolean;
   }): Promise<DeleteDiskResponse>{
     return apiClient.post(`/mv-servers/${serverId}/system-disks/delete`, data)
+  },
+
+  deleteCloudInit(serverId: string): Promise<void> {
+    return apiClient.delete(`/mv-servers/${serverId}/cloud-init`)
   }
 }

@@ -1044,24 +1044,15 @@ onMounted(() => {
 
 .gateway-list {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  width: 100%;
-}
-
-.gateway-item {
-  display: flex;
-  justify-content: flex-start;
+  flex-direction: row; /* 关键：改为水平排列 */
+  flex-wrap: wrap; /* 如果节点多可以换行，如果不想换行就用 nowrap */
+  align-items: center;
+  gap: 6px; /* 控制标签之间的间距 */
   width: 100%;
 }
 
 .gateway-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  justify-content: flex-start;
-  text-align: left;
+  white-space: nowrap;
 }
 
 /* 强制表格单元格左对齐 */
