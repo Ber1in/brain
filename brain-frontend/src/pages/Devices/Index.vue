@@ -4525,9 +4525,9 @@ onMounted(() => {
 }
 
 .checkbox-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .checkbox-item {
