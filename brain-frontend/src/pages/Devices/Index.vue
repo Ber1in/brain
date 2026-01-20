@@ -1635,11 +1635,7 @@ const loadNicTypes = async () => {
 
 // 新增：计算所有标签
 const allTags = computed(() => {
-  return availableTags.value.filter(tag => 
-    devices.value.some(device => 
-      device.tags && device.tags.includes(tag.name)
-    )
-  )
+  return availableTags.value
 })
 
 // 新增：获取标签数量统计
