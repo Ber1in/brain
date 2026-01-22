@@ -297,6 +297,65 @@
                 ]
             }
         },
+        "/dpu_agent/v1/xscnet/list": {
+            "get": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "List Xsc Controllers",
+                "description": "List virtual xsc controllers\n\nArgs:\n- `uuid`: Optional controller uuid to filter the results. If provided, only returns \n              information about the specified controller.",
+                "operationId": "list_xsc_controllers_dpu_agent_v1_xscnet_list_get",
+                "parameters": [
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Internal-Auth",
+                            "type": "string"
+                        },
+                        "name": "x-internal-auth",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/XscnetListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
         "/dpu_agent/v1/vblk/add": {
             "post": {
                 "tags": [
@@ -2041,8 +2100,16 @@
                         "title": "Bdev",
                         "type": "string",
                         "description": "Name of the block device"
+                    },
+                    "gws": {
+                        "title": "Gws",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     }
-                }
+                },
+                "additionalProperties": false
             },
             "BdevQosInfoResponse": {
                 "title": "BdevQosInfoResponse",
@@ -3139,6 +3206,96 @@
                         "title": "Gw",
                         "type": "string",
                         "example": "v1.0.0+7982"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "XscnetInfo": {
+                "title": "XscnetInfo",
+                "required": [
+                    "uuid",
+                    "mtu",
+                    "mac"
+                ],
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "title": "Uuid",
+                        "type": "integer"
+                    },
+                    "mtu": {
+                        "title": "Mtu",
+                        "type": "integer"
+                    },
+                    "mac": {
+                        "title": "Mac",
+                        "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                        "type": "string",
+                        "example": "00:11:00:11:00:11"
+                    },
+                    "vlan": {
+                        "title": "Vlan",
+                        "maximum": 4095,
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "ip": {
+                        "title": "Ip",
+                        "type": "string",
+                        "description": "IP/Netmask (support IPv4/IPv6)",
+                        "format": "ip-netmask",
+                        "example": "127.0.0.1/24"
+                    },
+                    "gw_ip": {
+                        "title": "Gw Ip",
+                        "type": "string",
+                        "format": "ipvanyaddress",
+                        "example": "127.0.0.1"
+                    },
+                    "dns": {
+                        "title": "Dns",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "ipvanyaddress"
+                        },
+                        "default": []
+                    },
+                    "dhcp_server": {
+                        "title": "Dhcp Server",
+                        "type": "string",
+                        "format": "ipvanyaddress",
+                        "example": "127.0.0.1"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "XscnetListResponse": {
+                "title": "XscnetListResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "xscnets": {
+                        "title": "Xscnets",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/XscnetInfo"
+                        },
+                        "default": []
                     }
                 },
                 "additionalProperties": false

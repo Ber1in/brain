@@ -41,6 +41,7 @@ class AppConfigResponse(BaseModel):
     check_heartbeat: bool = True
     heartbeat_interval = 60
 
+
 class AppConfig(AppConfigResponse):
     smtp: SMTPConfig = SMTPConfig()
     admin_password: str = "yuntester@admin2021"

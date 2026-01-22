@@ -33,10 +33,11 @@ IMAGE_POOL = "images"
 SNAP_NAME = "brain_snap"
 
 
-async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str, rebuild=False):
+async def _create_system_disk(
+        mv200_id, data: block_schemas.BareMetalCreate, creator: str, rebuild=False):
     disk_data = data.system_disk
     LOG.info(f"Starting system disk creation process for image {disk_data.image_id} "
-             f"on MV200 server {disk_data.mv200_id}, creator: {creator}")
+             f"on MV200 server {mv200_id}, creator: {creator}")
 
     # Check if image exists
     try:
@@ -49,14 +50,15 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         )
 
     # Check if MV200 server exists
-    mv_server = db.find_one(MV_SERVER_COLLECTION, {"id": disk_data.mv200_id})
+    mv_server = db.find_one(MV_SERVER_COLLECTION, {"id": mv200_id})
     if not mv_server:
-        LOG.warning(f"MV200 server '{disk_data.mv200_id}' not found when creating system disk")
+        LOG.warning(f"MV200 server '{mv200_id}' not found when creating system disk")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"MV200 server '{disk_data.mv200_id}' not found"
+            detail=f"MV200 server '{mv200_id}' not found"
         )
 
+    soc_ip = mv_server.get("ip_address")
     target_server = None
 
     servers = db.find(SERVER_COLLECTION)
@@ -70,20 +72,19 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
 
     if not target_server:
         LOG.warning(
-            f"Bare Metal server not found for MV200 {disk_data.mv200_id}")
+            f"Bare Metal server not found for MV200 {soc_ip}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Bare Metal server not found for MV200 {disk_data.mv200_id}"
+            detail=f"Bare Metal server not found for MV200 {soc_ip}"
         )
 
     # Generate unique ID and RBD path
     mon_host = image.get("mon_host")
-    soc_ip = mv_server.get("ip_address")
     host_ip = target_server["device"]["ip"]
     gateway = target_server["device"]["gateway"]
     mac = target_server["device"]["mac"]
-    disk_id = str(uuid.uuid4())
-    rbd_path = f"{RBD_POOL}/{disk_id}"
+    disk_id = data.system_disk.disk_id or str(uuid.uuid4())
+    rbd_path = f"{data.system_disk.pool}/{disk_id}"
 
     LOG.info(f"Generated disk ID: {disk_id}, RBD path: {rbd_path}, "
              f"mon_host: {mon_host}, soc_ip: {soc_ip}")
@@ -97,21 +98,6 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
             detail="Generated RBD path already exists (UUID conflict)"
         )
 
-    # Create disk document
-    disk_dict = {
-        "id": disk_id,
-        "rbd_path": rbd_path,
-        "image_id": disk_data.image_id,
-        "mv200_id": disk_data.mv200_id,
-        "mv200_ip": soc_ip,
-        "mon_host": mon_host,
-        "bare_id": target_server["id"],
-        "size_gb": disk_data.size_gb,
-        "flatten": disk_data.flatten,
-        "description": disk_data.description,
-        "creator": creator
-    }
-
     try:
         LOG.info(
             f"Starting RBD clone process for disk {disk_id} from image {image['ceph_location']}")
@@ -121,7 +107,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
             image_spec=quote(image["ceph_location"], safe=""),
             snapshot_name=SNAP_NAME,
             api_block_image_image_spec_snap_snapshot_name_clone_post_request={
-                "child_pool_name": RBD_POOL,
+                "child_pool_name": data.system_disk.pool,
                 "child_image_name": disk_id
             }
         )
@@ -131,12 +117,12 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         if disk_data.flatten:
             LOG.info(f"Flattening RBD image for disk {disk_id}")
             rbd_api.api_block_image_image_spec_flatten_post(
-                image_spec=quote(f"{RBD_POOL}/{disk_id}", safe=""))
+                image_spec=quote(rbd_path, safe=""))
             LOG.info(f"Successfully flattened RBD image for disk {disk_id}")
 
         LOG.info(f"Resizing RBD image for disk {disk_id} to {disk_data.size_gb}GB")
         rbd_api.api_block_image_image_spec_put(
-            image_spec=quote(f"{RBD_POOL}/{disk_id}", safe=""),
+            image_spec=quote(rbd_path, safe=""),
             api_block_image_image_spec_put_request={"size": disk_data.size_gb * 1024 * 1024 * 1024}
         )
         LOG.info(f"Successfully resized RBD image for disk {disk_id}")
@@ -152,7 +138,7 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
     try:
         res = blk_api.create_vblk_dpu_agent_v1_vblk_add_post(
             dpuagent_api_v1_schemas_vblk_schemas_create_request={
-                "rbd_path": f"{RBD_POOL}/{disk_id}",
+                "rbd_path": rbd_path,
                 "gw_pwd": "yunsilicon",
                 "gws": [mon_host],
                 "vq_count": 2,
@@ -171,7 +157,6 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
             f"Failed to create virtblk for disk {disk_id} in {soc_ip}, message: {res.message}")
         raise exceptions.VblkCreateException(res.message)
 
-    disk_dict["blk_id"] = res.uuid
     LOG.info(f"Successfully created virtual block device for disk {disk_id} with UUID: {res.uuid}")
 
     cloudinit_status = 0
@@ -198,10 +183,10 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
                         f"{host_ip}/24"
                     ],
                     "gateway4": gateway,
-                    "nameservers": [
-                        "10.0.0.50",
-                        "10.0.0.51"
-                    ],
+                    # "nameservers": [
+                    #     "10.0.0.50",
+                    #     "10.0.0.51"
+                    # ],
                 }
             ]
         }
@@ -244,7 +229,6 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
             if not efi_uuid:
                 efi_status = 1
             else:
-                disk_dict["efi_uuid"] = efi_uuid
                 LOG.info(
                     f"EFI create succeeded for server {target_server['id']}, entry: {efi_uuid}")
         except Exception as e:
@@ -259,9 +243,6 @@ async def _create_system_disk(data: block_schemas.BareMetalCreate, creator: str,
         )
         efi_status = 1
 
-    # Insert new system disk to database
-    LOG.info(f"Inserting disk {disk_id} into database")
-    db.insert(SYSTEM_DISK_COLLECTION, disk_dict)
     LOG.info(f"Successfully created system disk {disk_id}")
 
     return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
@@ -398,15 +379,16 @@ async def _delete_system_disk(disk_id, rebuild=False):
     return {"efi_status": efi_status, "cloudinit_status": cloudinit_status}
 
 
-@router.post("/system-disks", status_code=status.HTTP_201_CREATED)
+@router.post("/mv-servers/{server_id}/system-disks11", status_code=status.HTTP_201_CREATED)
 async def create_system_disk(
+    server_id: str,
     data: block_schemas.BareMetalCreate, 
     user=Depends(authenticate_user)
 ):
     """
     Create a new system disk RBD from image for specific MV200 server
     """
-    LOG.info(f"Received request to create system disk for MV200 {data.system_disk.mv200_id} "
+    LOG.info(f"Received request to create system disk for MV200 {server_id} "
              f"with image {data.system_disk.image_id}, creator: {user}")
     try:
         result = await _create_system_disk(data, user)

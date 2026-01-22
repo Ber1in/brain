@@ -210,15 +210,22 @@ export interface InterfaceInfo {
   xsc_id: number
 }
 
+
 export interface InterfaceCreate {
-  mv200_id: string
-  ip: string
-  vlan_tag: number
-  gateway?: string
+  vq_count: number
+  vq_size: number
   mtu?: number
   mac?: string
+  uuid?: number
+  pxe: boolean
+}
+
+export interface OvsflowRequest {
+  ip: string
+  vlan_tag: number
+  mac: string
+  gateway?: string
   dns?: string[]
-  description?: string
   dhcp_server?: string
 }
 
@@ -485,4 +492,38 @@ export interface InstallDetailResponse {
   name?: string
   arg_name?: string
   description?: string
+}
+
+export interface XscnetInfo {
+  uuid: number
+  mtu: number
+  mac: string
+  vlan?: number
+  ip?: string
+  gateway?: string
+  dhcp_server?: string
+  ifname?: string
+  dns: string[]
+}
+
+export interface BdevInfo {
+  readonly: boolean;
+  bdev: string;
+  gws?: string[] | null;
+  rbd_path?: string | null;
+  parent?: string | null;
+  size?: number | null;
+}
+
+export interface BackendSpecific {
+  block: BdevInfo;
+}
+
+export interface ControllerInfo {
+  ctrlr: string;
+  cpumask: string;
+  uuid: number;
+  vq_count: number;
+  vq_size: number;
+  backend_specific: BackendSpecific;
 }

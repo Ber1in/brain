@@ -182,7 +182,7 @@ const loadData = async () => {
       mv200Api.getAll(),
       systemDisksApi.getAll(),
       deviceApi.getAll(),
-      networkApi.getAll(),
+      mv200Api.getAllXsc(),
     ])
 
     images.value = imagesResponse

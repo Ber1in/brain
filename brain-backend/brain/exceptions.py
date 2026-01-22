@@ -68,3 +68,11 @@ class CheckPointSaveException(BrainException):
 
 class DpuagentVersionError(BrainException):
     message = "The dpuagent version is not supported: %(reason)s"
+
+
+class CloneSystemdiskException(BrainException):
+    message = "After trying all mon_host addresses, the RBD could still not be cloned: %(reason)s"
+
+
+class DeleteSystemdiskException(BrainException):
+    message = "After trying all mon_host addresses, the RBD could still not be deleted: %(reason)s"

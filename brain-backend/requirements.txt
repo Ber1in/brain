@@ -17,3 +17,4 @@ python-gitlab
 GitPython
 PyYAML
 asyncssh
+aiohttp

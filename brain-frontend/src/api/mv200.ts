@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest } from '@/types/api'
+import type { MVServer, MVServerCreate, MVServerUpdate, MCRRequest, InterfaceCreate, InterfaceInfo, OvsflowRequest, XscnetInfo, ControllerInfo, DeleteDiskResponse } from '@/types/api'
 
 export const mv200Api = {
   getAll(): Promise<MVServer[]> {
@@ -30,4 +30,49 @@ export const mv200Api = {
     return apiClient.post(`/mv-servers/${serverId}/update_mcr`, data)
   },
 
+  createXsc(mv200_id: string, data: InterfaceCreate): Promise<InterfaceInfo> {
+    return apiClient.post(`/mv-servers/${mv200_id}/xsc`, data)
+  },
+
+  addXscOvsFlow(mv200_id: string, uuid: number, data: OvsflowRequest): Promise<void> {
+    return apiClient.post(`/mv-servers/${mv200_id}/xsc/${uuid}/flowtables`, data)
+  },
+
+  removeXscOvsFlow(mv200_id: string, uuid: number): Promise<void> {
+    return apiClient.delete(`/mv-servers/${mv200_id}/xsc/${uuid}/flowtables`)
+  },
+
+  deleteXsc(mv200_id: string, uuid: number): Promise<void> {
+    return apiClient.delete(`/mv-servers/${mv200_id}/xsc/${uuid}`)
+  },
+
+  getAllXsc(mv200Id: string, uuid?: number): Promise<XscnetInfo[]> {
+    const params: Record<string, any> = {}
+    if (uuid !== undefined && uuid !== null) {
+      params.uuid = uuid
+    }
+    return apiClient.get(`/mv-servers/${mv200Id}/xsc`, { params })
+  },
+
+  getSystemDisks(mv200Id:string):  Promise<ControllerInfo[]> {
+    return apiClient.get(`/mv-servers/${mv200Id}/systemdisks`)
+  },
+
+  createSystemDisk(mv200Id: string, data: any): Promise<DeleteDiskResponse> {
+    return apiClient.post(`/mv-servers/${mv200Id}/system-disks/create`, data)
+  },
+
+  deleteSystemDisk(serverId: string, data: {
+    uuid: string;
+    rbd_path: string;
+    mon_hosts: string;
+    bare_id: string;
+    last_disk: boolean;
+  }): Promise<DeleteDiskResponse>{
+    return apiClient.post(`/mv-servers/${serverId}/system-disks/delete`, data)
+  },
+
+  deleteCloudInit(serverId: string): Promise<void> {
+    return apiClient.delete(`/mv-servers/${serverId}/cloud-init`)
+  }
 }

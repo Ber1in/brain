@@ -325,7 +325,14 @@
                       <span>编辑</span>
                     </div>
                   </el-dropdown-item>
-                  
+                  <el-dropdown-item command="viewXsc" class="dropdown-item">
+                    <el-icon><Link /></el-icon>
+                    <span>XSC网口管理</span>
+                  </el-dropdown-item>   
+                  <el-dropdown-item command="systemDisks" class="dropdown-item">
+                    <el-icon><Cpu /></el-icon>
+                    <span>云系统盘管理</span>
+                  </el-dropdown-item>               
                   <!-- 新增：更新MCR包 -->
                   <el-dropdown-item 
                     command="updateMcr" 
@@ -508,7 +515,9 @@ import {
   ArrowRight,
   QuestionFilled,
   Monitor,
-  Plus
+  Cpu,
+  Plus,
+  Link
 } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { deviceApi } from '@/api/device'
@@ -1348,6 +1357,12 @@ const handleCommand = (command: string, server: MVServer & {
     case 'detail':
       handleDetail(server)
       break
+    case 'viewXsc':
+      handleViewXsc(server)
+      break
+    case 'systemDisks':
+      handleSystemDisks(server)
+      break
     case 'edit':
       handleEdit(server)
       break
@@ -1358,6 +1373,31 @@ const handleCommand = (command: string, server: MVServer & {
       handleDelete(server)
       break
   }
+}
+
+// 新增：跳转到云系统盘页面
+const handleSystemDisks = (server: MVServer) => {
+  const bareId = server.associatedServer.data.deviceId || ''
+  
+  router.push({
+    path: `/system-disks/mv200/${server.id}`,
+    query: {
+      name: server.name,
+      ip: server.ip_address,
+      bareId: bareId
+    }
+  })
+}
+
+// 新增：跳转到XSC网口页面
+const handleViewXsc = (server: MVServer) => {
+  router.push({
+    path: `/xsc-interface/mv200/${server.id}`,
+    query: {
+      name: server.name,
+      ip: server.ip_address
+    }
+  })
 }
 
 const handleEdit = (server: MVServer & { 

@@ -136,34 +136,6 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
-    // 新增：XSC网口管理路由
-    {
-      path: '/xsc-interface',
-      name: 'XSCInterface',
-      component: () => import('@/pages/XSC/Index.vue'),
-      meta: {
-        title: 'XSC网口管理',
-        requiresAuth: true,
-      },
-    },
-    {
-      path: '/xsc-interface/create',
-      name: 'XSCInterfaceCreate',
-      component: () => import('@/pages/XSC/Create.vue'),
-      meta: {
-        title: '创建XSC网口',
-        requiresAuth: true,
-      },
-    },
-    {
-      path: '/xsc-interface/edit/:id',
-      name: 'XSCInterfaceEdit',
-      component: () => import('@/pages/XSC/Edit.vue'),
-      meta: {
-        title: '编辑XSC网口',
-        requiresAuth: true,
-      },
-    },
     {
       path: '/devices',
       name: '服务器管理',
@@ -203,6 +175,16 @@ const router = createRouter({
       path: '/help',
       name: '帮助文档',
       component: () => import('@/pages/Help.vue')
+    },
+    {
+      path: '/xsc-interface/mv200/:mv200_id',
+      name: 'XSC网口管理',
+      component: () => import('@/pages/XSC/Index.vue')
+    },
+    {
+      path: '/system-disks/mv200/:mv200Id',
+      name: '云系统盘管理',
+      component: () => import('@/pages/SystemDisks/Index.vue')
     }
   ],
 })

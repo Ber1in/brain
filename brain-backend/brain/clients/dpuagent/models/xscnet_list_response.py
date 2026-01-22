@@ -21,16 +21,17 @@ import json
 
 
 from typing import List, Optional
-from pydantic import BaseModel, Field, StrictBool, StrictStr, conlist
+from pydantic import BaseModel, Field, StrictInt, StrictStr, conlist
+from brain.clients.dpuagent.models.xscnet_info import XscnetInfo
 
-class BdevInfo(BaseModel):
+class XscnetListResponse(BaseModel):
     """
-    BdevInfo
+    XscnetListResponse
     """
-    readonly: StrictBool = Field(..., description="Indicates if the block device is read-only")
-    bdev: StrictStr = Field(..., description="Name of the block device")
-    gws: Optional[conlist(StrictStr)] = None
-    __properties = ["readonly", "bdev", "gws"]
+    code: StrictInt = Field(..., description="return code of the API execution result")
+    message: StrictStr = Field(..., description="Detailed execution results")
+    xscnets: Optional[conlist(XscnetInfo)] = None
+    __properties = ["code", "message", "xscnets"]
 
     class Config:
         """Pydantic configuration"""
@@ -46,8 +47,8 @@ class BdevInfo(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> BdevInfo:
-        """Create an instance of BdevInfo from a JSON string"""
+    def from_json(cls, json_str: str) -> XscnetListResponse:
+        """Create an instance of XscnetListResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self):
@@ -56,21 +57,28 @@ class BdevInfo(BaseModel):
                           exclude={
                           },
                           exclude_none=True)
+        # override the default output from pydantic by calling `to_dict()` of each item in xscnets (list)
+        _items = []
+        if self.xscnets:
+            for _item in self.xscnets:
+                if _item:
+                    _items.append(_item.to_dict())
+            _dict['xscnets'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: dict) -> BdevInfo:
-        """Create an instance of BdevInfo from a dict"""
+    def from_dict(cls, obj: dict) -> XscnetListResponse:
+        """Create an instance of XscnetListResponse from a dict"""
         if obj is None:
             return None
 
         if not isinstance(obj, dict):
-            return BdevInfo.parse_obj(obj)
+            return XscnetListResponse.parse_obj(obj)
 
-        _obj = BdevInfo.parse_obj({
-            "readonly": obj.get("readonly"),
-            "bdev": obj.get("bdev"),
-            "gws": obj.get("gws")
+        _obj = XscnetListResponse.parse_obj({
+            "code": obj.get("code"),
+            "message": obj.get("message"),
+            "xscnets": [XscnetInfo.from_dict(_item) for _item in obj.get("xscnets")] if obj.get("xscnets") is not None else None
         })
         return _obj
 
