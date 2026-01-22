@@ -331,6 +331,10 @@ async def prepare_test_environment(data: yuntester_schemas.ExecuteRequest, user,
                 "password": BMC_PASS
             }
         }
+        if server.cluster_id:
+            client_info["cluster_id"] = server.cluster_id
+        if server.node_id:
+            client_info["node_id"] = server.node_id
 
         nics = []
         for nic in server.nics:

@@ -78,6 +78,8 @@ class ExecuteNicInfo(BaseModel):
 class Server(BaseModel):
     device_id: str
     nics: List[ExecuteNicInfo] = []
+    cluster_id: int = None
+    node_id: int = None
 
 
 class ExecuteRequest(BaseModel):

@@ -410,6 +410,8 @@ export interface CaseNicInfo {
 export interface Server {
   device_id: string;
   nics?: CaseNicInfo[];
+  cluster_id?: number;
+  node_id?: number
 }
 
 export interface ExecuteRequest {

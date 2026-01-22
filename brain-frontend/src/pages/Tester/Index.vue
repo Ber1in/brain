@@ -984,7 +984,66 @@
                   </div>
                 </el-checkbox>
               </div>
-              
+              <div 
+                class="cluster-node-toggle"
+                v-if="selectedServers.includes(server.id)"
+              >
+                <el-checkbox
+                  v-model="server.enableClusterConfig"
+                  @change="handleClusterConfigToggle(server)"
+                  size="small"
+                >
+                  <span class="toggle-label">配置节点角色</span>
+                </el-checkbox>
+              </div>
+              <!-- 集群和节点配置区域 - 只在选中了服务器时才显示 -->
+              <div 
+                class="cluster-node-config"
+                v-if="selectedServers.includes(server.id) && server.enableClusterConfig"
+              >
+                <div class="config-fields">
+                  <div class="field-group">
+                    <el-input-number
+                      v-model="server.cluster_id"
+                      :min="1"
+                      :precision="0"
+                      placeholder="集群ID"
+                      size="small"
+                      style="width: 120px"
+                      :validate-event="false"
+                      @blur="validateClusterId(server)"
+                    >
+                      <template #prefix>
+                        <el-icon><Cpu /></el-icon>
+                      </template>
+                    </el-input-number>
+                    
+                    <span class="field-separator">-</span>
+                    
+                    <el-input-number
+                      v-model="server.node_id"
+                      :min="1"
+                      :precision="0"
+                      placeholder="节点ID"
+                      size="small"
+                      style="width: 120px"
+                      :validate-event="false"
+                      @blur="validateNodeId(server)"
+                    >
+                      <template #prefix>
+                        <el-icon><Monitor /></el-icon>
+                      </template>
+                    </el-input-number>
+                  </div>
+                  
+                  <div class="field-hint required-hint" v-if="server.cluster_id === undefined || server.node_id === undefined">
+                    必须填写集群ID和节点ID
+                  </div>
+                  <div class="field-hint" v-else>
+                    集群 {{ server.cluster_id }} - 节点 {{ server.node_id }}
+                  </div>
+                </div>
+              </div>
               <!-- 网口选择区域 - 紧跟在服务器后面 -->
               <div 
                 class="nic-selection-area" 
@@ -1198,7 +1257,8 @@ import {
   CircleClose,
   QuestionFilled,
   Download,
-  Share
+  Share,
+  Cpu
 } from '@element-plus/icons-vue'
 import { testApi } from '@/api/tester'
 import { deviceApi } from '@/api/device'
@@ -1255,7 +1315,14 @@ const saveCombinationForm = ref<CaseCombinationRequest>({
 })
 
 // 服务器相关数据
-const availableServers = ref<ServerDetailResponse[]>([])
+interface ServerWithClusterConfig extends ServerDetailResponse {
+  enableClusterConfig?: boolean
+  cluster_id?: number
+  node_id?: number
+}
+
+// 修改 availableServers 的类型
+const availableServers = ref<ServerWithClusterConfig[]>([])
 const selectedServers = ref<string[]>([])
 const serverDialogVisible = ref(false)
 const executeLoading = ref(false)
@@ -1773,7 +1840,7 @@ const sortedAvailableServers = computed(() => {
   })
 })
 
-// 处理服务器选择变化
+// 修改 handleServerSelectionChange 方法
 const handleServerSelectionChange = (server: ServerDetailResponse, checked: boolean) => {
   if (checked) {
     if (!selectedServers.value.includes(server.id!)) {
@@ -1784,7 +1851,12 @@ const handleServerSelectionChange = (server: ServerDetailResponse, checked: bool
     if (index > -1) {
       selectedServers.value.splice(index, 1)
       
-      // 当取消选择服务器时，取消选择该服务器的所有网口
+      // 取消选择服务器时，清理配置
+      server.enableClusterConfig = false
+      server.cluster_id = undefined
+      server.node_id = undefined
+      
+      // 原有的网口清理逻辑保持不变...
       if (server.nics) {
         server.nics.forEach(nic => {
           nic.allInterfacesSelected = false
@@ -3927,6 +3999,60 @@ const updateAllServersHardwareInfo = async () => {
   await Promise.all(updatePromises)
 }
 
+// 添加处理集群和节点ID变化的方法
+const handleClusterIdChange = (server: ServerDetailResponse) => {
+  // 如果清空了集群ID，也清空节点ID
+  if (!server.cluster_id) {
+    server.node_id = undefined
+  }
+  
+  // 验证集群ID必须是正整数
+  if (server.cluster_id !== undefined && server.cluster_id <= 0) {
+    ElMessage.warning('集群ID必须是正整数')
+    server.cluster_id = undefined
+  }
+}
+
+const handleNodeIdChange = (server: ServerDetailResponse) => {
+  // 验证节点ID必须是正整数
+  if (server.node_id !== undefined && server.node_id <= 0) {
+    ElMessage.warning('节点ID必须是正整数')
+    server.node_id = undefined
+  }
+}
+
+const handleClusterConfigToggle = (server: ServerDetailResponse) => {
+  if (!server.enableClusterConfig) {
+    // 取消勾选时，清空已填写的值
+    server.cluster_id = undefined
+    server.node_id = undefined
+  } else {
+    // 勾选时，初始化默认值（可选）
+    server.cluster_id = undefined
+    server.node_id = undefined
+  }
+}
+
+const validateClusterId = (server: ServerDetailResponse) => {
+  if (server.enableClusterConfig) {
+    if (server.cluster_id === undefined || server.cluster_id <= 0) {
+      ElMessage.warning('请输入有效的集群ID（必须大于0）')
+      return false
+    }
+  }
+  return true
+}
+
+const validateNodeId = (server: ServerDetailResponse) => {
+  if (server.enableClusterConfig) {
+    if (server.node_id === undefined || server.node_id <= 0) {
+      ElMessage.warning('请输入有效的节点ID（必须大于0）')
+      return false
+    }
+  }
+  return true
+}
+
 // 修改 loadAvailableServers 方法
 const loadAvailableServers = async () => {
   try {
@@ -3938,16 +4064,20 @@ const loadAvailableServers = async () => {
     
     availableServers.value = servers
     
-    // 为每个网卡的每个网口初始化选择属性
+    // 为每个服务器初始化配置字段
     availableServers.value.forEach(server => {
+      // 初始化集群配置开关和ID
+      server.enableClusterConfig = false
+      server.cluster_id = undefined
+      server.node_id = undefined
+      
+      // 原有的网卡初始化代码保持不变...
       if (server.nics) {
         server.nics.forEach(nic => {
-          // 初始化全选状态
           nic.allInterfacesSelected = false
           
           if (nic.nic_info) {
             nic.nic_info.forEach(nicInfo => {
-              // 初始化 selected 为 false
               if (nicInfo.selected === undefined) {
                 nicInfo.selected = false
               }
@@ -3964,6 +4094,11 @@ const loadAvailableServers = async () => {
 
 // 修改确认执行方法中的轮询部分
 const handleExecuteConfirm = async () => {
+  if (!validateClusterConfig()) {
+    executeLoading.value = false
+    return
+  }
+
   try {
     executeLoading.value = true
     
@@ -4001,20 +4136,19 @@ const handleExecuteConfirm = async () => {
     const servers: Server[] = selectedServersWithNics.value.map(server => {
       const selectedNics: CaseNicInfo[] = []
       
+      // 网卡选择逻辑保持不变...
       if (server.nics) {
         server.nics.forEach(nic => {
           if (isMv200Nic(nic.type)) {
-            // MV200网卡：如果选中，创建一个特殊的CaseNicInfo
             if (nic.selected && nic.mv200Matched && nic.mv200ServerInfo) {
               const caseNicInfo: CaseNicInfo = {
                 type: nic.type,
-                mac: nic.mac || '', // MV200没有单独的网口MAC
-                soc: nic.mv200ServerInfo.ip_address || '' // 使用MV200服务器的IP地址作为soc
+                mac: nic.mac || '',
+                soc: nic.mv200ServerInfo.ip_address || ''
               }
               selectedNics.push(caseNicInfo)
             }
           } else {
-            // 非MV200网卡：处理每个被选中的网口
             if (nic.nic_info) {
               nic.nic_info.forEach(nicInfo => {
                 if (nicInfo.selected) {
@@ -4034,10 +4168,20 @@ const handleExecuteConfirm = async () => {
         })
       }
       
-      return {
+      // 构建服务器对象
+      const serverConfig: Server = {
         device_id: server.id!,
         nics: selectedNics.length > 0 ? selectedNics : undefined
       }
+      
+      // 如果勾选了配置开关，则必须添加集群和节点ID
+      if (server.enableClusterConfig) {
+        serverConfig.cluster_id = Number(server.cluster_id)
+        serverConfig.node_id = Number(server.node_id)
+      }
+      // 如果没勾选开关，就不添加这两个字段
+      
+      return serverConfig
     })
     
     // 过滤掉没有任何网卡的服务器（理论上不应该发生，但安全起见）
@@ -4093,6 +4237,25 @@ const handleExecuteConfirm = async () => {
   }
 }
 
+const validateClusterConfig = (): boolean => {
+  for (const server of selectedServersWithNics.value) {
+    // 如果勾选了配置开关
+    if (server.enableClusterConfig) {
+      // 检查是否填写了集群ID和节点ID
+      if (server.cluster_id === undefined || server.cluster_id <= 0) {
+        ElMessage.warning(`服务器 ${server.bmc.hostname} 的集群ID必须填写且大于0`)
+        return false
+      }
+      
+      if (server.node_id === undefined || server.node_id <= 0) {
+        ElMessage.warning(`服务器 ${server.bmc.hostname} 的节点ID必须填写且大于0`)
+        return false
+      }
+    }
+  }
+  return true
+}
+
 onMounted(() => {
   loadBranchAndTag()
   loadExecuteHistory()
@@ -4106,6 +4269,64 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 集群节点配置开关样式 */
+.cluster-node-toggle {
+  padding: 8px 16px;
+  background: #f5f7fa;
+  border-top: 1px solid #e4e7ed;
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+}
+
+/* 集群节点配置样式 */
+.cluster-node-config {
+  padding: 12px 16px;
+  background: #f0f9ff;
+  border-top: 1px dashed #bae0ff;
+  border-radius: 0 0 6px 6px;
+}
+
+.config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-separator {
+  color: #909399;
+  font-weight: 500;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #909399;
+}
+
+.required-hint {
+  color: #f56c6c;
+  font-weight: 500;
+}
+
+/* 验证错误样式 */
+.input-error {
+  border-color: #f56c6c !important;
+}
+
+.input-error:focus {
+  border-color: #f56c6c !important;
+  box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.2) !important;
+}
+
 /* 在 style 部分添加以下样式 */
 .result-tag {
   font-weight: 500;
