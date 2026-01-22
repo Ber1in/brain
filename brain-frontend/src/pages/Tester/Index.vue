@@ -1035,13 +1035,6 @@
                       </template>
                     </el-input-number>
                   </div>
-                  
-                  <div class="field-hint required-hint" v-if="server.cluster_id === undefined || server.node_id === undefined">
-                    必须填写集群ID和节点ID
-                  </div>
-                  <div class="field-hint" v-else>
-                    集群 {{ server.cluster_id }} - 节点 {{ server.node_id }}
-                  </div>
                 </div>
               </div>
               <!-- 网口选择区域 - 紧跟在服务器后面 -->
@@ -4279,7 +4272,7 @@ onUnmounted(() => {
 .toggle-label {
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: #e6a23c; /* 改为告警色 - 橙色 */
 }
 
 /* 集群节点配置样式 */
