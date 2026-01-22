@@ -2,20 +2,25 @@
 # All rights reserved.
 
 import os
+from socket import timeout
 import yaml
 import random
 from typing import List
 from uuid import uuid4
 from fastapi import APIRouter, Depends, status, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 import logging
+from urllib.parse import quote
 
 
 from brain.auth import authenticate_user
 from brain.api.v2.schemas import common_schemas
 from brain.json_db import SQLiteDocumentDB
 from brain.utils import common_utils
+from brain.utils.get_client import get_cephclient
 from brain.utils.ssh_client import AsyncRemoteFS
 from brain.config import AppConfig, CONFIG_FILE, reload_settings, settings, AppConfigResponse
+from brain.clients.ceph import api as ceph_api
 
 LOG = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(authenticate_user)])
@@ -203,3 +208,38 @@ async def get_mcr_install_detail(path: str = Query(...)):
         install_detail = []
 
     return install_detail
+
+def _get_rbd_detail_sync(rbd_path: str, gws: str):
+    for gw in gws.split(","):
+        try:
+            ceph_client = get_cephclient(mon_host=gw)
+            rbd_api = ceph_api.RbdApi(ceph_client)
+
+            rbd = rbd_api.api_block_image_image_spec_get(
+                image_spec=quote(rbd_path, safe="", timeout=2)
+            )
+
+            return {
+                "parent": f"{rbd.parent['pool_name']}/{rbd.parent['image_name']}",
+                "size": rbd.size / 1024 / 1024 / 1024,
+            }
+
+        except Exception as e:
+            LOG.warning(
+                f"Failed to obtain the disk info from gws {gw}, error: {e}"
+            )
+    raise HTTPException(
+        status.HTTP_504_GATEWAY_TIMEOUT,
+        detail="The cloud management platform cannot connect to any gateway",
+    )
+
+
+@router.get("/rbd_detail", response_model=List[common_schemas.RbdDetailResponse])
+async def get_rbd_info(
+    rbd_path: str = Query(...),
+    gws: str = Query(...),
+):
+    result = await run_in_threadpool(
+        _get_rbd_detail_sync, rbd_path, gws
+    )
+    return result

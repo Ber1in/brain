@@ -1080,37 +1080,6 @@ async def get_systemdisks(server_id: str, uuid: Optional[int] = Query(None, ge=1
     except Exception as e:
         LOG.warning(f"Failed to list the cloud disk, error: {e}")
 
-    ceph_clients = {}
-    for block in blocks:
-        backend_block = block.get("backend_specific", {}).get("block", {})
-        gws = backend_block.get("gws") or []
-
-        for gw in gws:
-            try:
-                if gw not in ceph_clients:
-                    ceph_clients[gw] = get_cephclient(mon_host=gw)
-
-                ceph_client = ceph_clients[gw]
-                rbd_api = ceph_api.RbdApi(ceph_client)
-
-                bdev_parts = backend_block.get("bdev", "").split("_")
-                if len(bdev_parts) != 4:
-                    continue
-
-                rbd_path = f"{bdev_parts[0]}/{bdev_parts[1]}"
-                backend_block["rbd_path"] = rbd_path
-
-                rbd = rbd_api.api_block_image_image_spec_get(
-                    image_spec=quote(rbd_path, safe="")
-                )
-
-                backend_block["parent"] = f"{rbd.parent['pool_name']}/{rbd.parent['image_name']}"
-                backend_block["size"] = rbd.size / 1024 / 1024 / 1024
-                break
-
-            except Exception as e:
-                LOG.warning(f"Failed to obtain the disk disk info from gws {gw}, error: {e}")
-
     LOG.info(f"system disk for {mv200_ip} fetched successfully")
     return blocks
 

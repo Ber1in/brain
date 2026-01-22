@@ -71,3 +71,8 @@ class InstallDetailResponse(BaseModel):
     name: str = None
     arg_name: str = None
     description: str = None
+
+
+class RbdDetailResponse(BaseModel):
+    parent: str = None
+    size: int = None

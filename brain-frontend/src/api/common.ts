@@ -8,7 +8,9 @@ import type {
   FilteringConditions,
   OperationFilterRequest,
   OperationResponse,
-  InstallDetailResponse } from '@/types/api'
+  InstallDetailResponse,
+  RbdDetailResponse
+} from '@/types/api'
 
 export const tagApi = {
   // 获取所有标签
@@ -72,5 +74,11 @@ export const operationApi = {
 export const mcrApi = {
   getInstallDetail(path: string): Promise<InstallDetailResponse[]> {
     return apiClient.get('/api/mcr_install_detail', { params: { path } })
+  }
+}
+
+export const rbdApi = {
+  getRbdDetail(rbd_path: string, gws: string): Promise<RbdDetailResponse[]> {
+    return apiClient.get('/api/rbd_detail', { params: { rbd_path, gws } });
   }
 }

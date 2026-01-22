@@ -138,9 +138,6 @@ class BdevInfo(BaseModel):
                            description="Indicates if the block device is read-only", example=False)
     bdev: str = Field(..., description="Name of the block device")
     gws: Optional[List[str]] = Field(None)
-    rbd_path: str = None
-    parent: str = None
-    size: int = None
 
 
 class BackendSpecific(BaseModel):

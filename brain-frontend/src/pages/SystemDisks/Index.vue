@@ -112,9 +112,21 @@
           align="left"
         >
           <template #default="{ row }">
-            <div v-if="row.backend_specific?.block?.rbd_path" class="rbd-path-cell">
+            <div v-if="row.rbdDetail?.rbd_path" class="rbd-path-cell">
               <span class="rbd-path">
-                {{ row.backend_specific.block.rbd_path }}
+                {{ row.rbdDetail.rbd_path }}
+                <el-icon v-if="row.rbdLoading" class="loading-icon">
+                  <Loading />
+                </el-icon>
+                <el-tooltip 
+                  v-else-if="row.rbdError" 
+                  :content="row.rbdError" 
+                  placement="top"
+                >
+                  <el-icon class="error-icon">
+                    <CircleClose />
+                  </el-icon>
+                </el-tooltip>
               </span>
             </div>
             <span v-else class="empty-text">-</span>
@@ -129,9 +141,21 @@
           align="left"
         >
           <template #default="{ row }">
-            <div v-if="row.backend_specific?.block?.parent" class="image-cell">
+            <div v-if="row.rbdDetail?.parent" class="image-cell">
               <el-tag type="warning" size="small" class="parent-tag">
-                {{ getImageName(row.backend_specific.block.parent) }}
+                {{ getImageName(row.rbdDetail.parent) }}
+                <el-icon v-if="row.rbdLoading" class="loading-icon">
+                  <Loading />
+                </el-icon>
+                <el-tooltip 
+                  v-else-if="row.rbdError" 
+                  :content="row.rbdError" 
+                  placement="top"
+                >
+                  <el-icon class="error-icon">
+                    <CircleClose />
+                  </el-icon>
+                </el-tooltip>
               </el-tag>
             </div>
             <span v-else class="empty-text">-</span>
@@ -147,8 +171,20 @@
           align="left"
         >
           <template #default="{ row }">
-            <div v-if="row.backend_specific?.block?.size" class="size-cell">
-              <span class="size-text">{{ row.backend_specific.block.size }}</span>
+            <div v-if="row.rbdDetail?.size !== undefined" class="size-cell">
+              <span class="size-text">{{ row.rbdDetail.size }}</span>
+              <el-icon v-if="row.rbdLoading" class="loading-icon">
+                <Loading />
+              </el-icon>
+              <el-tooltip 
+                v-else-if="row.rbdError" 
+                :content="row.rbdError" 
+                placement="top"
+              >
+                <el-icon class="error-icon">
+                  <CircleClose />
+                </el-icon>
+              </el-tooltip>
             </div>
             <span v-else class="empty-text">-</span>
           </template>
@@ -230,11 +266,39 @@
         </el-descriptions-item>
         
         <el-descriptions-item label="RBD路径">
-          <code>{{ currentDisk.backend_specific?.block?.rbd_path || '-' }}</code>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <code>{{ currentDisk.rbdDetail?.rbd_path || '-' }}</code>
+            <el-icon v-if="currentDisk.rbdLoading" class="loading-icon">
+              <Loading />
+            </el-icon>
+            <el-tooltip 
+              v-else-if="currentDisk.rbdError" 
+              :content="currentDisk.rbdError" 
+              placement="top"
+            >
+              <el-icon class="error-icon">
+                <CircleClose />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </el-descriptions-item>
         
         <el-descriptions-item label="镜像路径">
-          <code>{{ currentDisk.backend_specific?.block?.parent || '-' }}</code>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <code>{{ currentDisk.rbdDetail?.parent || '-' }}</code>
+            <el-icon v-if="currentDisk.rbdLoading" class="loading-icon">
+              <Loading />
+            </el-icon>
+            <el-tooltip 
+              v-else-if="currentDisk.rbdError" 
+              :content="currentDisk.rbdError" 
+              placement="top"
+            >
+              <el-icon class="error-icon">
+                <CircleClose />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </el-descriptions-item>
         
         <el-descriptions-item label="网关节点">
@@ -252,10 +316,24 @@
         </el-descriptions-item>
         
         <el-descriptions-item label="大小">
-          <span v-if="currentDisk.backend_specific?.block?.size" class="size-text">
-            {{ currentDisk.backend_specific.block.size }} GB
-          </span>
-          <span v-else>-</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span v-if="currentDisk.rbdDetail?.size !== undefined" class="size-text">
+              {{ currentDisk.rbdDetail.size }} GB
+            </span>
+            <span v-else>-</span>
+            <el-icon v-if="currentDisk.rbdLoading" class="loading-icon">
+              <Loading />
+            </el-icon>
+            <el-tooltip 
+              v-else-if="currentDisk.rbdError" 
+              :content="currentDisk.rbdError" 
+              placement="top"
+            >
+              <el-icon class="error-icon">
+                <CircleClose />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </el-descriptions-item>
         
         <el-descriptions-item label="状态">
@@ -475,11 +553,14 @@ import {
   User,
   Hide,
   Search,
-  Delete
+  Delete,
+  Loading,
+  CircleClose
 } from '@element-plus/icons-vue'
 import { mv200Api } from '@/api/mv200'
 import { imagesApi } from '@/api/images'
-import type { ControllerInfo } from '@/types/api'
+import { rbdApi } from '@/api/common'
+import type { ControllerInfo, RbdDetailResponse } from '@/types/api'
 import type { Image } from '@/types/api'
 
 const route = useRoute()
@@ -487,9 +568,19 @@ const loading = ref(false)
 const batchDeleting = ref(false)
 const imagesLoading = ref(false)
 const creating = ref(false)
-const systemDisks = ref<ControllerInfo[]>([])
-const currentDisk = ref<ControllerInfo | null>(null)
-const selectedDisks = ref<ControllerInfo[]>([])
+// 使用扩展的ControllerInfo类型，添加RBD详情字段
+interface ControllerInfoWithRbd extends ControllerInfo {
+  rbdDetail?: {
+    rbd_path?: string | null;
+    parent?: string | null;
+    size?: number | null;
+  };
+  rbdLoading?: boolean;
+  rbdError?: string;
+}
+const systemDisks = ref<ControllerInfoWithRbd[]>([])
+const currentDisk = ref<ControllerInfoWithRbd | null>(null)
+const selectedDisks = ref<ControllerInfoWithRbd[]>([])
 const detailDialogVisible = ref(false)
 const createDialogVisible = ref(false)
 const showPassword = ref(false)
@@ -602,7 +693,7 @@ const createRules: FormRules = {
 }
 
 // 检查是否为cloudinit数据源
-const isCloudInitBdev = (disk: ControllerInfo): boolean => {
+const isCloudInitBdev = (disk: ControllerInfoWithRbd): boolean => {
   return disk.backend_specific?.block?.bdev === 'yunsilicon_cloudinit_bdev'
 }
 
@@ -612,7 +703,7 @@ const getRealDiskCount = computed(() => {
 })
 
 // 检查是否为最后一个真实磁盘
-const isLastRealDisk = (disk: ControllerInfo): boolean => {
+const isLastRealDisk = (disk: ControllerInfoWithRbd): boolean => {
   if (isCloudInitBdev(disk)) return false
   return getRealDiskCount.value === 1
 }
@@ -624,15 +715,142 @@ const getImageName = (fullPath: string): string => {
   return parts[parts.length - 1] || fullPath
 }
 
+// 检查是否需要进行RBD详情查询
+const shouldQueryRbdDetail = (disk: ControllerInfoWithRbd): boolean => {
+  const bdev = disk.backend_specific?.block?.bdev
+  const gws = disk.backend_specific?.block?.gws
+  
+  // 条件a: gws不为空
+  if (!gws || gws.length === 0) {
+    return false
+  }
+  
+  // 条件b: bdev通过_分割，恰好是4份
+  if (!bdev) return false
+  const parts = bdev.split('_')
+  return parts.length === 4
+}
+
+// 根据bdev构建RBD路径
+const buildRbdPathFromBdev = (bdev: string): string => {
+  const parts = bdev.split('_')
+  if (parts.length === 4) {
+    return `${parts[0]}/${parts[1]}`
+  }
+  return ''
+}
+
+// 异步查询RBD详情
+const fetchRbdDetail = async (disk: ControllerInfoWithRbd) => {
+  try {
+    const bdev = disk.backend_specific?.block?.bdev
+    const gws = disk.backend_specific?.block?.gws
+    
+    if (!bdev || !gws) {
+      return
+    }
+    
+    // 构建RBD路径
+    const rbdPath = buildRbdPathFromBdev(bdev)
+    if (!rbdPath) {
+      return
+    }
+    
+    // 设置加载状态
+    disk.rbdLoading = true
+    disk.rbdError = undefined
+    
+    const gwsParam = gws.join(',')
+    // 调用API查询RBD详情，但不阻塞
+    rbdApi.getRbdDetail(rbdPath, gwsParam)
+      .then((response: RbdDetailResponse[]) => {
+        // 处理响应数据
+        if (response && response.length > 0) {
+          disk.rbdDetail = {
+            rbd_path: rbdPath,
+            parent: response[0].parent,
+            size: response[0].size
+          }
+        }
+      })
+      .catch((error: any) => {
+        console.error('查询RBD详情失败:', error)
+        disk.rbdError = error.response?.data?.detail || error.message || '查询失败'
+      })
+      .finally(() => {
+        disk.rbdLoading = false
+      })
+    
+  } catch (error: any) {
+    console.error('启动RBD查询失败:', error)
+    disk.rbdLoading = false
+    disk.rbdError = '启动查询失败'
+  }
+}
+
+// 批量异步查询RBD详情
+const batchFetchRbdDetails = async () => {
+  const queryPromises = []
+  
+  for (const disk of systemDisks.value) {
+    if (shouldQueryRbdDetail(disk)) {
+      // 为每个符合条件的磁盘启动独立查询
+      queryPromises.push(
+        (async () => {
+          try {
+            // 设置加载状态
+            disk.rbdLoading = true
+            
+            const bdev = disk.backend_specific?.block?.bdev
+            const gws = disk.backend_specific?.block?.gws
+            const rbdPath = buildRbdPathFromBdev(bdev!)
+            
+            // 调用API查询RBD详情
+            const gwsParam = gws.join(',')
+            const response: RbdDetailResponse[] = await rbdApi.getRbdDetail(rbdPath, gwsParam!)
+            
+            // 处理响应数据
+            if (response && response.length > 0) {
+              // 使用Vue.set或直接赋值触发响应式更新
+              disk.rbdDetail = {
+                rbd_path: rbdPath,
+                parent: response[0].parent,
+                size: response[0].size
+              }
+            }
+          } catch (error: any) {
+            console.error('查询RBD详情失败:', error)
+            disk.rbdError = error.response?.data?.detail || error.message || '查询失败'
+          } finally {
+            disk.rbdLoading = false
+          }
+        })()
+      )
+    }
+  }
+  
+  // 并行执行所有查询，但不阻塞
+  if (queryPromises.length > 0) {
+    Promise.allSettled(queryPromises).then(results => {
+      const successCount = results.filter(r => r.status === 'fulfilled').length
+      const failedCount = results.filter(r => r.status === 'rejected').length
+      
+      if (failedCount > 0) {
+        console.warn(`RBD详情查询完成: ${successCount}个成功, ${failedCount}个失败`)
+      }
+    })
+  }
+}
+
 // 大小排序方法
-const sizeSortMethod = (a: ControllerInfo, b: ControllerInfo) => {
-  const sizeA = a.backend_specific?.block?.size || 0
-  const sizeB = b.backend_specific?.block?.size || 0
+const sizeSortMethod = (a: ControllerInfoWithRbd, b: ControllerInfoWithRbd) => {
+  const sizeA = a.rbdDetail?.size || 0
+  const sizeB = b.rbdDetail?.size || 0
   return sizeA - sizeB
 }
 
 // 处理选择变化
-const handleSelectionChange = (selection: ControllerInfo[]) => {
+const handleSelectionChange = (selection: ControllerInfoWithRbd[]) => {
   selectedDisks.value = selection
 }
 
@@ -670,7 +888,7 @@ const handleBatchDelete = async () => {
       // 准备请求数据
       const requestData = {
         uuid: disk.uuid,
-        rbd_path: disk.backend_specific?.block?.rbd_path || '',
+        rbd_path: disk.rbdDetail?.rbd_path || '',
         mon_hosts: disk.backend_specific?.block?.gws?.join(',') || '',
         bare_id: bareId,
         last_disk: isLast
@@ -700,7 +918,7 @@ const handleBatchDelete = async () => {
 }
 
 // 单个删除
-const handleDeleteDisk = async (disk: ControllerInfo) => {
+const handleDeleteDisk = async (disk: ControllerInfoWithRbd) => {
   try {
     // 检查是否为cloudinit数据源且不是最后一个真实磁盘
     if (isCloudInitBdev(disk) && !isLastRealDisk(disk)) {
@@ -728,7 +946,7 @@ const handleDeleteDisk = async (disk: ControllerInfo) => {
     // 准备请求数据
     const requestData = {
       uuid: disk.uuid,
-      rbd_path: disk.backend_specific?.block?.rbd_path || '',
+      rbd_path: disk.rbdDetail?.rbd_path || '',
       mon_hosts: disk.backend_specific?.block?.gws?.join(',') || '',
       bare_id: bareId,
       last_disk: isLast
@@ -756,22 +974,39 @@ const loadSystemDisks = async () => {
   try {
     console.log('正在加载MV200系统盘，ID:', mv200Info.value.id)
     const response = await mv200Api.getSystemDisks(mv200Info.value.id)
-    systemDisks.value = response
+    
+    // 立即显示列表（不等待RBD查询）
+    systemDisks.value = response.map(disk => ({
+      ...disk,
+      rbdDetail: undefined,  // 初始为空
+      rbdLoading: false,
+      rbdError: undefined
+    }))
     
     // 按UUID排序
     systemDisks.value.sort((a, b) => {
-      // 将UUID转换为字符串再进行比较
       const uuidA = String(a.uuid || '')
       const uuidB = String(b.uuid || '')
       return uuidA.localeCompare(uuidB)
     })
+    
     console.log('加载成功，共', systemDisks.value.length, '个系统盘')
     
+    // 重要：立即停止loading，显示列表
+    loading.value = false
+    
+    // 改为异步逐个查询，不等待结果
+    for (const disk of systemDisks.value) {
+      if (shouldQueryRbdDetail(disk)) {
+        // 立即启动查询，不等待结果
+        fetchRbdDetail(disk)
+      }
+    }
+    
   } catch (error: any) {
+    loading.value = false
     ElMessage.error('加载云系统盘失败: ' + (error.message || '未知错误'))
     console.error('加载云系统盘失败:', error)
-  } finally {
-    loading.value = false
   }
 }
 
@@ -799,7 +1034,7 @@ const filteredDisks = computed(() => {
   const keyword = searchKeyword.value.toLowerCase()
   return systemDisks.value.filter(disk => {
     // 搜索UUID
-    if (disk.uuid.toString().includes(keyword)) return true
+    if (disk.uuid.toString().toLowerCase().includes(keyword)) return true
     
     // 搜索网关节点
     if (disk.backend_specific?.block?.gws?.some(gw => 
@@ -807,13 +1042,13 @@ const filteredDisks = computed(() => {
     )) return true
     
     // 搜索镜像
-    if (disk.backend_specific?.block?.parent?.toLowerCase().includes(keyword)) return true
+    if (disk.rbdDetail?.parent?.toLowerCase().includes(keyword)) return true
     
     // 搜索块设备
     if (disk.backend_specific?.block?.bdev?.toLowerCase().includes(keyword)) return true
     
     // 搜索RBD路径
-    if (disk.backend_specific?.block?.rbd_path?.toLowerCase().includes(keyword)) return true
+    if (disk.rbdDetail?.rbd_path?.toLowerCase().includes(keyword)) return true
     
     return false
   })
@@ -959,7 +1194,7 @@ const handleCreateSystemDisk = async () => {
 }
 
 // 操作命令处理
-const handleCommand = (command: string, disk: ControllerInfo) => {
+const handleCommand = (command: string, disk: ControllerInfoWithRbd) => {
   switch (command) {
     case 'detail':
       showDiskDetail(disk)
@@ -971,8 +1206,14 @@ const handleCommand = (command: string, disk: ControllerInfo) => {
 }
 
 // 显示详细信息
-const showDiskDetail = (disk: ControllerInfo) => {
+const showDiskDetail = (disk: ControllerInfoWithRbd) => {
   currentDisk.value = disk
+  
+  // 如果需要但还没有查询RBD详情，则在打开详情时查询
+  if (shouldQueryRbdDetail(disk) && !disk.rbdDetail && !disk.rbdLoading) {
+    fetchRbdDetail(disk)
+  }
+  
   detailDialogVisible.value = true
 }
 
@@ -1085,6 +1326,8 @@ onMounted(() => {
   display: flex;
   justify-content: flex-start;
   text-align: left;
+  align-items: center;
+  gap: 4px;
 }
 
 .rbd-path {
@@ -1110,6 +1353,24 @@ onMounted(() => {
   color: #c0c4cc;
   font-style: italic;
   text-align: left;
+}
+
+/* 加载和错误图标样式 */
+.loading-icon {
+  color: #e6a23c;
+  animation: spin 1s linear infinite;
+  margin-left: 4px;
+}
+
+.error-icon {
+  color: #f56c6c;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* 空状态样式 */

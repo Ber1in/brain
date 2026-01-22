@@ -494,6 +494,11 @@ export interface InstallDetailResponse {
   description?: string
 }
 
+export interface RbdDetailResponse {
+  parent?: string | null;
+  size?: number | null;
+}
+
 export interface XscnetInfo {
   uuid: number
   mtu: number
