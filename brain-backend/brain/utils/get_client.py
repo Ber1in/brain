@@ -43,7 +43,7 @@ def get_cephclient(mon_host, username="admin", password="yunsilicon"):
     token_api = cephauth.AuthApi(api_client=apiclient)
     try:
         res = token_api.api_auth_post(
-            auth_request={"username": username, "password": password}, _request_timeout=5)
+            auth_request={"username": username, "password": password}, _request_timeout=2)
         apiclient.configuration.access_token = res.token
     except Exception as e:
         LOG.error(f"Failed to log in to the Ceph cluster, error: {e}")
