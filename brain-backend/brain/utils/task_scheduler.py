@@ -147,10 +147,6 @@ class GenericTaskScheduler:
         except Exception as e:
             LOG.error(f"Error executing task '{task_id}': {str(e)}")
             raise
-        finally:
-            # Clean up completed tasks
-            if task_id in self.tasks:
-                del self.tasks[task_id]
 
     def task_exists(self, task_id: str) -> bool:
         """Check whether a task exists"""
