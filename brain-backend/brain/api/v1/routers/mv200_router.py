@@ -866,15 +866,16 @@ async def create_interface(server_id: str, data: mv200_schemas.InterfaceCreate):
     dpuagentclient = get_dpuagentclient(server["ip_address"])
     xscapi = dpuagentApi.XscnetApi(dpuagentclient)
     try:
-        res = xscapi.create_xscnet_dpu_agent_v1_xscnet_add_post(
-            {
-                "pxe": data.pxe,
-                "vq_count": data.vq_count,
-                "vq_size": data.vq_size,
-                "mac": iface_data["mac"],
-                "mtu": data.mtu,
-            }
-        )
+        params = {
+            "pxe": data.pxe,
+            "vq_count": data.vq_count,
+            "vq_size": data.vq_size,
+            "mac": iface_data["mac"],
+            "mtu": data.mtu,
+        }
+        if data.uuid is not None:
+            params["uuid"] = data.uuid
+        res = xscapi.create_xscnet_dpu_agent_v1_xscnet_add_post(params)
         if res.code != 0:
             LOG.error(
                 f"Failed to create XSC network for interface "
