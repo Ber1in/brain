@@ -460,8 +460,43 @@
               <div class="timeline">
                 <div class="timeline-item">
                   <div class="timeline-date">
+                    <span class="date">2026-01-23</span>
+                    <el-tag type="success" size="small">v2.0.6</el-tag>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="update-card">
+                      <div class="update-type">
+                        <el-tag type="success" size="small">新增功能</el-tag>
+                      </div>
+                      <ul>
+                        <li>支持查询服务器系统版本、内核版本、架构信息</li>
+                        <li>支持批量同时为多台服务器更新mcr包</li>
+                        <li>质量保证平台选择服务器执行用例时，允许配置节点角色</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="warning" size="small">功能优化</el-tag>
+                      </div>
+                      <ul>
+                        <li>创建xsc网口页面配合AIDPU接口修改，且xsc网口管理修改为mv200管理的子页面</li>
+                        <li>云系统盘管理页面修改为mv200管理的子页面</li>
+                        <li>质量保证平台mv200 product name不再固定为MV200-XX，优化判断逻辑，正确生成测试yaml env</li>
+                      </ul>
+                      <div class="update-type">
+                        <el-tag type="info" size="small">问题修复</el-tag>
+                      </div>
+                      <ul>
+                        <li>修复占用及飞书提醒消息丢失的问题</li>
+                        <li>修复服务器管理页面无法跨页多选的问题</li>
+                        <li>修复服务器管理页面标签筛选功能，仅显示当前页面标签的问题</li>
+                        <li>修复续约功能失效，续约后依旧会被旧占用记录到期释放的问题</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-date">
                     <span class="date">2026-01-09</span>
-                    <el-tag type="success" size="small">v2.0.5</el-tag>
+                    <el-tag type="primary" size="small">v2.0.5</el-tag>
                   </div>
                   <div class="timeline-content">
                     <div class="update-card">
