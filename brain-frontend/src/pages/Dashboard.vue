@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard">
     <el-row :gutter="20">
-      <el-col :span="4">
+      <el-col :span="6">
         <el-card class="stat-card" @click="goToPage('images')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #409eff">
@@ -14,7 +14,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="6">
         <el-card class="stat-card" @click="goToPage('mv200')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #67c23a">
@@ -27,7 +27,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="6">
         <el-card class="stat-card" @click="goToPage('devices')" style="cursor: pointer;">
           <div class="stat-content">
             <div class="stat-icon" style="background: #67c23a">
@@ -40,48 +40,9 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
-        <el-card class="stat-card" @click="goToPage('blocks')" style="cursor: pointer;">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #e6a23c">
-              <el-icon><DataBoard /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ diskCount }}</div>
-              <div class="stat-label">云系统盘数量</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="4">
-        <el-card class="stat-card" @click="goToPage('xsc-interface')" style="cursor: pointer;">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #f56c6c">
-              <el-icon><Connection /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ xscInterfaceCount }}</div>
-              <div class="stat-label">XSC网口数量</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
     </el-row>
 
     <el-row :gutter="20" style="margin-top: 20px">
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>最近创建的系统磁盘</span>
-          </template>
-          <el-table :data="recentDisks" v-loading="loading">
-            <el-table-column label="ID" prop="id" width="200" />
-            <el-table-column label="镜像" :formatter="getImageName" />
-            <el-table-column label="MV200" :formatter="getMV200Name" />
-            <el-table-column label="大小(GB)" prop="size_gb" width="100" />
-          </el-table>
-        </el-card>
-      </el-col>
       <el-col :span="12">
         <el-card>
           <template #header>
@@ -112,7 +73,6 @@ import { imagesApi } from '@/api/images'
 import { mv200Api } from '@/api/mv200'
 import { deviceApi } from '@/api/device'
 import { useRouter } from 'vue-router'
-import { systemDisksApi } from '@/api/system-disks'
 import { networkApi } from '@/api/network'
 import type { Image, MVServer, SystemDisk, InterfaceInfo, ServerDetailResponse } from '@/types/api'
 
@@ -121,16 +81,11 @@ const loading = ref(false)
 const images = ref<Image[]>([])
 const mv200Servers = ref<MVServer[]>([])
 const devices = ref<ServerDetailResponse[]>([])
-const disks = ref<SystemDisk[]>([])
-const xscInterfaces = ref<InterfaceInfo[]>([])
 const loadError = ref(false)
 
 const imageCount = computed(() => images.value.length)
 const mv200Count = computed(() => mv200Servers.value.length)
 const deviceCount = computed(() => devices.value.length)
-const diskCount = computed(() => disks.value.length)
-const xscInterfaceCount = computed(() => xscInterfaces.value.length)
-const recentDisks = computed(() => disks.value.slice(0, 5))
 
 // API服务状态计算属性
 const apiStatusType = computed(() => {
@@ -162,9 +117,6 @@ const goToPage = (pageType: string) => {
     case 'devices':
       router.push('/devices')
       break
-    case 'blocks':
-      router.push('/system-disks')
-      break
     case 'xsc-interface':
       router.push('/xsc-interface')
       break
@@ -177,28 +129,22 @@ const loadData = async () => {
   loading.value = true
   loadError.value = false
   try {
-    const [imagesResponse, serversResponse, disksResponse, devicesResponse, interfacesResponse] = await Promise.all([
+    const [imagesResponse, serversResponse, devicesResponse] = await Promise.all([
       imagesApi.getAll(),
       mv200Api.getAll(),
-      systemDisksApi.getAll(),
       deviceApi.getAll(),
-      mv200Api.getAllXsc(),
     ])
 
     images.value = imagesResponse
     mv200Servers.value = serversResponse
-    disks.value = disksResponse
     devices.value = devicesResponse
-    xscInterfaces.value = interfacesResponse
   } catch (error) {
     console.error('加载数据失败:', error)
     loadError.value = true
     // 清空数据，避免显示旧数据
     images.value = []
     mv200Servers.value = []
-    disks.value = []
     devices.value = []
-    xscInterfaces.value = []
   } finally {
     loading.value = false
   }
