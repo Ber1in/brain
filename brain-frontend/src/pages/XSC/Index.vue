@@ -147,7 +147,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" fixed="right">
           <template #default="{ row }">
             <el-dropdown 
               @command="(command) => handleCommand(command, row)" 

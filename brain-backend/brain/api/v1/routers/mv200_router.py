@@ -817,8 +817,8 @@ async def get_interface(server_id: str, uuid: Optional[int] = Query(None, ge=1, 
     for nic in nics_info:
         if not nic.mac or not nic.ip_addr:
             continue
-        if nic.ip_addr == "0.0.0.0":
-            continue
+        # if nic.ip_addr == "0.0.0.0":
+        #     continue
 
         mac = nic.mac.lower().replace("-", ":")
         ip = nic.ip_addr.strip()
@@ -826,11 +826,11 @@ async def get_interface(server_id: str, uuid: Optional[int] = Query(None, ge=1, 
         nic_index[(mac, ip)] = nic.ifname
 
     for xsc in xscs:
-        if not xsc.get("mac") or not xsc.get("ip"):
+        if not xsc.get("mac"):
             continue
 
         xsc_mac = xsc["mac"].lower()
-        xsc_ip = xsc["ip"].split("/", 1)[0]
+        xsc_ip = xsc.get("ip", "0.0.0.0").split("/", 1)[0]
 
         ifname = nic_index.get((xsc_mac, xsc_ip))
         if ifname:
