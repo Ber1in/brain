@@ -1004,17 +1004,25 @@ const handleFollow = async () => {
     
     const focus = !isFollowing.value // true 表示关注，false 表示取消关注
     if (focus) {
-      // 关注成功
+      // 关注
       await deviceApi.followServer(deviceId.value)
       ElMessage.success(`关注成功，将会接收到该服务器的占用释放提醒邮件`)
+      // 直接更新本地状态
+      if (!deviceData.value.recipients) {
+        deviceData.value.recipients = []
+      }
+      deviceData.value.recipients.push(currentUser.value)
     } else {
-      // 取消关注成功
+      // 取消关注
       await deviceApi.unfollowServer(deviceId.value)
       ElMessage.success('取消关注，不再接收该服务器的占用释放提醒邮件')
+      // 直接更新本地状态
+      if (deviceData.value.recipients) {
+        deviceData.value.recipients = deviceData.value.recipients.filter(
+          user => user !== currentUser.value
+        )
+      }
     }
-    
-    // 重新加载数据以更新关注状态
-    await loadDeviceDetail()
     
   } catch (error: any) {
     const action = isFollowing.value ? '取消关注' : '关注'
