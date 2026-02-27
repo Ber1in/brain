@@ -622,33 +622,35 @@ async def ipmi_power_action(bmcip: str, action: str, host: str, user: str, pwd: 
 
     local_error = None
 
-    try:
-        # lanplus
-        cmd = ["ipmitool", "-I", "lanplus", "-H", bmcip,
-               "-U", BMC_USER, "-P", BMC_PASS,
-               "chassis", "power", action]
-        LOG.info(f"[LOCAL] Trying lanplus for {bmcip}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-
-        if result.returncode != 0:
-            LOG.error(f"[LOCAL] lanplus failed on {bmcip}: {result.stderr.strip()}")
-
-            # lan fallback
-            cmd = ["ipmitool", "-I", "lan", "-H", bmcip,
-                   "-U", BMC_USER, "-P", BMC_PASS,
-                   "chassis", "power", action]
-            LOG.info(f"[LOCAL] Retrying with lan for {bmcip}")
+    if bmcip:
+        try:
+            # lanplus
+            cmd = ["ipmitool", "-I", "lanplus", "-H", bmcip,
+                "-U", BMC_USER, "-P", BMC_PASS,
+                "chassis", "power", action]
+            LOG.info(f"[LOCAL] Trying lanplus for {bmcip}")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
-        if result.returncode == 0:
-            LOG.info(f"[LOCAL] IPMI {action} succeeded on {bmcip}")
-            return
-        else:
-            local_error = result.stderr.strip()
+            if result.returncode != 0:
+                LOG.error(f"[LOCAL] lanplus failed on {bmcip}: \n{result.stderr.strip()}")
 
-    except Exception as e:
-        local_error = str(e)
-        LOG.error(f"[LOCAL] IPMI {action} crashed on {bmcip}: {local_error}")
+                # lan fallback
+                cmd = ["ipmitool", "-I", "lan", "-H", bmcip,
+                    "-U", BMC_USER, "-P", BMC_PASS,
+                    "chassis", "power", action]
+                LOG.info(f"[LOCAL] Retrying with lan for {bmcip}")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+            if result.returncode == 0:
+                LOG.info(f"[LOCAL] IPMI {action} succeeded on {bmcip}")
+                return
+            else:
+                local_error = result.stderr.strip()
+                LOG.error(f"[LOCAL] lan failed on {bmcip}: \n{local_error}")
+
+        except Exception as e:
+            local_error = str(e)
+            LOG.error(f"[LOCAL] IPMI {action} crashed on {bmcip}: {local_error}")
 
     try:
         LOG.info(f"[SSH] Trying SSH fallback for IPMI {action} on {host}")
