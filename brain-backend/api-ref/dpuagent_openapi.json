@@ -356,6 +356,189 @@
                 ]
             }
         },
+        "/dpu_agent/v1/xscpolicing/{uuid}": {
+            "get": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Get Policing",
+                "description": "Retrieve the BPS and PPS policing configuration for the specified xscnet UUID.\n\nParameters:\n- uuid (int): The xscnet interface UUID, must be between 0 and 63.\n\nReturns:\n- dict: Policing configuration including bps_rate, bps_burst, pps_rate, pps_burst,\n        along with a code indicating success or failure and a message.",
+                "operationId": "get_policing_dpu_agent_v1_xscpolicing__uuid__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Internal-Auth",
+                            "type": "string"
+                        },
+                        "name": "x-internal-auth",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PolicingResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Set Policing",
+                "description": "Configures both BPS (Bits Per Second) and PPS (Packets Per Second) policing for a specified\nxscnet UUID.\n\nThis endpoint creates traffic policing profiles with associated meters for both bandwidth (BPS)\nand packet rate (PPS) control on the specified network interface.\n\nArgs:\n- `data`: PolicingRequest model containing rate and burst parameters for both BPS and PPS.\n- `uuid`: Target device UUID (0-63) where policing will be applied. \n\nReturns:\n- code 0 on success, or error code from underlying command if failure occurs",
+                "operationId": "set_policing_dpu_agent_v1_xscpolicing__uuid__post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Internal-Auth",
+                            "type": "string"
+                        },
+                        "name": "x-internal-auth",
+                        "in": "header"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PolicingRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "xscnet"
+                ],
+                "summary": "Unset Policing",
+                "description": "Remove all policing configurations (BPS and PPS) for a given xscnet interface.\n\nThis includes:\n- Deleting all meters (RX and TX, BPS and PPS)\n- Deleting all associated profiles\n\nParameters:\n- uuid: xscnet UUID (must be in use)\n\nReturns:\n- code 0 on success, or error code from underlying command if failure occurs",
+                "operationId": "unset_policing_dpu_agent_v1_xscpolicing__uuid__delete",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Uuid",
+                            "maximum": 63,
+                            "minimum": 0,
+                            "type": "integer"
+                        },
+                        "name": "uuid",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Internal-Auth",
+                            "type": "string"
+                        },
+                        "name": "x-internal-auth",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseResponseBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
         "/dpu_agent/v1/vblk/add": {
             "post": {
                 "tags": [
@@ -2677,6 +2860,78 @@
                 },
                 "additionalProperties": false
             },
+            "PolicingRequest": {
+                "title": "PolicingRequest",
+                "required": [
+                    "bps_rate",
+                    "pps_rate"
+                ],
+                "type": "object",
+                "properties": {
+                    "bps_rate": {
+                        "title": "Bps Rate",
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 100000
+                    },
+                    "bps_burst": {
+                        "title": "Bps Burst",
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 625
+                    },
+                    "pps_rate": {
+                        "title": "Pps Rate",
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 80000
+                    },
+                    "pps_burst": {
+                        "title": "Pps Burst",
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 10000
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PolicingResponse": {
+                "title": "PolicingResponse",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "title": "Code",
+                        "type": "integer",
+                        "description": "return code of the API execution result"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string",
+                        "description": "Detailed execution results"
+                    },
+                    "bps_rate": {
+                        "title": "Bps Rate",
+                        "type": "integer"
+                    },
+                    "bps_burst": {
+                        "title": "Bps Burst",
+                        "type": "integer"
+                    },
+                    "pps_rate": {
+                        "title": "Pps Rate",
+                        "type": "integer"
+                    },
+                    "pps_burst": {
+                        "title": "Pps Burst",
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
             "QoSRequest": {
                 "title": "QoSRequest",
                 "required": [
@@ -3519,6 +3774,10 @@
                     "uuid": {
                         "title": "Uuid",
                         "type": "integer"
+                    },
+                    "mac": {
+                        "title": "Mac",
+                        "type": "string"
                     }
                 },
                 "additionalProperties": false

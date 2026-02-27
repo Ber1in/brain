@@ -21,17 +21,17 @@ import json
 
 
 from typing import Optional
-from pydantic import BaseModel, Field, StrictInt, StrictStr
+from pydantic import BaseModel, Field, conint
 
-class DpuagentApiV1SchemasXscnetSchemasCreateResponseBody(BaseModel):
+class PolicingRequest(BaseModel):
     """
-    DpuagentApiV1SchemasXscnetSchemasCreateResponseBody
+    PolicingRequest
     """
-    code: StrictInt = Field(..., description="return code of the API execution result")
-    message: StrictStr = Field(..., description="Detailed execution results")
-    uuid: Optional[StrictInt] = None
-    mac: Optional[StrictStr] = None
-    __properties = ["code", "message", "uuid", "mac"]
+    bps_rate: conint(strict=True, ge=1) = Field(...)
+    bps_burst: Optional[conint(strict=True, ge=1)] = None
+    pps_rate: conint(strict=True, ge=1) = Field(...)
+    pps_burst: Optional[conint(strict=True, ge=1)] = None
+    __properties = ["bps_rate", "bps_burst", "pps_rate", "pps_burst"]
 
     class Config:
         """Pydantic configuration"""
@@ -47,8 +47,8 @@ class DpuagentApiV1SchemasXscnetSchemasCreateResponseBody(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> DpuagentApiV1SchemasXscnetSchemasCreateResponseBody:
-        """Create an instance of DpuagentApiV1SchemasXscnetSchemasCreateResponseBody from a JSON string"""
+    def from_json(cls, json_str: str) -> PolicingRequest:
+        """Create an instance of PolicingRequest from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self):
@@ -60,19 +60,19 @@ class DpuagentApiV1SchemasXscnetSchemasCreateResponseBody(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: dict) -> DpuagentApiV1SchemasXscnetSchemasCreateResponseBody:
-        """Create an instance of DpuagentApiV1SchemasXscnetSchemasCreateResponseBody from a dict"""
+    def from_dict(cls, obj: dict) -> PolicingRequest:
+        """Create an instance of PolicingRequest from a dict"""
         if obj is None:
             return None
 
         if not isinstance(obj, dict):
-            return DpuagentApiV1SchemasXscnetSchemasCreateResponseBody.parse_obj(obj)
+            return PolicingRequest.parse_obj(obj)
 
-        _obj = DpuagentApiV1SchemasXscnetSchemasCreateResponseBody.parse_obj({
-            "code": obj.get("code"),
-            "message": obj.get("message"),
-            "uuid": obj.get("uuid"),
-            "mac": obj.get("mac")
+        _obj = PolicingRequest.parse_obj({
+            "bps_rate": obj.get("bps_rate"),
+            "bps_burst": obj.get("bps_burst"),
+            "pps_rate": obj.get("pps_rate"),
+            "pps_burst": obj.get("pps_burst")
         })
         return _obj
 

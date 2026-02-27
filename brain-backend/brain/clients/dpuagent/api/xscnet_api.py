@@ -28,6 +28,8 @@ from brain.clients.dpuagent.models.base_response_body import BaseResponseBody
 from brain.clients.dpuagent.models.dpuagent_api_v1_schemas_xscnet_schemas_create_request import DpuagentApiV1SchemasXscnetSchemasCreateRequest
 from brain.clients.dpuagent.models.dpuagent_api_v1_schemas_xscnet_schemas_create_response_body import DpuagentApiV1SchemasXscnetSchemasCreateResponseBody
 from brain.clients.dpuagent.models.dpuagent_api_v1_schemas_xscnet_schemas_delete_request import DpuagentApiV1SchemasXscnetSchemasDeleteRequest
+from brain.clients.dpuagent.models.policing_request import PolicingRequest
+from brain.clients.dpuagent.models.policing_response import PolicingResponse
 from brain.clients.dpuagent.models.qo_s_request import QoSRequest
 from brain.clients.dpuagent.models.qos_response import QosResponse
 from brain.clients.dpuagent.models.xscnet_list_response import XscnetListResponse
@@ -361,6 +363,155 @@ class XscnetApi:
             _request_auth=_params.get('_request_auth'))
 
     @validate_arguments
+    def get_policing_dpu_agent_v1_xscpolicing_uuid_get(self, uuid : conint(strict=True, le=63, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> PolicingResponse:  # noqa: E501
+        """Get Policing  # noqa: E501
+
+        Retrieve the BPS and PPS policing configuration for the specified xscnet UUID.  Parameters: - uuid (int): The xscnet interface UUID, must be between 0 and 63.  Returns: - dict: Policing configuration including bps_rate, bps_burst, pps_rate, pps_burst,         along with a code indicating success or failure and a message.  # noqa: E501
+        This method makes a synchronous HTTP request by default. To make an
+        asynchronous HTTP request, please pass async_req=True
+
+        >>> thread = api.get_policing_dpu_agent_v1_xscpolicing_uuid_get(uuid, x_internal_auth, async_req=True)
+        >>> result = thread.get()
+
+        :param uuid: (required)
+        :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
+        :param async_req: Whether to execute the request asynchronously.
+        :type async_req: bool, optional
+        :param _request_timeout: timeout setting for this request.
+               If one number provided, it will be total request
+               timeout. It can also be a pair (tuple) of
+               (connection, read) timeouts.
+        :return: Returns the result object.
+                 If the method is called asynchronously,
+                 returns the request thread.
+        :rtype: PolicingResponse
+        """
+        kwargs['_return_http_data_only'] = True
+        if '_preload_content' in kwargs:
+            message = "Error! Please call the get_policing_dpu_agent_v1_xscpolicing_uuid_get_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
+            raise ValueError(message)
+        return self.get_policing_dpu_agent_v1_xscpolicing_uuid_get_with_http_info(uuid, x_internal_auth, **kwargs)  # noqa: E501
+
+    @validate_arguments
+    def get_policing_dpu_agent_v1_xscpolicing_uuid_get_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
+        """Get Policing  # noqa: E501
+
+        Retrieve the BPS and PPS policing configuration for the specified xscnet UUID.  Parameters: - uuid (int): The xscnet interface UUID, must be between 0 and 63.  Returns: - dict: Policing configuration including bps_rate, bps_burst, pps_rate, pps_burst,         along with a code indicating success or failure and a message.  # noqa: E501
+        This method makes a synchronous HTTP request by default. To make an
+        asynchronous HTTP request, please pass async_req=True
+
+        >>> thread = api.get_policing_dpu_agent_v1_xscpolicing_uuid_get_with_http_info(uuid, x_internal_auth, async_req=True)
+        >>> result = thread.get()
+
+        :param uuid: (required)
+        :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
+        :param async_req: Whether to execute the request asynchronously.
+        :type async_req: bool, optional
+        :param _preload_content: if False, the ApiResponse.data will
+                                 be set to none and raw_data will store the
+                                 HTTP response body without reading/decoding.
+                                 Default is True.
+        :type _preload_content: bool, optional
+        :param _return_http_data_only: response data instead of ApiResponse
+                                       object with status code, headers, etc
+        :type _return_http_data_only: bool, optional
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the authentication
+                              in the spec for a single request.
+        :type _request_auth: dict, optional
+        :type _content_type: string, optional: force content-type for the request
+        :return: Returns the result object.
+                 If the method is called asynchronously,
+                 returns the request thread.
+        :rtype: tuple(PolicingResponse, status_code(int), headers(HTTPHeaderDict))
+        """
+
+        _params = locals()
+
+        _all_params = [
+            'uuid',
+            'x_internal_auth'
+        ]
+        _all_params.extend(
+            [
+                'async_req',
+                '_return_http_data_only',
+                '_preload_content',
+                '_request_timeout',
+                '_request_auth',
+                '_content_type',
+                '_headers'
+            ]
+        )
+
+        # validate the arguments
+        for _key, _val in _params['kwargs'].items():
+            if _key not in _all_params:
+                raise ApiTypeError(
+                    "Got an unexpected keyword argument '%s'"
+                    " to method get_policing_dpu_agent_v1_xscpolicing_uuid_get" % _key
+                )
+            _params[_key] = _val
+        del _params['kwargs']
+
+        _collection_formats = {}
+
+        # process the path parameters
+        _path_params = {}
+        if _params['uuid']:
+            _path_params['uuid'] = _params['uuid']
+
+
+        # process the query parameters
+        _query_params = []
+        # process the header parameters
+        _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
+        # process the form parameters
+        _form_params = []
+        _files = {}
+        # process the body parameter
+        _body_params = None
+        # set the HTTP header `Accept`
+        _header_params['Accept'] = self.api_client.select_header_accept(
+            ['application/json'])  # noqa: E501
+
+        # authentication setting
+        _auth_settings = ['OAuth2PasswordBearer']  # noqa: E501
+
+        _response_types_map = {
+            '200': "PolicingResponse",
+            '422': "HTTPValidationError",
+        }
+
+        return self.api_client.call_api(
+            '/dpu_agent/v1/xscpolicing/{uuid}', 'GET',
+            _path_params,
+            _query_params,
+            _header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            response_types_map=_response_types_map,
+            auth_settings=_auth_settings,
+            async_req=_params.get('async_req'),
+            _return_http_data_only=_params.get('_return_http_data_only'),  # noqa: E501
+            _preload_content=_params.get('_preload_content', True),
+            _request_timeout=_params.get('_request_timeout'),
+            collection_formats=_collection_formats,
+            _request_auth=_params.get('_request_auth'))
+
+    @validate_arguments
     def list_xsc_controllers_dpu_agent_v1_xscnet_list_get(self, uuid : Optional[conint(strict=True, le=63, ge=0)] = None, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> XscnetListResponse:  # noqa: E501
         """List Xsc Controllers  # noqa: E501
 
@@ -494,6 +645,170 @@ class XscnetApi:
 
         return self.api_client.call_api(
             '/dpu_agent/v1/xscnet/list', 'GET',
+            _path_params,
+            _query_params,
+            _header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            response_types_map=_response_types_map,
+            auth_settings=_auth_settings,
+            async_req=_params.get('async_req'),
+            _return_http_data_only=_params.get('_return_http_data_only'),  # noqa: E501
+            _preload_content=_params.get('_preload_content', True),
+            _request_timeout=_params.get('_request_timeout'),
+            collection_formats=_collection_formats,
+            _request_auth=_params.get('_request_auth'))
+
+    @validate_arguments
+    def set_policing_dpu_agent_v1_xscpolicing_uuid_post(self, uuid : conint(strict=True, le=63, ge=0), policing_request : PolicingRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
+        """Set Policing  # noqa: E501
+
+        Configures both BPS (Bits Per Second) and PPS (Packets Per Second) policing for a specified xscnet UUID.  This endpoint creates traffic policing profiles with associated meters for both bandwidth (BPS) and packet rate (PPS) control on the specified network interface.  Args: - `data`: PolicingRequest model containing rate and burst parameters for both BPS and PPS. - `uuid`: Target device UUID (0-63) where policing will be applied.   Returns: - code 0 on success, or error code from underlying command if failure occurs  # noqa: E501
+        This method makes a synchronous HTTP request by default. To make an
+        asynchronous HTTP request, please pass async_req=True
+
+        >>> thread = api.set_policing_dpu_agent_v1_xscpolicing_uuid_post(uuid, policing_request, x_internal_auth, async_req=True)
+        >>> result = thread.get()
+
+        :param uuid: (required)
+        :type uuid: int
+        :param policing_request: (required)
+        :type policing_request: PolicingRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
+        :param async_req: Whether to execute the request asynchronously.
+        :type async_req: bool, optional
+        :param _request_timeout: timeout setting for this request.
+               If one number provided, it will be total request
+               timeout. It can also be a pair (tuple) of
+               (connection, read) timeouts.
+        :return: Returns the result object.
+                 If the method is called asynchronously,
+                 returns the request thread.
+        :rtype: BaseResponseBody
+        """
+        kwargs['_return_http_data_only'] = True
+        if '_preload_content' in kwargs:
+            message = "Error! Please call the set_policing_dpu_agent_v1_xscpolicing_uuid_post_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
+            raise ValueError(message)
+        return self.set_policing_dpu_agent_v1_xscpolicing_uuid_post_with_http_info(uuid, policing_request, x_internal_auth, **kwargs)  # noqa: E501
+
+    @validate_arguments
+    def set_policing_dpu_agent_v1_xscpolicing_uuid_post_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), policing_request : PolicingRequest, x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
+        """Set Policing  # noqa: E501
+
+        Configures both BPS (Bits Per Second) and PPS (Packets Per Second) policing for a specified xscnet UUID.  This endpoint creates traffic policing profiles with associated meters for both bandwidth (BPS) and packet rate (PPS) control on the specified network interface.  Args: - `data`: PolicingRequest model containing rate and burst parameters for both BPS and PPS. - `uuid`: Target device UUID (0-63) where policing will be applied.   Returns: - code 0 on success, or error code from underlying command if failure occurs  # noqa: E501
+        This method makes a synchronous HTTP request by default. To make an
+        asynchronous HTTP request, please pass async_req=True
+
+        >>> thread = api.set_policing_dpu_agent_v1_xscpolicing_uuid_post_with_http_info(uuid, policing_request, x_internal_auth, async_req=True)
+        >>> result = thread.get()
+
+        :param uuid: (required)
+        :type uuid: int
+        :param policing_request: (required)
+        :type policing_request: PolicingRequest
+        :param x_internal_auth:
+        :type x_internal_auth: str
+        :param async_req: Whether to execute the request asynchronously.
+        :type async_req: bool, optional
+        :param _preload_content: if False, the ApiResponse.data will
+                                 be set to none and raw_data will store the
+                                 HTTP response body without reading/decoding.
+                                 Default is True.
+        :type _preload_content: bool, optional
+        :param _return_http_data_only: response data instead of ApiResponse
+                                       object with status code, headers, etc
+        :type _return_http_data_only: bool, optional
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the authentication
+                              in the spec for a single request.
+        :type _request_auth: dict, optional
+        :type _content_type: string, optional: force content-type for the request
+        :return: Returns the result object.
+                 If the method is called asynchronously,
+                 returns the request thread.
+        :rtype: tuple(BaseResponseBody, status_code(int), headers(HTTPHeaderDict))
+        """
+
+        _params = locals()
+
+        _all_params = [
+            'uuid',
+            'policing_request',
+            'x_internal_auth'
+        ]
+        _all_params.extend(
+            [
+                'async_req',
+                '_return_http_data_only',
+                '_preload_content',
+                '_request_timeout',
+                '_request_auth',
+                '_content_type',
+                '_headers'
+            ]
+        )
+
+        # validate the arguments
+        for _key, _val in _params['kwargs'].items():
+            if _key not in _all_params:
+                raise ApiTypeError(
+                    "Got an unexpected keyword argument '%s'"
+                    " to method set_policing_dpu_agent_v1_xscpolicing_uuid_post" % _key
+                )
+            _params[_key] = _val
+        del _params['kwargs']
+
+        _collection_formats = {}
+
+        # process the path parameters
+        _path_params = {}
+        if _params['uuid']:
+            _path_params['uuid'] = _params['uuid']
+
+
+        # process the query parameters
+        _query_params = []
+        # process the header parameters
+        _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
+        # process the form parameters
+        _form_params = []
+        _files = {}
+        # process the body parameter
+        _body_params = None
+        if _params['policing_request'] is not None:
+            _body_params = _params['policing_request']
+
+        # set the HTTP header `Accept`
+        _header_params['Accept'] = self.api_client.select_header_accept(
+            ['application/json'])  # noqa: E501
+
+        # set the HTTP header `Content-Type`
+        _content_types_list = _params.get('_content_type',
+            self.api_client.select_header_content_type(
+                ['application/json']))
+        if _content_types_list:
+                _header_params['Content-Type'] = _content_types_list
+
+        # authentication setting
+        _auth_settings = ['OAuth2PasswordBearer']  # noqa: E501
+
+        _response_types_map = {
+            '200': "BaseResponseBody",
+            '422': "HTTPValidationError",
+        }
+
+        return self.api_client.call_api(
+            '/dpu_agent/v1/xscpolicing/{uuid}', 'POST',
             _path_params,
             _query_params,
             _header_params,
@@ -815,6 +1130,155 @@ class XscnetApi:
 
         return self.api_client.call_api(
             '/dpu_agent/v1/xscqos/{uuid}', 'GET',
+            _path_params,
+            _query_params,
+            _header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            response_types_map=_response_types_map,
+            auth_settings=_auth_settings,
+            async_req=_params.get('async_req'),
+            _return_http_data_only=_params.get('_return_http_data_only'),  # noqa: E501
+            _preload_content=_params.get('_preload_content', True),
+            _request_timeout=_params.get('_request_timeout'),
+            collection_formats=_collection_formats,
+            _request_auth=_params.get('_request_auth'))
+
+    @validate_arguments
+    def unset_policing_dpu_agent_v1_xscpolicing_uuid_delete(self, uuid : conint(strict=True, le=63, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> BaseResponseBody:  # noqa: E501
+        """Unset Policing  # noqa: E501
+
+        Remove all policing configurations (BPS and PPS) for a given xscnet interface.  This includes: - Deleting all meters (RX and TX, BPS and PPS) - Deleting all associated profiles  Parameters: - uuid: xscnet UUID (must be in use)  Returns: - code 0 on success, or error code from underlying command if failure occurs  # noqa: E501
+        This method makes a synchronous HTTP request by default. To make an
+        asynchronous HTTP request, please pass async_req=True
+
+        >>> thread = api.unset_policing_dpu_agent_v1_xscpolicing_uuid_delete(uuid, x_internal_auth, async_req=True)
+        >>> result = thread.get()
+
+        :param uuid: (required)
+        :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
+        :param async_req: Whether to execute the request asynchronously.
+        :type async_req: bool, optional
+        :param _request_timeout: timeout setting for this request.
+               If one number provided, it will be total request
+               timeout. It can also be a pair (tuple) of
+               (connection, read) timeouts.
+        :return: Returns the result object.
+                 If the method is called asynchronously,
+                 returns the request thread.
+        :rtype: BaseResponseBody
+        """
+        kwargs['_return_http_data_only'] = True
+        if '_preload_content' in kwargs:
+            message = "Error! Please call the unset_policing_dpu_agent_v1_xscpolicing_uuid_delete_with_http_info method with `_preload_content` instead and obtain raw data from ApiResponse.raw_data"  # noqa: E501
+            raise ValueError(message)
+        return self.unset_policing_dpu_agent_v1_xscpolicing_uuid_delete_with_http_info(uuid, x_internal_auth, **kwargs)  # noqa: E501
+
+    @validate_arguments
+    def unset_policing_dpu_agent_v1_xscpolicing_uuid_delete_with_http_info(self, uuid : conint(strict=True, le=63, ge=0), x_internal_auth : Optional[StrictStr] = None, **kwargs) -> ApiResponse:  # noqa: E501
+        """Unset Policing  # noqa: E501
+
+        Remove all policing configurations (BPS and PPS) for a given xscnet interface.  This includes: - Deleting all meters (RX and TX, BPS and PPS) - Deleting all associated profiles  Parameters: - uuid: xscnet UUID (must be in use)  Returns: - code 0 on success, or error code from underlying command if failure occurs  # noqa: E501
+        This method makes a synchronous HTTP request by default. To make an
+        asynchronous HTTP request, please pass async_req=True
+
+        >>> thread = api.unset_policing_dpu_agent_v1_xscpolicing_uuid_delete_with_http_info(uuid, x_internal_auth, async_req=True)
+        >>> result = thread.get()
+
+        :param uuid: (required)
+        :type uuid: int
+        :param x_internal_auth:
+        :type x_internal_auth: str
+        :param async_req: Whether to execute the request asynchronously.
+        :type async_req: bool, optional
+        :param _preload_content: if False, the ApiResponse.data will
+                                 be set to none and raw_data will store the
+                                 HTTP response body without reading/decoding.
+                                 Default is True.
+        :type _preload_content: bool, optional
+        :param _return_http_data_only: response data instead of ApiResponse
+                                       object with status code, headers, etc
+        :type _return_http_data_only: bool, optional
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the authentication
+                              in the spec for a single request.
+        :type _request_auth: dict, optional
+        :type _content_type: string, optional: force content-type for the request
+        :return: Returns the result object.
+                 If the method is called asynchronously,
+                 returns the request thread.
+        :rtype: tuple(BaseResponseBody, status_code(int), headers(HTTPHeaderDict))
+        """
+
+        _params = locals()
+
+        _all_params = [
+            'uuid',
+            'x_internal_auth'
+        ]
+        _all_params.extend(
+            [
+                'async_req',
+                '_return_http_data_only',
+                '_preload_content',
+                '_request_timeout',
+                '_request_auth',
+                '_content_type',
+                '_headers'
+            ]
+        )
+
+        # validate the arguments
+        for _key, _val in _params['kwargs'].items():
+            if _key not in _all_params:
+                raise ApiTypeError(
+                    "Got an unexpected keyword argument '%s'"
+                    " to method unset_policing_dpu_agent_v1_xscpolicing_uuid_delete" % _key
+                )
+            _params[_key] = _val
+        del _params['kwargs']
+
+        _collection_formats = {}
+
+        # process the path parameters
+        _path_params = {}
+        if _params['uuid']:
+            _path_params['uuid'] = _params['uuid']
+
+
+        # process the query parameters
+        _query_params = []
+        # process the header parameters
+        _header_params = dict(_params.get('_headers', {}))
+        if _params['x_internal_auth']:
+            _header_params['x-internal-auth'] = _params['x_internal_auth']
+
+        # process the form parameters
+        _form_params = []
+        _files = {}
+        # process the body parameter
+        _body_params = None
+        # set the HTTP header `Accept`
+        _header_params['Accept'] = self.api_client.select_header_accept(
+            ['application/json'])  # noqa: E501
+
+        # authentication setting
+        _auth_settings = ['OAuth2PasswordBearer']  # noqa: E501
+
+        _response_types_map = {
+            '200': "BaseResponseBody",
+            '422': "HTTPValidationError",
+        }
+
+        return self.api_client.call_api(
+            '/dpu_agent/v1/xscpolicing/{uuid}', 'DELETE',
             _path_params,
             _query_params,
             _header_params,

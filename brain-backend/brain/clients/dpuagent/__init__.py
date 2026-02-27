@@ -71,6 +71,8 @@ from brain.clients.dpuagent.models.ovsflow_delete_request import OvsflowDeleteRe
 from brain.clients.dpuagent.models.ovsflow_request import OvsflowRequest
 from brain.clients.dpuagent.models.pcp_request import PcpRequest
 from brain.clients.dpuagent.models.pfc_request import PfcRequest
+from brain.clients.dpuagent.models.policing_request import PolicingRequest
+from brain.clients.dpuagent.models.policing_response import PolicingResponse
 from brain.clients.dpuagent.models.qo_s_request import QoSRequest
 from brain.clients.dpuagent.models.qos_info import QosInfo
 from brain.clients.dpuagent.models.qos_ratio_request import QosRatioRequest

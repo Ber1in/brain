@@ -23,15 +23,17 @@ import json
 from typing import Optional
 from pydantic import BaseModel, Field, StrictInt, StrictStr
 
-class DpuagentApiV1SchemasXscnetSchemasCreateResponseBody(BaseModel):
+class PolicingResponse(BaseModel):
     """
-    DpuagentApiV1SchemasXscnetSchemasCreateResponseBody
+    PolicingResponse
     """
     code: StrictInt = Field(..., description="return code of the API execution result")
     message: StrictStr = Field(..., description="Detailed execution results")
-    uuid: Optional[StrictInt] = None
-    mac: Optional[StrictStr] = None
-    __properties = ["code", "message", "uuid", "mac"]
+    bps_rate: Optional[StrictInt] = None
+    bps_burst: Optional[StrictInt] = None
+    pps_rate: Optional[StrictInt] = None
+    pps_burst: Optional[StrictInt] = None
+    __properties = ["code", "message", "bps_rate", "bps_burst", "pps_rate", "pps_burst"]
 
     class Config:
         """Pydantic configuration"""
@@ -47,8 +49,8 @@ class DpuagentApiV1SchemasXscnetSchemasCreateResponseBody(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> DpuagentApiV1SchemasXscnetSchemasCreateResponseBody:
-        """Create an instance of DpuagentApiV1SchemasXscnetSchemasCreateResponseBody from a JSON string"""
+    def from_json(cls, json_str: str) -> PolicingResponse:
+        """Create an instance of PolicingResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self):
@@ -60,19 +62,21 @@ class DpuagentApiV1SchemasXscnetSchemasCreateResponseBody(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: dict) -> DpuagentApiV1SchemasXscnetSchemasCreateResponseBody:
-        """Create an instance of DpuagentApiV1SchemasXscnetSchemasCreateResponseBody from a dict"""
+    def from_dict(cls, obj: dict) -> PolicingResponse:
+        """Create an instance of PolicingResponse from a dict"""
         if obj is None:
             return None
 
         if not isinstance(obj, dict):
-            return DpuagentApiV1SchemasXscnetSchemasCreateResponseBody.parse_obj(obj)
+            return PolicingResponse.parse_obj(obj)
 
-        _obj = DpuagentApiV1SchemasXscnetSchemasCreateResponseBody.parse_obj({
+        _obj = PolicingResponse.parse_obj({
             "code": obj.get("code"),
             "message": obj.get("message"),
-            "uuid": obj.get("uuid"),
-            "mac": obj.get("mac")
+            "bps_rate": obj.get("bps_rate"),
+            "bps_burst": obj.get("bps_burst"),
+            "pps_rate": obj.get("pps_rate"),
+            "pps_burst": obj.get("pps_burst")
         })
         return _obj
 
