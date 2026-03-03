@@ -26,6 +26,7 @@ db = SQLiteDocumentDB()
 SERVER_COLLECTION = "servers"
 TEST_DATA_DIR = "/opt/yunTesterData"
 TEST_HISTORY_COLLECTION = "test_history"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class FsyncFileHandler(logging.FileHandler):
@@ -146,7 +147,7 @@ async def startup_event():
 # app.add_middleware(QAAutoFileAccessMiddleware, db_connection=db)
 os.makedirs(TEST_DATA_DIR, exist_ok=True)
 app.mount("/qa-auto-files", StaticFiles(directory=TEST_DATA_DIR), name="qa-auto-files")
-app.mount("/daemon", StaticFiles(directory="files"), name="daemon")
+app.mount("/daemon", StaticFiles(directory=os.path.join(BASE_DIR, "files")), name="daemon")
 
 
 if settings.check_heartbeat:
