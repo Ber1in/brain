@@ -535,6 +535,20 @@ async def get_mv_server(server_id: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="MV server not found"
         )
+    data = {}
+    try:
+        cmd = "yuncli fw --config read /tmp/brain_mv200.cfg >/dev/null 2>&1 && grep -E '^(sub_product_id|switch_emu_enable|vm_emu_enable)=' /tmp/brain_mv200.cfg"
+        res = await ssh_execute_async(server["ip_address"], cmd, MV200_OS_USER, MV200_OS_PASSWORD, False)
+
+        for line in res.splitlines():
+            k, v = line.split("=")
+            data[k] = v
+
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=f"Failed to connect to DPU agent at {server['ip_address']}"
+        )
 
     try:
         dpuagentclient = get_dpuagentclient(server["ip_address"])
@@ -574,17 +588,18 @@ async def get_mv_server(server_id: str):
                 "dpuagent": res.dpuagent
             }
             server["versions"] = versions
+            
+        db.update(MV_SERVER_COLLECTION, {"id": server_id}, server_original)
 
     except (urllib3.exceptions.ConnectTimeoutError, urllib3.exceptions.MaxRetryError):
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail=f"Failed to connect to DPU agent at {server['ip_address']}"
-        )
+        # raise HTTPException(
+        #     status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        #     detail=f"Failed to connect to DPU agent at {server['ip_address']}"
+        # )
     # except dpuagentExp.NotFoundException:
-    #     LOG.warning(f"DPU agent at {server['ip_address']} does not support "
-    #                 "recovery mode query API (possibly old version)")
+        LOG.warning(f"The server {server['ip_address']} dpuagent service is not enabled")
 
-    db.update(MV_SERVER_COLLECTION, {"id": server_id}, server_original)
+    server.update(data)
     LOG.info(f"Successfully retrieved MV server {server_id}")
     return server
 

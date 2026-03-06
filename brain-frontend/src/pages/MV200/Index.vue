@@ -141,7 +141,17 @@
         <el-table-column label="MCR版本" width="200">
           <template #default="{ row }">
             <div class="mcr-version">
-              <template v-if="row.mcrVersionLoading">
+              <!-- 先检查是否离线 -->
+              <template v-if="row.clouddiskStatusError || row.recoveryModeError || row.mcrVersionError">
+                <el-icon class="error-icon"><Warning /></el-icon>
+                <span class="status-text">离线</span>
+              </template>
+              <!-- 再判断是否为AI DPU + 裸金属模式 -->
+              <template v-else-if="!isAIDpuBareMetal(row)">
+                <span class="empty-text">-</span>
+              </template>
+              <!-- 正常显示MCR版本 -->
+              <template v-else-if="row.mcrVersionLoading">
                 <el-icon class="loading-icon"><Loading /></el-icon>
                 <span class="status-text">查询中...</span>
               </template>
@@ -157,52 +167,66 @@
             </div>
           </template>
         </el-table-column>
-        <!-- 新增：MCR状态列 -->
+
+        <!-- MCR状态列 - 添加条件判断 -->
         <el-table-column 
           label="MCR状态"
           width="110"
         >
           <template #default="{ row }">
-            <div v-if="row.task_id" class="mcr-status">
-              <template v-if="!taskStatusMap[row.task_id]">
-                <!-- 状态查询中 -->
-                <el-icon class="loading-spinner"><Loading /></el-icon>
-                <span class="status-text">查询中...</span>
-              </template>
-              <template v-else>
-                <el-tooltip
-                  placement="top"
-                  popper-class="mcr-status-tooltip"
-                >
-                  <template #content>
-                    <div class="mcr-tooltip-content">
-                      <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
-                      <div>MCR: {{ getMcrPackage(row) }}</div>
-                      <div v-if="getTaskDetail(row)" class="detail-section">
-                        <div>详情:</div>
-                        <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
-                      </div>
-                    </div>
-                  </template>
-                  <el-tag 
-                    :type="getMcrStatusType(row)" 
-                    size="small"
-                    class="mcr-status-tag"
+            <!-- 先检查是否离线 -->
+            <template v-if="row.clouddiskStatusError || row.recoveryModeError || row.mcrVersionError">
+              <span class="empty-text">离线</span>
+            </template>
+            <!-- 再判断是否为AI DPU + 裸金属模式 -->
+            <template v-else-if="!isAIDpuBareMetal(row)">
+              <span class="empty-text">-</span>
+            </template>
+            <!-- 正常显示MCR状态 -->
+            <template v-else>
+              <div v-if="row.task_id" class="mcr-status">
+                <template v-if="!taskStatusMap[row.task_id]">
+                  <!-- 状态查询中 -->
+                  <el-icon class="loading-spinner"><Loading /></el-icon>
+                  <span class="status-text">查询中...</span>
+                </template>
+                <template v-else>
+                  <el-tooltip
+                    placement="top"
+                    popper-class="mcr-status-tooltip"
                   >
-                    {{ getMcrStatusText(row) }}
-                  </el-tag>
-                </el-tooltip>
-                <el-icon 
-                  v-if="getMcrStatus(row) === 'running'" 
-                  class="loading-spinner"
-                >
-                  <Loading />
-                </el-icon>
-              </template>
-            </div>
-            <span v-else class="empty-text">-</span>
+                    <template #content>
+                      <div class="mcr-tooltip-content">
+                        <div>步骤: {{ getStageText(getTaskStage(row)) }}</div>
+                        <div>MCR: {{ getMcrPackage(row) }}</div>
+                        <div v-if="getTaskDetail(row)" class="detail-section">
+                          <div>详情:</div>
+                          <pre class="detail-text">{{ cleanAnsiCodes(getTaskDetail(row)) }}</pre>
+                        </div>
+                      </div>
+                    </template>
+                    <el-tag 
+                      :type="getMcrStatusType(row)" 
+                      size="small"
+                      class="mcr-status-tag"
+                    >
+                      {{ getMcrStatusText(row) }}
+                    </el-tag>
+                  </el-tooltip>
+                  <el-icon 
+                    v-if="getMcrStatus(row) === 'running'" 
+                    class="loading-spinner"
+                  >
+                    <Loading />
+                  </el-icon>
+                </template>
+              </div>
+              <span v-else class="empty-text">-</span>
+            </template>
           </template>
         </el-table-column>
+
+        <!-- 支持云盘启动列 - 添加条件判断 -->
         <el-table-column prop="clouddisk_enable" label="支持云盘启动" width="140">
           <template #header>
             <span>支持云盘启动</span>
@@ -218,7 +242,16 @@
           </template>
           <template #default="{ row }">
             <div class="clouddisk-status">
-              <template v-if="row.clouddiskStatusLoading">
+              <!-- 先检查是否离线 -->
+              <template v-if="row.clouddiskStatusError || row.recoveryModeError || row.mcrVersionError">
+                <span class="empty-text">离线</span>
+              </template>
+              <!-- 再判断是否为AI DPU + 裸金属模式 -->
+              <template v-else-if="!isAIDpuBareMetal(row)">
+                <span class="empty-text">-</span>
+              </template>
+              <!-- 正常显示云盘启动状态 -->
+              <template v-else-if="row.clouddiskStatusLoading">
                 <el-icon class="loading-icon"><Loading /></el-icon>
                 <span class="status-text">查询中...</span>
               </template>
@@ -240,7 +273,8 @@
             </div>
           </template>
         </el-table-column>
-        <!-- 修改恢复模式列为开关形式 -->
+
+        <!-- 恢复模式列 - 添加条件判断 -->
         <el-table-column label="恢复模式" width="140">
           <template #header>
             <span>恢复模式</span>
@@ -256,7 +290,16 @@
           </template>
           <template #default="{ row }">
             <div class="recovery-mode">
-              <template v-if="row.recoveryModeLoading">
+              <!-- 先检查是否离线 -->
+              <template v-if="row.clouddiskStatusError || row.recoveryModeError || row.mcrVersionError">
+                <span class="empty-text">离线</span>
+              </template>
+              <!-- 再判断是否为AI DPU + 裸金属模式 -->
+              <template v-else-if="!isAIDpuBareMetal(row)">
+                <span class="empty-text">-</span>
+              </template>
+              <!-- 正常显示恢复模式 -->
+              <template v-else-if="row.recoveryModeLoading">
                 <el-icon class="loading-icon"><Loading /></el-icon>
                 <span class="status-text">查询中...</span>
               </template>
@@ -281,6 +324,50 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
+
+        <!-- 产品类型列 -->
+        <el-table-column prop="sub_product_id" label="产品类型" width="120">
+          <template #default="{ row }">
+            <div class="product-type">
+              <!-- 先检查是否离线 -->
+              <template v-if="row.clouddiskStatusError || row.recoveryModeError || row.mcrVersionError">
+                <span class="empty-text">离线</span>
+              </template>
+              <!-- 正常显示产品类型 -->
+              <template v-else-if="row.sub_product_id === 1">
+                <el-tag type="success" size="small">AI DPU</el-tag>
+              </template>
+              <template v-else-if="row.sub_product_id === 2">
+                <el-tag type="primary" size="small">Virtio DPU</el-tag>
+              </template>
+              <template v-else>
+                <span class="empty-text">-</span>
+              </template>
+            </div>
+          </template>
+        </el-table-column>
+
+        <!-- 运行模式列 -->
+        <el-table-column label="运行模式" width="120">
+          <template #default="{ row }">
+            <div class="operation-mode">
+              <!-- 先检查是否离线 -->
+              <template v-if="row.clouddiskStatusError || row.recoveryModeError || row.mcrVersionError">
+                <span class="empty-text">离线</span>
+              </template>
+              <!-- 正常显示运行模式 -->
+              <template v-else-if="row.switch_emu_enable === 1">
+                <el-tag type="warning" size="small">裸金属模式</el-tag>
+              </template>
+              <template v-else-if="row.vm_emu_enable === 1">
+                <el-tag type="info" size="small">虚拟化模式</el-tag>
+              </template>
+              <template v-else>
+                <span class="empty-text">-</span>
+              </template>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-dropdown @command="(command) => handleCommand(command, row)" size="small">
@@ -1202,6 +1289,31 @@ const loadData = async () => {
   }
 }
 
+// 判断是否为AI DPU + 裸金属模式
+const isAIDpuBareMetal = (server: MVServer & { 
+  sub_product_id?: number; 
+  switch_emu_enable?: number;
+  vm_emu_enable?: number;
+  clouddiskStatusError?: boolean;
+  recoveryModeError?: boolean;
+  mcrVersionError?: boolean;
+}) => {
+  // 如果设备离线，不显示这些信息
+  if (server.clouddiskStatusError || server.recoveryModeError || server.mcrVersionError) {
+    return false
+  }
+  
+  // 判断是否为AI DPU (sub_product_id === 1) 且 裸金属模式 (switch_emu_enable === 1)
+  return server.sub_product_id === 1 && server.switch_emu_enable === 1
+}
+
+// 判断是否为504超时错误
+const isTimeoutError = (error: any): boolean => {
+  return error?.response?.status === 504 || 
+         error?.message?.includes('timeout') || 
+         error?.code === 'ECONNABORTED'
+}
+
 // 异步加载服务器详情（云盘启动状态和恢复模式）
 const loadServerDetails = async () => {
   const promises = servers.value.map(async (server, index) => {
@@ -1209,37 +1321,52 @@ const loadServerDetails = async () => {
       // 调用单个服务器详情接口获取详细信息
       const serverDetail = await mv200Api.getById(server.id)
       
-      // 更新该服务器的云盘启动状态和恢复模式
+      // 更新该服务器的详细信息
       servers.value[index] = {
         ...servers.value[index],
         clouddisk_enable: serverDetail.clouddisk_enable || false,
         clouddiskStatusLoading: false,
         clouddiskStatusError: false,
-        recovery_mode: serverDetail.recovery_mode || 'manual', // 默认为手动模式
+        recovery_mode: serverDetail.recovery_mode || 'manual',
         recoveryModeLoading: false,
         recoveryModeError: false,
         mcrVersionLoading: false,
         mcrVersionError: false,
-        versions: serverDetail.versions, // 保存版本信息
-        task_id: serverDetail.task_id // 更新task_id
+        versions: serverDetail.versions,
+        task_id: serverDetail.task_id,
+        // 新增字段
+        sub_product_id: serverDetail.sub_product_id,
+        switch_emu_enable: serverDetail.switch_emu_enable,
+        vm_emu_enable: serverDetail.vm_emu_enable
       }
 
       // 如果有task_id，启动状态查询
       if (serverDetail.task_id) {
         queryTaskStatus(servers.value[index])
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`获取服务器 ${server.name} 的详情失败:`, error)
-      // 更新状态为错误
+      
+      // 判断是否为504超时
+      const isTimeout = isTimeoutError(error)
+      
+      // 更新状态
       servers.value[index] = {
         ...servers.value[index],
         clouddiskStatusLoading: false,
-        clouddiskStatusError: true,
-        clouddisk_enable: false,
         recoveryModeLoading: false,
-        recoveryModeError: true,
         mcrVersionLoading: false,
-        mcrVersionError: true
+        // 如果是504超时，所有状态都标记为错误（离线）
+        clouddiskStatusError: isTimeout ? true : true,  // 默认也是离线
+        recoveryModeError: isTimeout ? true : true,
+        mcrVersionError: isTimeout ? true : true,
+        // 所有字段都设置为undefined，这样会显示"离线"或"-"
+        clouddisk_enable: false,
+        recovery_mode: undefined,
+        versions: undefined,
+        sub_product_id: undefined,
+        switch_emu_enable: undefined,
+        vm_emu_enable: undefined
       }
     }
   })
@@ -1437,6 +1564,31 @@ onMounted(() => {
 
 
 <style scoped>
+/* 产品类型和运行模式样式 */
+.product-type,
+.operation-mode {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.product-type :deep(.el-tag),
+.operation-mode :deep(.el-tag) {
+  font-weight: 500;
+  min-width: 90px;
+  text-align: center;
+  justify-content: center;
+}
+
+/* 确保标签居中显示 */
+:deep(.product-type .el-tag),
+:deep(.operation-mode .el-tag) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
 /* MCR状态样式 */
 .mcr-status {
   display: flex;

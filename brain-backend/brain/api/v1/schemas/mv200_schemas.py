@@ -101,7 +101,9 @@ class MVServer(BaseModel):
                                                      "value is one of auto and manual")
 
     task_id: str = None
-
+    sub_product_id: Optional[int] = None
+    switch_emu_enable: Optional[int] = None
+    vm_emu_enable: Optional[int] = None
 
 class InterfaceCreate(BaseModel):
     pxe: bool = Field(False)

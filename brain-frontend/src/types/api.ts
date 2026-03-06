@@ -54,6 +54,9 @@ export interface MVServer {
   versions?: MCRVersionInfo;
   clouddisk_enable: boolean;
   recovery_mode?: string
+  sub_product_id?: number
+  switch_emu_enable?: number
+  vm_emu_enable?: number
 }
 
 export interface MVServerCreate {
