@@ -102,6 +102,30 @@
           </el-tag>
         </el-descriptions-item>
 
+        <!-- 新增：产品类型和运行模式 -->
+        <el-descriptions-item label="产品类型">
+          <template v-if="mv200Data.sub_product_id === 1">
+            <el-tag type="success" size="large">AI DPU</el-tag>
+          </template>
+          <template v-else-if="mv200Data.sub_product_id === 2">
+            <el-tag type="primary" size="large">Virtio DPU</el-tag>
+          </template>
+          <template v-else>
+            <span class="empty-text">-</span>
+          </template>
+        </el-descriptions-item>
+
+        <el-descriptions-item label="运行模式">
+          <template v-if="mv200Data.switch_emu_enable === 1">
+            <el-tag type="warning" size="large">裸金属模式</el-tag>
+          </template>
+          <template v-else-if="mv200Data.vm_emu_enable === 1">
+            <el-tag type="info" size="large">虚拟化模式</el-tag>
+          </template>
+          <template v-else>
+            <span class="empty-text">-</span>
+          </template>
+        </el-descriptions-item>
         <!-- 描述 -->
         <el-descriptions-item label="描述" :span="2">
           {{ mv200Data.description || '无' }}
@@ -150,7 +174,11 @@ const mv200Data = ref<MVServer>({
   nic_sn: '',
   versions: undefined,
   clouddisk_enable: false,
-  recovery_mode: 'manual'
+  recovery_mode: 'manual',
+  // 新增字段
+  sub_product_id: undefined,
+  switch_emu_enable: undefined,
+  vm_emu_enable: undefined
 })
 
 const allDevices = ref<ServerDetailResponse[]>([])
@@ -464,6 +492,28 @@ onMounted(() => {
 :deep(.el-descriptions__content) {
   font-family: 'Monaco', 'Consolas', monospace;
   background-color: #ffffff;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+/* 产品类型和运行模式的标签样式 */
+:deep(.el-descriptions__content .el-tag) {
+  font-weight: 500;
+  min-width: 100px;
+  text-align: center;
+  justify-content: center;
+  font-size: 14px;
+  padding: 0 16px;
+  height: 32px;
+  line-height: 30px;
+}
+
+/* 空文本样式 */
+.empty-text {
+  color: #c0c4cc;
+  font-style: italic;
+  font-size: 14px;
 }
 
 /* 更新按钮加载状态样式 */
