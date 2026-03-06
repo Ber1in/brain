@@ -323,7 +323,6 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
 
         <!-- 产品类型列 -->
         <el-table-column prop="sub_product_id" label="产品类型" width="120">
@@ -368,6 +367,7 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-dropdown @command="(command) => handleCommand(command, row)" size="small">
