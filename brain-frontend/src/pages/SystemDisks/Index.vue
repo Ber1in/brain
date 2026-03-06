@@ -6,6 +6,15 @@
           <div class="header-info">
             <div class="title-section">
               <div class="title-row">
+                <el-button 
+                  type="primary" 
+                  link 
+                  icon="ArrowLeft"
+                  @click="goBack"
+                  style="margin-right: 16px;"
+                >
+                  返回MV200列表
+                </el-button>
                 <span>云系统盘管理</span>
                 <div class="mv200-info">
                   <el-tag type="primary" size="large" class="name-tag">
@@ -540,7 +549,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { 
   View,
@@ -563,6 +572,7 @@ import { rbdApi } from '@/api/common'
 import type { ControllerInfo, RbdDetailResponse } from '@/types/api'
 import type { Image } from '@/types/api'
 
+const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const batchDeleting = ref(false)
@@ -1008,6 +1018,10 @@ const loadSystemDisks = async () => {
     ElMessage.error('加载云系统盘失败: ' + (error.message || '未知错误'))
     console.error('加载云系统盘失败:', error)
   }
+}
+
+const goBack = () => {
+  router.push('/mv200')
 }
 
 // 加载镜像列表

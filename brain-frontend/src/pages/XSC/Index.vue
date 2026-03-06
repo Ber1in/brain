@@ -3,19 +3,29 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <div class="header-left">
-            <el-button 
-              type="primary" 
-              link 
-              icon="ArrowLeft"
-              @click="goBack"
-              style="margin-right: 16px;"
-            >
-              返回MV200列表
-            </el-button>
-            <span class="header-title">
-              MV200: {{ mv200Name }} ({{ mv200Ip }}) - XSC网口管理
-            </span>
+          <div class="title-section">
+            <div class="title-row">
+              <el-button 
+                type="primary" 
+                link 
+                icon="ArrowLeft"
+                @click="goBack"
+                style="margin-right: 16px;"
+              >
+                返回MV200列表
+              </el-button>
+              <span>XSC网口管理</span>
+              <div class="mv200-info">
+                <el-tag type="primary" size="large" class="name-tag">
+                  <el-icon><Cpu /></el-icon>
+                  {{ mv200Name }}
+                </el-tag>
+                <el-tag type="info" size="large">
+                  <el-icon><Link /></el-icon>
+                  {{ mv200Ip }}
+                </el-tag>
+              </div>
+            </div>
           </div>
           <div class="header-actions">
             <el-input
@@ -1709,6 +1719,34 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.mv200-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.name-tag {
+  font-weight: 500;
+}
+
+.name-tag .el-icon,
+.ip-tag .el-icon {
+  margin-right: 4px;
+}
+
+.title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+
 /* 删除中的行样式 */
 :deep(.el-table__row.deleting-row) {
   opacity: 0.6;
