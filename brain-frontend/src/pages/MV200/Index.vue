@@ -412,15 +412,54 @@
                       <span>编辑</span>
                     </div>
                   </el-dropdown-item>
-                  <el-dropdown-item command="viewXsc" class="dropdown-item">
-                    <el-icon><Link /></el-icon>
-                    <span>XSC网口管理</span>
-                  </el-dropdown-item>   
-                  <el-dropdown-item command="systemDisks" class="dropdown-item">
-                    <el-icon><Cpu /></el-icon>
-                    <span>云系统盘管理</span>
-                  </el-dropdown-item>               
-                  <!-- 新增：更新MCR包 -->
+                  
+                  <!-- XSC网口管理 - 增加条件判断 -->
+                  <el-dropdown-item 
+                    command="viewXsc" 
+                    class="dropdown-item"
+                    :disabled="!isAIDpuBareMetal(row)"
+                  >
+                    <el-tooltip
+                      v-if="!isAIDpuBareMetal(row)"
+                      effect="dark"
+                      content="仅AI DPU裸金属模式支持XSC网口管理"
+                      placement="left"
+                    >
+                      <div class="dropdown-item-content">
+                        <el-icon><Link /></el-icon>
+                        <span>XSC网口管理</span>
+                      </div>
+                    </el-tooltip>
+                    <div v-else class="dropdown-item-content">
+                      <el-icon><Link /></el-icon>
+                      <span>XSC网口管理</span>
+                    </div>
+                  </el-dropdown-item>
+                  
+                  <!-- 云系统盘管理 - 增加条件判断 -->
+                  <el-dropdown-item 
+                    command="systemDisks" 
+                    class="dropdown-item"
+                    :disabled="!isAIDpuBareMetal(row)"
+                  >
+                    <el-tooltip
+                      v-if="!isAIDpuBareMetal(row)"
+                      effect="dark"
+                      content="仅AI DPU裸金属模式支持云系统盘管理"
+                      placement="left"
+                    >
+                      <div class="dropdown-item-content">
+                        <el-icon><Cpu /></el-icon>
+                        <span>云系统盘管理</span>
+                      </div>
+                    </el-tooltip>
+                    <div v-else class="dropdown-item-content">
+                      <el-icon><Cpu /></el-icon>
+                      <span>云系统盘管理</span>
+                    </div>
+                  </el-dropdown-item>
+                  
+                  <!-- 更新MCR包 -->
                   <el-dropdown-item 
                     command="updateMcr" 
                     class="dropdown-item update-mcr-item"
