@@ -1,135 +1,96 @@
 <template>
-  <div >
-    <el-card>
-      <template #header>
-        <h2>录入MV200</h2>
-      </template>
-      
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="名称" prop="name">
-          <el-input 
-            v-model="form.name" 
-            placeholder="输入名称" 
-            clearable
-          />
-          <div class="form-tip">用于标识MV200的唯一名称</div>
-        </el-form-item>
-
-        <el-form-item label="SOC IP地址" prop="ip_address">
-          <el-input 
-            v-model="form.ip_address" 
-            placeholder="输入SOC IP地址" 
-            clearable
-          />
-          <div class="form-tip">MV200的SOC IP地址</div>
-        </el-form-item>
-
-        <el-form-item label="描述">
-          <el-input 
-            v-model="form.description" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="输入描述信息"
-            maxlength="200"
-            show-word-limit
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
-            创建
-          </el-button>
-          <el-button @click="$router.back()">取消</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+  <div>
+    <GenericForm
+      :title="formTitle"
+      :fields="fields"
+      :loading="loading"
+      :initial-data="initialData"
+      :on-submit="handleSubmit"
+      :on-cancel="handleCancel"
+      submit-button-text="创建"
+      cancel-button-text="取消"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import GenericForm from '@/components/form/GenericForm.vue'
+import { createIPRule } from '@/utils/validators'
 import { mv200Api } from '@/api/mv200'
 import type { MVServerCreate } from '@/types/api'
+import type { FormField } from '@/components/form/GenericForm.vue'
 
 const router = useRouter()
-const formRef = ref<FormInstance>()
 const loading = ref(false)
 
-const form = ref<MVServerCreate>({
+const formTitle = '录入MV200'
+
+const initialData: MVServerCreate = {
   name: '',
   ip_address: '',
   description: ''
-})
-
-// IP地址验证函数
-const validateIP = (rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请输入IP地址'))
-    return
-  }
-  
-  // 简单的IP地址格式验证
-  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/
-  if (!ipPattern.test(value)) {
-    callback(new Error('请输入有效的IP地址格式'))
-    return
-  }
-  
-  // 验证每个数字段是否在0-255之间
-  const parts = value.split('.')
-  for (const part of parts) {
-    const num = parseInt(part)
-    if (num < 0 || num > 255) {
-      callback(new Error('IP地址每个数字段应在0-255之间'))
-      return
-    }
-  }
-  
-  callback()
 }
 
-const rules: FormRules = {
-  name: [
-    { required: true, message: '请输入服务器名称', trigger: 'blur' },
-    { min: 1, max: 50, message: '服务器名称长度应在1-50个字符之间', trigger: 'blur' }
-  ],
-  ip_address: [
-    { required: true, validator: validateIP, trigger: 'blur' }
-  ]
-}
+// 表单字段配置
+const fields: FormField[] = [
+  {
+    type: 'text',
+    name: 'name',
+    label: '名称',
+    placeholder: '输入名称',
+    required: true,
+    rules: [
+      { required: true, message: '请输入服务器名称', trigger: 'blur' },
+      { min: 1, max: 50, message: '服务器名称长度应在1-50个字符之间', trigger: 'blur' }
+    ],
+    tips: '用于标识MV200的唯一名称'
+  },
+  {
+    type: 'text',
+    name: 'ip_address',
+    label: 'SOC IP地址',
+    placeholder: '输入SOC IP地址',
+    required: true,
+    rules: [
+      { required: true, message: '请输入IP地址', trigger: 'blur' },
+      createIPRule()
+    ],
+    tips: 'MV200的SOC IP地址'
+  },
+  {
+    type: 'textarea',
+    name: 'description',
+    label: '描述',
+    placeholder: '输入描述信息',
+    rows: 3,
+    maxlength: 200,
+    showWordLimit: true
+  }
+]
 
-const handleSubmit = async () => {
-  if (!formRef.value) return
-
+const handleSubmit = async (formData: MVServerCreate) => {
   try {
-    // 验证表单
-    const valid = await formRef.value.validate()
-    if (!valid) return
-
     loading.value = true
-
-    await mv200Api.create(form.value)
+    await mv200Api.create(formData)
     ElMessage.success('创建成功')
     router.push('/mv200')
+    return true
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '创建失败')
+    return false
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  // 不再需要加载任何资源
-})
+const handleCancel = () => {
+  router.back()
+}
 </script>
 
 <style scoped>
-
-.form-tip {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
-}
+/* 样式可以保持原样，GenericForm 组件会处理大部分样式 */
 </style>
