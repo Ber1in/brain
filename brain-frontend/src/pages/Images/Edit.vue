@@ -1,77 +1,69 @@
 <template>
   <div class="image-edit">
-    <el-card>
-      <template #header>
-        <h2>编辑镜像</h2>
+    <GenericForm
+      :title="'编辑镜像'"
+      :fields="formFields"
+      :initial-data="formData"
+      :loading="loading"
+      :on-submit="handleSubmit"
+      submit-text="保存"
+      cancel-text="取消"
+      :redirect-to="'/images'"
+      :extra-rules="extraRules"
+      ref="formRef"
+    >
+      <!-- 只读信息插槽 -->
+      <template #header-left>
+        <div class="readonly-info">
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="镜像ID">{{ imageId }}</el-descriptions-item>
+            <el-descriptions-item label="Ceph位置">{{ originalData.ceph_location }}</el-descriptions-item>
+            <el-descriptions-item label="监控主机">{{ originalData.mon_host }}</el-descriptions-item>
+            <el-descriptions-item label="当前最小容量">{{ originalData.min_size }} GB</el-descriptions-item>
+          </el-descriptions>
+        </div>
       </template>
       
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="镜像ID">
-          <el-input v-model="imageId" disabled />
-        </el-form-item>
-
-        <el-form-item label="Ceph位置">
-          <el-input v-model="originalData.ceph_location" disabled />
-        </el-form-item>
-
-        <el-form-item label="监控主机">
-          <el-input v-model="originalData.mon_host" disabled />
-        </el-form-item>
-
-        <el-form-item label="最小容量(GB)" prop="min_size">
+      <!-- 最小容量特殊提示 -->
+      <template #field-min_size="{ field, value, update }">
+        <div class="min-size-field">
           <el-input-number
-            v-model="form.min_size"
+            :model-value="value"
+            @update:model-value="update"
             :min="originalData.min_size"
             :step="1"
             controls-position="right"
             placeholder="输入最小容量"
             style="width: 200px"
           />
-          <div class="size-tip" v-if="form.min_size > originalData.min_size">
+          <div v-if="value > originalData.min_size" class="size-tip">
             <el-icon><Warning /></el-icon>
             <span>当前容量为 {{ originalData.min_size }}GB，修改后不能减小</span>
           </div>
-        </el-form-item>
-
-        <el-form-item label="镜像名称" prop="name">
-          <el-input v-model="form.name" placeholder="输入镜像名称" />
-        </el-form-item>
-
-        <el-form-item label="描述">
-          <el-input 
-            v-model="form.description" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="输入描述信息"
-            maxlength="200"
-            show-word-limit
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
-            保存
-          </el-button>
-          <el-button @click="$router.push('/images')">取消</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+        </div>
+      </template>
+    </GenericForm>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Warning } from '@element-plus/icons-vue'  // 导入Warning图标
+import { ElMessage, type FormRules } from 'element-plus'
+import { Warning } from '@element-plus/icons-vue'
 import { imagesApi } from '@/api/images'
+import { GenericForm } from '@/components'
+import { createRequiredRule, createLengthRule } from '@/utils/validators'
 import type { Image, ImageUpdate } from '@/types/api'
+import type { FormField } from '@/components/form/GenericForm.vue'
 
 const route = useRoute()
 const router = useRouter()
-const formRef = ref<FormInstance>()
+const formRef = ref()
 const loading = ref(false)
 const imageId = ref<string>('')
+
+// 原始数据（只读）
 const originalData = reactive({
   name: '',
   ceph_location: '',
@@ -80,21 +72,55 @@ const originalData = reactive({
   description: ''
 })
 
-// 修改form的类型，添加min_size字段
-const form = reactive<ImageUpdate & { min_size: number }>({
+// 表单数据（可编辑）
+const formData = reactive({
   name: '',
   description: '',
   min_size: 0
 })
 
-const rules: FormRules = {
+// 表单字段配置
+const formFields = computed<FormField[]>(() => [
+  {
+    name: 'name',
+    label: '镜像名称',
+    type: 'text',
+    required: true,
+    placeholder: '输入镜像名称',
+    defaultValue: originalData.name
+  },
+  {
+    name: 'min_size',
+    label: '最小容量(GB)',
+    type: 'custom', // 使用自定义渲染
+    required: true,
+    tip: `当前容量: ${originalData.min_size}GB，修改后不能减小`
+  },
+  {
+    name: 'description',
+    label: '描述',
+    type: 'textarea',
+    placeholder: '输入描述信息',
+    rows: 3,
+    maxlength: 200,
+    showWordLimit: true,
+    defaultValue: originalData.description || ''
+  }
+])
+
+// 额外的验证规则
+const extraRules = computed<FormRules>(() => ({
   name: [
-    { required: true, message: '请输入镜像名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '镜像名称长度应在2-50个字符之间', trigger: 'blur' }
+    createRequiredRule('镜像名称'),
+    createLengthRule('镜像名称', { min: 2, max: 50 })
   ],
   min_size: [
-    { required: true, message: '请输入最小容量', trigger: 'blur' },
-    { 
+    {
+      required: true,
+      message: '请输入最小容量',
+      trigger: 'blur'
+    },
+    {
       validator: (rule: any, value: number, callback: any) => {
         if (value < originalData.min_size) {
           callback(new Error(`最小容量不能小于当前值(${originalData.min_size}GB)`))
@@ -105,61 +131,51 @@ const rules: FormRules = {
       trigger: 'blur'
     }
   ]
-}
+}))
 
 // 加载镜像数据
 const loadImageData = async () => {
   try {
     const image = await imagesApi.getById(imageId.value)
+    
+    // 设置原始数据
     originalData.name = image.name
     originalData.ceph_location = image.ceph_location
     originalData.mon_host = image.mon_host
     originalData.min_size = image.min_size
     originalData.description = image.description || ''
     
-    form.name = image.name
-    form.description = image.description || ''
-    form.min_size = image.min_size  // 初始化form中的min_size
+    // 设置表单数据
+    formData.name = image.name
+    formData.description = image.description || ''
+    formData.min_size = image.min_size
+    
   } catch (error) {
     ElMessage.error('加载镜像数据失败')
     router.push('/images')
   }
 }
 
-const handleSubmit = async () => {
-  if (!formRef.value) return
-
-  const valid = await formRef.value.validate()
-  if (!valid) return
-
-  loading.value = true
-  try {
-    // 构建更新数据，只包含需要更新的字段
-    const updateData: ImageUpdate & { min_size: number } = {
-      name: form.name,
-      description: form.description || ''
-    }
-    
-    // 如果最小容量有变化且比原来大，才包含在更新数据中
-    if (form.min_size !== originalData.min_size) {
-      if (form.min_size < originalData.min_size) {
-        ElMessage.error(`最小容量不能小于当前值(${originalData.min_size}GB)`)
-        loading.value = false
-        return
-      }
-      updateData.min_size = form.min_size
-    }
-    
-    await imagesApi.update(imageId.value, updateData)
-    ElMessage.success('更新成功')
-    router.push('/images')
-  } catch (error) {
-    ElMessage.error('更新失败')
-  } finally {
-    loading.value = false
+// 提交处理
+const handleSubmit = async (data: any): Promise<void> => {
+  // 构建更新数据
+  const updateData: ImageUpdate & { min_size?: number } = {
+    name: data.name,
+    description: data.description || ''
   }
+  
+  // 如果最小容量有变化且比原来大，才包含在更新数据中
+  if (data.min_size !== originalData.min_size) {
+    if (data.min_size < originalData.min_size) {
+      throw new Error(`最小容量不能小于当前值(${originalData.min_size}GB)`)
+    }
+    updateData.min_size = data.min_size
+  }
+  
+  return imagesApi.update(imageId.value, updateData)
 }
 
+// 初始化
 onMounted(() => {
   imageId.value = route.params.id as string
   if (!imageId.value) {
@@ -170,12 +186,27 @@ onMounted(() => {
   loadImageData()
 })
 </script>
+
 <style scoped>
+.image-edit {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.readonly-info {
+  margin-bottom: 20px;
+}
+
+.min-size-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .size-tip {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
   padding: 6px 10px;
   background-color: #fffbf0;
   border: 1px solid #faecd8;
@@ -188,4 +219,3 @@ onMounted(() => {
   font-size: 14px;
 }
 </style>
-
