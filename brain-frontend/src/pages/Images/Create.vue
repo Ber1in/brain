@@ -48,6 +48,7 @@
 import { ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { imagesApi } from '@/api/images'
+import { createRequiredRule, createCephLocationRule, createIPRule, createNumberRangeRule } from '@/utils/validators'
 import type { ImageCreate } from '@/types/api'
 
 const formRef = ref<FormInstance>()
@@ -61,55 +62,18 @@ const form = ref<ImageCreate>({
   description: '',
 })
 
-// 自定义校验规则：检查是否包含且仅包含一个斜杠
-const validateCephLocation = (rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请输入镜像源地址'))
-    return
-  }
-  
-  const slashCount = (value.match(/\//g) || []).length
-  if (slashCount === 0) {
-    callback(new Error('镜像源地址必须包含一个斜杠(/)，格式: pool/rbd'))
-  } else if (slashCount > 1) {
-    callback(new Error('镜像源地址只能包含一个斜杠(/)，格式: pool/rbd'))
-  } else {
-    callback()
-  }
-}
-
-const validateIP = (rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请输入IP地址'))
-    return
-  }
-  
-  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/
-  if (!ipPattern.test(value)) {
-    callback(new Error('请输入有效的IP地址格式'))
-    return
-  }
-  
-  const parts = value.split('.')
-  for (const part of parts) {
-    const num = parseInt(part)
-    if (num < 0 || num > 255) {
-      callback(new Error('IP地址每个数字段应在0-255之间'))
-      return
-    }
-  }
-  
-  callback()
-}
-
+// 使用公共验证规则
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入镜像名称', trigger: 'blur' }],
+  name: [createRequiredRule('镜像名称')],
   ceph_location: [
-    { required: true, message: '请输入镜像源地址', trigger: 'blur' },
-    { validator: validateCephLocation, trigger: 'blur' }
+    createRequiredRule('镜像源地址'),
+    createCephLocationRule('镜像源地址')
   ],
-  mon_host: [{ required: true, validator: validateIP, trigger: 'blur' }],
-  min_size: [{ required: true, message: '请输入用此镜像创建系统盘时最小容量', trigger: 'blur' }],
+  mon_host: [createIPRule('Ceph集群IP')],
+  min_size: [
+    createRequiredRule('最小容量'),
+    createNumberRangeRule('最小容量', { min: 1 })
+  ],
 }
 
 const handleSubmit = async () => {
@@ -130,3 +94,10 @@ const handleSubmit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.image-create {
+  max-width: 800px;
+  margin: 0 auto;
+}
+</style>
