@@ -63,7 +63,7 @@
                   </div>
                 </el-tooltip>
                 <div v-else class="dropdown-item-content">
-                  <el-icon><Delete /></elicon>
+                  <el-icon><Delete /></el-icon>
                     <span>删除</span>
                   </div>
                 </el-dropdown-item>
