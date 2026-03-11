@@ -1,24 +1,19 @@
-import apiClient from './client'
+/**
+ * 镜像管理 API（使用通用 CRUD 工厂重构）
+ */
+import { createCrudApi } from './crud-factory'
 import type { Image, ImageCreate, ImageUpdate } from '@/types/api'
 
+// 创建镜像管理的 CRUD API
+const imagesCrud = createCrudApi<Image, ImageCreate, ImageUpdate>({
+  endpoint: 'images'
+})
+
+// 导出与原 API 相同的接口以保持向后兼容
 export const imagesApi = {
-  getAll(): Promise<Image[]> {
-    return apiClient.get('/images')
-  },
-
-  getById(id: string): Promise<Image> {
-    return apiClient.get(`/images/${id}`)
-  },
-
-  create(data: ImageCreate): Promise<Image> {
-    return apiClient.post('/images', data)
-  },
-
-  update(id: string, data: ImageUpdate): Promise<Image> {
-    return apiClient.put(`/images/${id}`, data)
-  },
-
-  delete(id: string): Promise<void> {
-    return apiClient.delete(`/images/${id}`)
-  },
+  getAll: imagesCrud.getAll,
+  getById: imagesCrud.getById,
+  create: imagesCrud.create,
+  update: imagesCrud.update,
+  delete: imagesCrud.delete
 }
